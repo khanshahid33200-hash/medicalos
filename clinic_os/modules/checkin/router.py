@@ -1,6 +1,6 @@
 """FastAPI routes for check-in module"""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import uuid4
 import logging
@@ -23,7 +23,7 @@ router = APIRouter()
 @router.post("/", response_model=CheckInResponse)
 async def submit_checkin(
     data: CheckInRequest,
-    clinic_id: str = Header(...),
+    clinic_id: Optional[str] = Query("clinic-001"),
     idempotency_key: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -36,14 +36,10 @@ async def submit_checkin(
     - Web forms
     - Paper records (OCR'd)
 
-    Query parameter: clinic_id (required for public endpoint)
+    Query parameter: clinic_id (optional, defaults to 'clinic-001')
     """
     try:
-        if not clinic_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="clinic_id is required",
-            )
+        clinic_id = clinic_id or "clinic-001"
 
         service = CheckInService(db, clinic_id)
         checkin, patient, is_new = await service.create_checkin(data)
@@ -168,11 +164,12 @@ async def get_patient_history(
 
 @router.get("/stats")
 async def get_clinic_stats(
-    clinic_id: str,
+    clinic_id: Optional[str] = Query("clinic-001"),
     db: AsyncSession = Depends(get_db),
 ):
     """Get check-in statistics for a clinic"""
     try:
+        clinic_id = clinic_id or "clinic-001"
         service = CheckInService(db, clinic_id)
         stats = await service.get_clinic_stats()
         return {"clinic_id": clinic_id, **stats}
