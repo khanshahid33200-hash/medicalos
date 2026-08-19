@@ -48,7 +48,9 @@ sentry-sdk==1.38.0
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
+pytest-mock==3.12.0
 httpx==0.25.2
+aiosqlite==3.0.0  # SQLite async driver for tests
 
 # Development
 black==23.12.1
