@@ -54,7 +54,7 @@ class AppointmentBookRequest(BaseModel):
     department: Optional[str] = None
     reason_for_visit: Optional[str] = None
     notes: Optional[str] = None
-    confirmation_method: str = Field(default="whatsapp", regex="^(sms|whatsapp|call)$")
+    confirmation_method: str = Field(default="whatsapp", pattern="^(sms|whatsapp|call)$")
 
     @validator("appointment_date")
     def validate_future_date(cls, v):
@@ -107,7 +107,7 @@ class AppointmentResponse(BaseModel):
 
 class AppointmentConfirmRequest(BaseModel):
     """Confirm appointment attendance"""
-    confirmation_method: str = Field(default="sms", regex="^(sms|whatsapp|call)$")
+    confirmation_method: str = Field(default="sms", pattern="^(sms|whatsapp|call)$")
     notes: Optional[str] = None
 
 

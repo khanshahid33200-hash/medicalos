@@ -1,16 +1,52 @@
 import { useState } from 'react'
-import { Plus, ChevronRight } from 'lucide-react'
+import { Plus, ChevronRight, X } from 'lucide-react'
 import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import Button from '../components/Button'
-import { useAppointments } from '../hooks/useApi'
+import { useAppointments, useBookAppointment } from '../hooks/useApi'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function Appointments() {
   const [filter, setFilter] = useState<'upcoming' | 'completed' | 'all'>('upcoming')
+  const [showBookingModal, setShowBookingModal] = useState(false)
+  const [bookingForm, setBookingForm] = useState({
+    patient_id: '',
+    doctor_id: 'doctor-001',
+    appointment_date: '',
+    department: 'General',
+    reason_for_visit: '',
+    confirmation_method: 'whatsapp',
+  })
+
   const { data, isLoading, error } = useAppointments({ status: filter === 'all' ? undefined : filter })
+  const { mutate: bookAppointment, isLoading: isBooking } = useBookAppointment()
 
   const appointments = data?.data?.appointments || []
+
+  const handleBookingChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setBookingForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
+  const handleSubmitBooking = (e: React.FormEvent) => {
+    e.preventDefault()
+    bookAppointment(bookingForm, {
+      onSuccess: () => {
+        setShowBookingModal(false)
+        setBookingForm({
+          patient_id: '',
+          doctor_id: 'doctor-001',
+          appointment_date: '',
+          department: 'General',
+          reason_for_visit: '',
+          confirmation_method: 'whatsapp',
+        })
+      },
+    })
+  }
 
   return (
     <Layout userRole="doctor">
@@ -21,7 +57,7 @@ export default function Appointments() {
             <h1 className="text-3xl font-bold text-gray-900">Appointments</h1>
             <p className="text-gray-600 mt-2">Manage all patient appointments</p>
           </div>
-          <Button variant="primary" size="lg">
+          <Button variant="primary" size="lg" onClick={() => setShowBookingModal(true)}>
             <Plus size={20} />
             New Appointment
           </Button>
@@ -118,6 +154,136 @@ export default function Appointments() {
             ))
           )}
         </div>
+
+        {/* Booking Modal */}
+        {showBookingModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-md mx-4">
+              <CardHeader className="flex items-center justify-between bg-primary-600 text-white">
+                <h2 className="text-xl font-bold">New Appointment</h2>
+                <button
+                  onClick={() => setShowBookingModal(false)}
+                  className="p-1 hover:bg-primary-700 rounded"
+                >
+                  <X size={20} />
+                </button>
+              </CardHeader>
+              <CardContent className="py-6">
+                <form onSubmit={handleSubmitBooking} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Patient ID *
+                    </label>
+                    <input
+                      type="text"
+                      name="patient_id"
+                      value={bookingForm.patient_id}
+                      onChange={handleBookingChange}
+                      placeholder="Enter patient ID"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Doctor *
+                    </label>
+                    <select
+                      name="doctor_id"
+                      value={bookingForm.doctor_id}
+                      onChange={handleBookingChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="doctor-001">Dr. Smith</option>
+                      <option value="doctor-002">Dr. Johnson</option>
+                      <option value="doctor-003">Dr. Patel</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Department
+                    </label>
+                    <select
+                      name="department"
+                      value={bookingForm.department}
+                      onChange={handleBookingChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="General">General</option>
+                      <option value="Pediatrics">Pediatrics</option>
+                      <option value="Cardiology">Cardiology</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date & Time *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      name="appointment_date"
+                      value={bookingForm.appointment_date}
+                      onChange={handleBookingChange}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Reason for Visit
+                    </label>
+                    <textarea
+                      name="reason_for_visit"
+                      value={bookingForm.reason_for_visit}
+                      onChange={handleBookingChange}
+                      placeholder="Brief reason for consultation"
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Confirmation Method
+                    </label>
+                    <select
+                      name="confirmation_method"
+                      value={bookingForm.confirmation_method}
+                      onChange={handleBookingChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="sms">SMS</option>
+                      <option value="whatsapp">WhatsApp</option>
+                      <option value="call">Call</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setShowBookingModal(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      disabled={isBooking}
+                      className="flex-1"
+                    >
+                      {isBooking ? 'Booking...' : 'Book Appointment'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </Layout>
   )

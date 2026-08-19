@@ -1,6 +1,6 @@
 """SQLAlchemy models for booking module"""
 
-from sqlalchemy import Column, String, UUID, DateTime, Text, JSONB, Boolean, Integer, Time, Float, Enum as SQLEnum
+from sqlalchemy import Column, String, UUID, DateTime, Text, JSON, Boolean, Integer, Time, Float, Enum as SQLEnum
 from sqlalchemy.sql import func
 from datetime import datetime, date
 import uuid

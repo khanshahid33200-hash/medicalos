@@ -1,9 +1,10 @@
 """FastAPI routes for booking module"""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 import logging
+from typing import Optional
 
 from clinic_os.database import get_db
 from clinic_os.modules.booking.schemas import (
@@ -25,8 +26,8 @@ router = APIRouter()
 
 @router.post("/", response_model=AppointmentResponse)
 async def book_appointment(
-    clinic_id: str,
     data: AppointmentBookRequest,
+    clinic_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -74,9 +75,9 @@ async def book_appointment(
 
 @router.get("/", response_model=AppointmentListResponse)
 async def list_appointments(
-    clinic_id: str,
-    patient_id: str = None,
-    status: str = None,
+    patient_id: Optional[str] = None,
+    status: Optional[str] = None,
+    clinic_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
     """List appointments for a clinic or patient"""
@@ -115,8 +116,8 @@ async def list_appointments(
 
 @router.get("/{appointment_id}", response_model=AppointmentResponse)
 async def get_appointment(
-    clinic_id: str,
     appointment_id: str,
+    clinic_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Get specific appointment"""
@@ -152,9 +153,9 @@ async def get_appointment(
 
 @router.post("/{appointment_id}/confirm", response_model=AppointmentResponse)
 async def confirm_appointment(
-    clinic_id: str,
     appointment_id: str,
     data: AppointmentConfirmRequest,
+    clinic_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Confirm appointment attendance"""
@@ -189,9 +190,9 @@ async def confirm_appointment(
 
 @router.put("/{appointment_id}/reschedule", response_model=AppointmentResponse)
 async def reschedule_appointment(
-    clinic_id: str,
     appointment_id: str,
     data: AppointmentRescheduleRequest,
+    clinic_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Reschedule appointment to new date/time"""
@@ -226,9 +227,9 @@ async def reschedule_appointment(
 
 @router.delete("/{appointment_id}", response_model=dict)
 async def cancel_appointment(
-    clinic_id: str,
     appointment_id: str,
     data: AppointmentCancelRequest,
+    clinic_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel appointment"""
@@ -260,8 +261,8 @@ async def cancel_appointment(
 
 @router.post("/available-slots", response_model=list)
 async def get_available_slots(
-    clinic_id: str,
     data: AvailableSlotsRequest,
+    clinic_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Get available appointment slots for a doctor"""
@@ -293,7 +294,7 @@ async def get_available_slots(
 
 @router.get("/stats", response_model=dict)
 async def get_appointment_stats(
-    clinic_id: str,
+    clinic_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Get appointment statistics for clinic"""

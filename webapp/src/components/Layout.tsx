@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   X,
+  QrCode,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -32,24 +33,26 @@ export default function Layout({ children, userRole = 'doctor' }: LayoutProps) {
     if (userRole === 'admin') {
       return [
         ...common,
+        { path: '/qr-kiosk', label: 'QR Kiosk', icon: QrCode },
         { path: '/staff', label: 'Staff Management', icon: Users },
         { path: '/settings', label: 'Settings', icon: Settings },
       ]
     }
 
-    if (userRole === 'doctor') {
+    if (userRole === 'doctor' || userRole === 'staff') {
       return [
         ...common,
         { path: '/queue', label: 'Queue', icon: Users },
+        { path: '/qr-kiosk', label: 'QR Kiosk', icon: QrCode },
         { path: '/reports', label: 'Reports', icon: FileText },
       ]
     }
 
     if (userRole === 'patient') {
       return [
-        { path: '/check-in', label: 'Check-in', icon: Users },
-        { path: '/my-appointments', label: 'My Appointments', icon: Calendar },
-        { path: '/queue-tracker', label: 'Queue Tracker', icon: LayoutDashboard },
+        { path: '/checkin', label: 'Check-in', icon: Users },
+        { path: '/appointments', label: 'My Appointments', icon: Calendar },
+        { path: '/queue', label: 'Queue Status', icon: LayoutDashboard },
       ]
     }
 

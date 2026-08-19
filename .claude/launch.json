@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "clinic-os-backend",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "clinic_os.main:app", "--reload", "--port", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "clinic-os-webapp",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "url": "http://localhost:3000",
+      "cwd": "D:\\clinical os\\webapp"
+    }
+  ]
+}

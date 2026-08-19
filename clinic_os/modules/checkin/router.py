@@ -22,8 +22,8 @@ router = APIRouter()
 
 @router.post("/", response_model=CheckInResponse)
 async def submit_checkin(
-    clinic_id: str,
     data: CheckInRequest,
+    clinic_id: str = Header(...),
     idempotency_key: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):

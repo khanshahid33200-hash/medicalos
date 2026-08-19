@@ -21,13 +21,13 @@ class CheckInRequest(BaseModel):
     previous_doctor: Optional[str] = None
     previous_medication: Optional[str] = None
     duration_symptoms: Optional[str] = None  # e.g., "2 days", "1 week"
-    severity: Optional[str] = Field(None, regex="^(mild|moderate|severe)$")
+    severity: Optional[str] = Field(None, pattern="^(mild|moderate|severe)$")
     chronic_conditions: Optional[str] = None
     past_surgeries: Optional[str] = None
     consent_ai_triage: bool = Field(default=False)
 
     # Metadata
-    source: str = Field(default="whatsapp", regex="^(whatsapp|sms|web|paper)$")
+    source: str = Field(default="whatsapp", pattern="^(whatsapp|sms|web|paper)$")
     form_response_time_sec: Optional[int] = None
 
     @validator("phone")

@@ -1,6 +1,6 @@
 """SQLAlchemy models for check-in module"""
 
-from sqlalchemy import Column, String, UUID, DateTime, Text, JSONB, Boolean, Enum as SQLEnum, Integer
+from sqlalchemy import Column, String, UUID, DateTime, Text, JSON, Boolean, Enum as SQLEnum, Integer
 from sqlalchemy.sql import func
 from datetime import datetime
 import uuid
@@ -31,7 +31,7 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
-    clinic_id = Column(UUID, nullable=False)  # RLS filter
+    clinic_id = Column(String(255), nullable=False)  # RLS filter
     phone = Column(String(20), nullable=False)
     name = Column(String(255), nullable=False)
     age = Column(Integer, nullable=True)
@@ -51,7 +51,7 @@ class CheckIn(Base):
     __tablename__ = "check_ins"
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
-    clinic_id = Column(UUID, nullable=False)  # RLS filter
+    clinic_id = Column(String(255), nullable=False)  # RLS filter
     patient_id = Column(UUID, nullable=True)
     phone = Column(String(20), nullable=False)
     name = Column(String(255), nullable=False)
@@ -86,10 +86,10 @@ class CheckInForm(Base):
     __tablename__ = "check_in_forms"
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
-    clinic_id = Column(UUID, nullable=False)  # RLS filter
+    clinic_id = Column(String(255), nullable=False)  # RLS filter
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    fields = Column(JSONB, nullable=False)  # Field definitions
+    fields = Column(JSON, nullable=False)  # Field definitions
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
@@ -100,12 +100,12 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
-    clinic_id = Column(UUID, nullable=False)  # RLS filter
+    clinic_id = Column(String(255), nullable=False)  # RLS filter
     action = Column(String(50), nullable=False)
     resource_type = Column(String(50), nullable=False)
     resource_id = Column(String(255), nullable=False)
     user_id = Column(UUID, nullable=True)
-    details = Column(JSONB, nullable=True)
+    details = Column(JSON, nullable=True)
     status = Column(String(20), default="success")  # success, failure
     timestamp = Column(DateTime, default=func.now(), nullable=False)
     created_at = Column(DateTime, default=func.now(), nullable=False)
