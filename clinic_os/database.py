@@ -7,13 +7,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Engine kwargs based on DB type
+engine_kwargs = {
+    "echo": settings.debug,
+}
+
+if "sqlite" not in settings.database_url:
+    engine_kwargs.update({
+        "pool_size": 10,
+        "max_overflow": 5,
+        "pool_pre_ping": True,
+    })
+
 # Create async engine
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
-    pool_size=10,
-    max_overflow=5,
-    pool_pre_ping=True,
+    **engine_kwargs
 )
 
 # Create session factory

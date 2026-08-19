@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 import logging
 
 from clinic_os.config import settings
+from clinic_os.database import init_db
 from clinic_os.modules.checkin import router as checkin_router
 from clinic_os.modules.booking import router as booking_router
 from clinic_os.modules.reports import router as reports_router
@@ -95,6 +96,10 @@ async def startup_event():
     """Initialize on startup"""
     logger.info(f"Clinic OS starting in {settings.environment} mode")
     logger.info(f"Database: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'configured'}")
+    try:
+        await init_db()
+    except Exception as e:
+        logger.warning(f"Could not auto-initialize DB on startup: {e}")
 
 
 @app.on_event("shutdown")
