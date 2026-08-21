@@ -98,6 +98,23 @@ class ApiClient {
     return this.client.get(`/doctor/profile/${firebaseUid}`)
   }
 
+  // Admin Doctor Management Endpoints
+  async listDoctors() {
+    return this.client.get('/doctor/list')
+  }
+
+  async createDoctor(data: any) {
+    return this.client.post('/doctor/create', data)
+  }
+
+  async updateDoctorStatus(doctorId: string, status: string) {
+    return this.client.put(`/doctor/${doctorId}/status`, { status })
+  }
+
+  async deleteDoctor(doctorId: string) {
+    return this.client.delete(`/doctor/${doctorId}`)
+  }
+
   // Health check
   async healthCheck() {
     return this.client.get('/health', { baseURL: 'http://localhost:8000' })

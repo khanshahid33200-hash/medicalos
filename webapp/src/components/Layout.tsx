@@ -10,7 +10,8 @@ import {
   Menu,
   X,
   QrCode,
-  Building2
+  Building2,
+  ShieldCheck
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -34,6 +35,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/qr-kiosk', label: 'QR Kiosk', icon: QrCode },
     { path: '/reports', label: 'Reports', icon: FileText },
     { path: '/history', label: 'History', icon: HistoryIcon },
+    { path: '/admin', label: 'Admin Panel', icon: ShieldCheck },
   ]
 
   const handleLogout = async () => {
@@ -101,7 +103,7 @@ export default function Layout({ children }: LayoutProps) {
                   {doctorProfile?.name ? doctorProfile.name.charAt(4) || 'D' : 'D'}
                 </div>
                 <div className="text-xs min-w-0 flex-1">
-                  <p className="font-semibold text-white truncate">{doctorProfile?.name || 'Dr. Rahul Sharma'}</p>
+                  <p className="font-semibold text-white truncate">{doctorProfile?.name || 'Dr. Authorized Doctor'}</p>
                   <p className="text-slate-400 truncate">{doctorProfile?.department_name || 'Cardiology'}</p>
                 </div>
               </div>

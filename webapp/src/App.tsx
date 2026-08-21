@@ -11,6 +11,7 @@ import Queue from './pages/Queue'
 import Reports from './pages/Reports'
 import QRKiosk from './pages/QRKiosk'
 import History from './pages/History'
+import AdminPanel from './pages/AdminPanel'
 
 function App() {
   useEffect(() => {
@@ -29,7 +30,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/checkin" element={<Checkin />} />
 
-        {/* Protected Doctor Dashboard Routes */}
+        {/* Protected Doctor & Admin Dashboard Routes */}
         <Route
           path="/dashboard"
           element={
@@ -75,6 +76,14 @@ function App() {
           element={
             <ProtectedRoute>
               <History />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPanel />
             </ProtectedRoute>
           }
         />
