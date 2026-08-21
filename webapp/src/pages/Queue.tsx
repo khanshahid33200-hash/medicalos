@@ -8,7 +8,14 @@ import {
   Ticket,
   UserCheck,
   Building2,
-  Users
+  Users,
+  FileText,
+  Plus,
+  Trash2,
+  Printer,
+  X,
+  Activity,
+  Pill
 } from 'lucide-react'
 import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
@@ -17,7 +24,10 @@ import { useAuth } from '../context/AuthContext'
 import {
   getQueueForDoctor,
   updateQueueStatusForDoctor,
-  QueueItem
+  savePrescriptionForDoctor,
+  QueueItem,
+  ClinicalPrescription,
+  MedicinePrescription
 } from '../utils/doctorStore'
 
 export default function Queue() {
@@ -25,9 +35,24 @@ export default function Queue() {
   const doctorId = doctorProfile?.doctor_id || 'doc-001'
   const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
   const departmentName = doctorProfile?.department_name || 'Cardiology'
+  const hospitalName = doctorProfile?.hospital_name || 'Metro Care General Hospital'
 
   const [queueItems, setQueueItems] = useState<QueueItem[]>([])
   const [announcedToken, setAnnouncedToken] = useState<string | null>(null)
+
+  // Consultation & Prescription Modal State
+  const [activeConsultationPatient, setActiveConsultationPatient] = useState<QueueItem | null>(null)
+  const [prescriptionForm, setPrescriptionForm] = useState<ClinicalPrescription>({
+    chief_complaints: '',
+    diagnosis: '',
+    clinical_notes: '',
+    vitals: { bp: '120/80', pulse: '72', temperature: '98.6', weight: '70' },
+    medicines: [
+      { medicine_name: 'Paracetamol 650mg', dosage: '1 Tablet', frequency: '1-0-1 (Morning & Night)', duration: '5 Days', instructions: 'After meal' }
+    ],
+    advice: 'Drink warm water, take rest, and avoid cold food.',
+    followup_date: 'After 7 Days'
+  })
 
   const reloadQueue = () => {
     if (doctorId) {
@@ -92,27 +117,88 @@ export default function Queue() {
     setAnnouncedToken(nextPatient.token_number)
   }
 
-  // Action 2: Start Consultation
+  // Open Prescription Editor for Patient
+  const handleOpenConsultationModal = (patient: QueueItem) => {
+    setActiveConsultationPatient(patient)
+    setPrescriptionForm({
+      chief_complaints: patient.symptoms || 'General Checkup & Consultation',
+      diagnosis: patient.prescription?.diagnosis || '',
+      clinical_notes: patient.prescription?.clinical_notes || '',
+      vitals: patient.prescription?.vitals || { bp: '120/80', pulse: '72', temperature: '98.6', weight: '70' },
+      medicines: patient.prescription?.medicines && patient.prescription.medicines.length > 0
+        ? patient.prescription.medicines
+        : [{ medicine_name: 'Paracetamol 650mg', dosage: '1 Tablet', frequency: '1-0-1 (Morning & Night)', duration: '5 Days', instructions: 'After meal' }],
+      advice: patient.prescription?.advice || 'Drink warm water and take rest.',
+      followup_date: patient.prescription?.followup_date || 'After 7 Days'
+    })
+  }
+
+  // Handle Prescription Form Changes
+  const handlePrescriptionTextChange = (field: keyof ClinicalPrescription, val: any) => {
+    setPrescriptionForm((prev) => ({ ...prev, [field]: val }))
+  }
+
+  const handleVitalsChange = (vitalKey: string, val: string) => {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      vitals: { ...prev.vitals, [vitalKey]: val }
+    }))
+  }
+
+  // Medicine Row Actions
+  const handleAddMedicine = () => {
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      medicines: [
+        ...(prev.medicines || []),
+        { medicine_name: '', dosage: '1 Tablet', frequency: '1-0-1', duration: '5 Days', instructions: 'After meal' }
+      ]
+    }))
+  }
+
+  const handleUpdateMedicine = (index: number, field: keyof MedicinePrescription, val: string) => {
+    setPrescriptionForm((prev) => {
+      const updatedMeds = [...(prev.medicines || [])]
+      updatedMeds[index] = { ...updatedMeds[index], [field]: val }
+      return { ...prev, medicines: updatedMeds }
+    })
+  }
+
+  const handleRemoveMedicine = (index: number) => {
+    setPrescriptionForm((prev) => {
+      const updatedMeds = (prev.medicines || []).filter((_, i) => i !== index)
+      return { ...prev, medicines: updatedMeds }
+    })
+  }
+
+  // Save Prescription & Complete Consultation
+  const handleSavePrescription = () => {
+    if (!activeConsultationPatient) return
+    const updated = savePrescriptionForDoctor(doctorId, activeConsultationPatient.id, prescriptionForm)
+    setQueueItems(updated)
+    setActiveConsultationPatient(null)
+  }
+
+  const handlePrintPrescription = () => {
+    window.print()
+  }
+
+  // Quick Actions
   const handleStartConsultation = (id: string) => {
     const updated = updateQueueStatusForDoctor(doctorId, id, 'With Doctor')
     setQueueItems(updated)
     const item = updated.find((q) => q.id === id)
-    if (item) setAnnouncedToken(item.token_number)
+    if (item) {
+      setAnnouncedToken(item.token_number)
+      handleOpenConsultationModal(item)
+    }
   }
 
-  // Action 3: Complete Consultation
-  const handleCompleteConsultation = (id: string) => {
-    const updated = updateQueueStatusForDoctor(doctorId, id, 'Completed')
-    setQueueItems(updated)
-  }
-
-  // Action 4: Skip Patient
   const handleSkip = (id: string) => {
     const updated = updateQueueStatusForDoctor(doctorId, id, 'Skipped')
     setQueueItems(updated)
   }
 
-  // Action 5: Recall Patient
   const handleRecall = (id: string) => {
     const updated = updateQueueStatusForDoctor(doctorId, id, 'Waiting')
     setQueueItems(updated)
@@ -127,10 +213,10 @@ export default function Queue() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-              <Users className="text-blue-600" size={30} /> Live Patient Queue for {doctorName}
+              <Users className="text-blue-600" size={30} /> Live Patient Queue & Consultations
             </h1>
             <p className="text-gray-600 text-sm mt-1 flex items-center gap-2">
-              <span>Department of {departmentName} • Scanned QR Patient Queue</span>
+              <span>{doctorName} • {departmentName}</span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> Real-time Sync Active
               </span>
@@ -195,8 +281,8 @@ export default function Queue() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="success" size="md" onClick={() => handleCompleteConsultation(activeDoctorPatient.id)}>
-                    <CheckCircle size={16} /> Complete Consultation
+                  <Button variant="primary" size="md" onClick={() => handleOpenConsultationModal(activeDoctorPatient)} className="bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center gap-2">
+                    <FileText size={16} /> Write Prescription & Diagnosis
                   </Button>
                   <Button variant="secondary" size="md" onClick={() => handleSkip(activeDoctorPatient.id)}>
                     <SkipForward size={16} /> Skip Patient
@@ -209,7 +295,7 @@ export default function Queue() {
 
         {/* Queue Table */}
         <Card>
-          <CardHeader title={`Doctor Queue Records (${queueItems.length} Patients)`} />
+          <CardHeader title={`Doctor Queue & Prescription Records (${queueItems.length} Patients)`} />
           <CardContent className="p-0">
             {queueItems.length === 0 ? (
               <div className="p-12 text-center space-y-3">
@@ -226,10 +312,10 @@ export default function Queue() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-semibold text-gray-500">
                     <tr>
-                      <th className="px-6 py-3.5">Token Number</th>
-                      <th className="px-6 py-3.5">Patient Details</th>
+                      <th className="px-6 py-3.5">Token</th>
+                      <th className="px-6 py-3.5">Patient Info</th>
                       <th className="px-6 py-3.5">Symptoms / Concerns</th>
-                      <th className="px-6 py-3.5">Check-In Time</th>
+                      <th className="px-6 py-3.5">Diagnosis / Rx Summary</th>
                       <th className="px-6 py-3.5">Status</th>
                       <th className="px-6 py-3.5 text-right">Doctor Actions</th>
                     </tr>
@@ -246,10 +332,18 @@ export default function Queue() {
                           {item.patient_name}
                           <p className="text-xs text-gray-400 font-normal">{item.phone}</p>
                         </td>
-                        <td className="px-6 py-4 text-gray-700 text-xs">
+                        <td className="px-6 py-4 text-gray-700 text-xs max-w-xs truncate">
                           {item.symptoms || 'General Checkup'}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">{item.check_in_time}</td>
+                        <td className="px-6 py-4 text-xs">
+                          {item.prescription?.diagnosis ? (
+                            <span className="font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                              🩺 {item.prescription.diagnosis}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">No Diagnosis Yet</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4">
                           {item.status === 'With Doctor' && (
                             <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full border border-emerald-300">
@@ -274,30 +368,20 @@ export default function Queue() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenConsultationModal(item)}
+                              title="Write / Edit Prescription & Clinical Notes"
+                              className="px-2.5 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition shadow-sm"
+                            >
+                              <FileText size={12} /> Rx Notes
+                            </button>
                             {item.status === 'Waiting' && (
-                              <>
-                                <button
-                                  onClick={() => handleStartConsultation(item.id)}
-                                  title="Start Consultation"
-                                  className="px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
-                                >
-                                  <Play size={12} /> Start
-                                </button>
-                                <button
-                                  onClick={() => handleSkip(item.id)}
-                                  title="Skip Patient"
-                                  className="px-2.5 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
-                                >
-                                  <SkipForward size={12} /> Skip
-                                </button>
-                              </>
-                            )}
-                            {item.status === 'With Doctor' && (
                               <button
-                                onClick={() => handleCompleteConsultation(item.id)}
-                                className="px-2.5 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                                onClick={() => handleStartConsultation(item.id)}
+                                title="Start Consultation"
+                                className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
                               >
-                                <CheckCircle size={12} /> Complete
+                                <Play size={12} /> Start
                               </button>
                             )}
                             {(item.status === 'Skipped' || item.status === 'Completed') && (
@@ -319,6 +403,251 @@ export default function Queue() {
             )}
           </CardContent>
         </Card>
+
+        {/* Doctor Full Clinical Consultation & Prescription Modal */}
+        {activeConsultationPatient && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-50 p-3 sm:p-6 overflow-y-auto">
+            <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden border border-gray-100 my-8">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-blue-700 via-indigo-800 to-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20">
+                    Rx
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold tracking-wide">Doctor Clinical Workspace & Prescription</h2>
+                    <p className="text-xs text-blue-200">{hospitalName} • {departmentName}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={handlePrintPrescription} className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+                    <Printer size={15} /> Print Rx Card
+                  </button>
+                  <button onClick={() => setActiveConsultationPatient(null)} className="p-1.5 hover:bg-white/20 text-blue-200 hover:text-white rounded-xl transition">
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+                {/* 1. Patient Profile Summary Header Card */}
+                <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-extrabold text-gray-900">{activeConsultationPatient.patient_name}</h3>
+                      <span className="px-2.5 py-0.5 bg-blue-600 text-white font-bold text-xs rounded-full">
+                        {activeConsultationPatient.token_number}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Phone: <strong>{activeConsultationPatient.phone}</strong> • Age: <strong>{activeConsultationPatient.age || '32'} Yrs</strong> • Gender: <strong>{activeConsultationPatient.gender || 'M'}</strong>
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-600 bg-white p-3 rounded-xl border border-blue-100">
+                    <p className="font-bold text-blue-700">QR Check-in Symptoms:</p>
+                    <p className="italic text-gray-800">{activeConsultationPatient.symptoms || 'General Checkup'}</p>
+                  </div>
+                </div>
+
+                {/* 2. Patient Vitals */}
+                <div className="bg-white p-4 rounded-2xl border border-gray-200 space-y-2">
+                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Activity size={16} className="text-rose-500" /> Patient Vitals
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500">Blood Pressure (BP)</label>
+                      <input
+                        type="text"
+                        value={prescriptionForm.vitals?.bp || ''}
+                        onChange={(e) => handleVitalsChange('bp', e.target.value)}
+                        placeholder="120/80 mmHg"
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500">Pulse Rate</label>
+                      <input
+                        type="text"
+                        value={prescriptionForm.vitals?.pulse || ''}
+                        onChange={(e) => handleVitalsChange('pulse', e.target.value)}
+                        placeholder="72 bpm"
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500">Temperature</label>
+                      <input
+                        type="text"
+                        value={prescriptionForm.vitals?.temperature || ''}
+                        onChange={(e) => handleVitalsChange('temperature', e.target.value)}
+                        placeholder="98.6 °F"
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500">Body Weight</label>
+                      <input
+                        type="text"
+                        value={prescriptionForm.vitals?.weight || ''}
+                        onChange={(e) => handleVitalsChange('weight', e.target.value)}
+                        placeholder="70 kg"
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold text-gray-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Chief Symptoms & Diagnosis */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Chief Symptoms / Patient Complaints *
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={prescriptionForm.chief_complaints || ''}
+                      onChange={(e) => handlePrescriptionTextChange('chief_complaints', e.target.value)}
+                      placeholder="e.g. Chest tightness, fever for 3 days, body pain..."
+                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Doctor Diagnosis / Disease Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={prescriptionForm.diagnosis || ''}
+                      onChange={(e) => handlePrescriptionTextChange('diagnosis', e.target.value)}
+                      placeholder="e.g. Acute Bronchitis, Essential Hypertension..."
+                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm font-bold text-blue-900 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 4. Doctor Freeform Examination Notes */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Doctor Clinical Notes & Clinical Examination (Type Anything Here)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={prescriptionForm.clinical_notes || ''}
+                    onChange={(e) => handlePrescriptionTextChange('clinical_notes', e.target.value)}
+                    placeholder="Write detailed clinical notes, test recommendations, lab investigation findings, or specific medical observations..."
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* 5. Prescribed Medicines (Rx Table) */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                    <h4 className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
+                      <Pill className="text-blue-600" size={18} /> Prescribed Medicines & Dosage (Rx)
+                    </h4>
+                    <Button variant="secondary" size="sm" onClick={handleAddMedicine} className="text-xs font-bold flex items-center gap-1">
+                      <Plus size={14} /> Add Medicine
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {prescriptionForm.medicines?.map((med, idx) => (
+                      <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl items-center">
+                        <div className="sm:col-span-4">
+                          <input
+                            type="text"
+                            placeholder="Medicine Name (e.g. Amoxicillin 500mg)"
+                            value={med.medicine_name}
+                            onChange={(e) => handleUpdateMedicine(idx, 'medicine_name', e.target.value)}
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-900"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <input
+                            type="text"
+                            placeholder="Dosage (1 Tab)"
+                            value={med.dosage}
+                            onChange={(e) => handleUpdateMedicine(idx, 'dosage', e.target.value)}
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div className="sm:col-span-3">
+                          <input
+                            type="text"
+                            placeholder="Frequency (1-0-1 After Meal)"
+                            value={med.frequency}
+                            onChange={(e) => handleUpdateMedicine(idx, 'frequency', e.target.value)}
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <input
+                            type="text"
+                            placeholder="Duration (5 Days)"
+                            value={med.duration}
+                            onChange={(e) => handleUpdateMedicine(idx, 'duration', e.target.value)}
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div className="sm:col-span-1 text-right">
+                          <button
+                            onClick={() => handleRemoveMedicine(idx)}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 6. General Advice & Follow-up */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      General Advice & Instructions
+                    </label>
+                    <input
+                      type="text"
+                      value={prescriptionForm.advice || ''}
+                      onChange={(e) => handlePrescriptionTextChange('advice', e.target.value)}
+                      placeholder="e.g. Avoid cold drinks, take 8 hours of rest..."
+                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Follow-up Date / Review
+                    </label>
+                    <input
+                      type="text"
+                      value={prescriptionForm.followup_date || ''}
+                      onChange={(e) => handlePrescriptionTextChange('followup_date', e.target.value)}
+                      placeholder="e.g. After 7 Days or Next Monday"
+                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <Button variant="secondary" onClick={() => setActiveConsultationPatient(null)}>
+                  Cancel
+                </Button>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <Button variant="primary" onClick={handleSavePrescription} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-600/30 flex-1 sm:flex-none">
+                    <CheckCircle size={18} /> Save & Complete Consultation
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   )

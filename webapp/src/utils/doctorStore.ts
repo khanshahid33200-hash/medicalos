@@ -1,5 +1,28 @@
 import apiClient from '../api/client'
 
+export interface MedicinePrescription {
+  medicine_name: string
+  dosage: string
+  frequency: string
+  duration: string
+  instructions?: string
+}
+
+export interface ClinicalPrescription {
+  chief_complaints?: string
+  diagnosis?: string
+  clinical_notes?: string
+  vitals?: {
+    bp?: string
+    pulse?: string
+    temperature?: string
+    weight?: string
+  }
+  medicines?: MedicinePrescription[]
+  advice?: string
+  followup_date?: string
+}
+
 export interface QueueItem {
   id: string
   doctor_id: string
@@ -14,6 +37,7 @@ export interface QueueItem {
   status: 'Waiting' | 'With Doctor' | 'Completed' | 'Skipped'
   check_in_time: string
   date: string
+  prescription?: ClinicalPrescription
 }
 
 export interface AppointmentItem {
@@ -27,17 +51,29 @@ export interface AppointmentItem {
   receipt_number: string
   department: string
   status: 'Scheduled' | 'Completed' | 'Cancelled'
+  prescription?: ClinicalPrescription
 }
 
 export interface ReportItem {
   id: string
   doctor_id: string
   patient_name: string
+  patient_phone?: string
   report_title: string
   report_type: string
   date: string
   doctor_notes: string
   findings: string
+  diagnosis?: string
+  medicines?: MedicinePrescription[]
+  vitals?: {
+    bp?: string
+    pulse?: string
+    temperature?: string
+    weight?: string
+  }
+  advice?: string
+  followup_date?: string
 }
 
 const queueChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window ? new BroadcastChannel('clinic_os_queue_channel') : null
@@ -154,6 +190,52 @@ export function updateQueueStatusForDoctor(doctorId: string, itemId: string, sta
   // Sync to Backend
   apiClient.updateDoctorQueueStatus(doctorId, itemId, status).catch(() => {})
   return updated
+}
+
+export function savePrescriptionForDoctor(doctorId: string, queueItemId: string, prescription: ClinicalPrescription): QueueItem[] {
+  const existingQueue = getQueueForDoctor(doctorId)
+  const targetItem = existingQueue.find((q) => q.id === queueItemId)
+
+  const updatedQueue = existingQueue.map((item) => {
+    if (item.id === queueItemId) {
+      return {
+        ...item,
+        status: 'Completed' as const,
+        prescription,
+      }
+    }
+    return item
+  })
+
+  saveQueueForDoctor(doctorId, updatedQueue)
+
+  // Save to Reports Store
+  if (targetItem) {
+    try {
+      const existingReports = getReportsForDoctor(doctorId)
+      const newReport: ReportItem = {
+        id: `rep-${Date.now()}`,
+        doctor_id: doctorId,
+        patient_name: targetItem.patient_name,
+        patient_phone: targetItem.phone,
+        report_title: prescription.diagnosis ? `Prescription - ${prescription.diagnosis}` : `Consultation Report - ${targetItem.patient_name}`,
+        report_type: 'Clinical Prescription & Rx',
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        doctor_notes: prescription.clinical_notes || '',
+        findings: prescription.chief_complaints || targetItem.symptoms || '',
+        diagnosis: prescription.diagnosis,
+        medicines: prescription.medicines,
+        vitals: prescription.vitals,
+        advice: prescription.advice,
+        followup_date: prescription.followup_date,
+      }
+      saveReportsForDoctor(doctorId, [newReport, ...existingReports])
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  return updatedQueue
 }
 
 // Doctor-Specific Appointments Store
