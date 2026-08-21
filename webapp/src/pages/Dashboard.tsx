@@ -1,4 +1,4 @@
-import { BarChart3, Users, Calendar, AlertCircle } from 'lucide-react'
+import { Users, Calendar, AlertCircle } from 'lucide-react'
 import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import { useAppointmentStats, useCheckinStats } from '../hooks/useApi'

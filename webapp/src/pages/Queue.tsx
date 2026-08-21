@@ -1,348 +1,299 @@
-import { useState, useEffect } from 'react'
-import { Users, Clock, CheckCircle, Phone, X, AlertCircle } from 'lucide-react'
+import { useState } from 'react'
+import {
+  Play,
+  CheckCircle,
+  SkipForward,
+  RotateCcw,
+  Volume2,
+  Ticket,
+  UserCheck
+} from 'lucide-react'
 import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import Button from '../components/Button'
 
-interface QueueEntry {
+interface QueueItem {
   id: string
-  queue_number: string
+  token_number: string
   patient_name: string
-  phone: string // masked for privacy
-  severity: 'mild' | 'moderate' | 'severe'
+  phone: string
+  status: 'Waiting' | 'With Doctor' | 'Completed' | 'Skipped'
   check_in_time: string
-  status: 'waiting' | 'in_progress' | 'completed'
-  estimated_wait_minutes: number
 }
 
 export default function Queue() {
-  const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([])
-  const [currentlyServing, setCurrentlyServing] = useState<QueueEntry | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([
+    {
+      id: 'q-001',
+      token_number: 'Token 001',
+      patient_name: 'Rahul Sharma',
+      phone: '+91-9876543210',
+      status: 'With Doctor',
+      check_in_time: '09:45 AM',
+    },
+    {
+      id: 'q-002',
+      token_number: 'Token 002',
+      patient_name: 'Amit Khan',
+      phone: '+91-9876543211',
+      status: 'Waiting',
+      check_in_time: '10:05 AM',
+    },
+    {
+      id: 'q-003',
+      token_number: 'Token 003',
+      patient_name: 'Priya Sharma',
+      phone: '+91-9876543212',
+      status: 'Waiting',
+      check_in_time: '10:15 AM',
+    },
+    {
+      id: 'q-004',
+      token_number: 'Token 004',
+      patient_name: 'Vikram Singh',
+      phone: '+91-9876543213',
+      status: 'Waiting',
+      check_in_time: '10:25 AM',
+    },
+    {
+      id: 'q-005',
+      token_number: 'Token 005',
+      patient_name: 'Suresh Patel',
+      phone: '+91-9876543216',
+      status: 'Skipped',
+      check_in_time: '09:30 AM',
+    },
+  ])
 
-  // Mock data - in production this would come from the API via WebSocket
-  useEffect(() => {
-    const mockQueue: QueueEntry[] = [
-      {
-        id: '1',
-        queue_number: '12',
-        patient_name: 'Patient 12',
-        phone: '****5432',
-        severity: 'moderate',
-        check_in_time: new Date(Date.now() - 15 * 60000).toISOString(),
-        status: 'in_progress',
-        estimated_wait_minutes: 0,
-      },
-      {
-        id: '2',
-        queue_number: '13',
-        patient_name: 'Patient 13',
-        phone: '****9876',
-        severity: 'mild',
-        check_in_time: new Date(Date.now() - 8 * 60000).toISOString(),
-        status: 'waiting',
-        estimated_wait_minutes: 5,
-      },
-      {
-        id: '3',
-        queue_number: '14',
-        patient_name: 'Patient 14',
-        phone: '****5678',
-        severity: 'moderate',
-        check_in_time: new Date(Date.now() - 3 * 60000).toISOString(),
-        status: 'waiting',
-        estimated_wait_minutes: 12,
-      },
-      {
-        id: '4',
-        queue_number: '15',
-        patient_name: 'Patient 15',
-        phone: '****1234',
-        severity: 'severe',
-        check_in_time: new Date().toISOString(),
-        status: 'waiting',
-        estimated_wait_minutes: 18,
-      },
-    ]
+  const [announcedToken, setAnnouncedToken] = useState<string | null>('Token 001')
 
-    setCurrentlyServing(mockQueue[0])
-    setQueueEntries(mockQueue.slice(1))
-  }, [])
+  const activeDoctorPatient = queueItems.find((q) => q.status === 'With Doctor')
+  const waitingPatients = queueItems.filter((q) => q.status === 'Waiting')
 
-  // Auto-refresh queue every 30 seconds
-  useEffect(() => {
-    if (!autoRefresh) return
-
-    const interval = setInterval(() => {
-      // In production, this would fetch from the API
-      setQueueEntries((prev) =>
-        prev.map((entry) => ({
-          ...entry,
-          estimated_wait_minutes: Math.max(0, entry.estimated_wait_minutes - 1),
-        }))
-      )
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [autoRefresh])
-
+  // Action 1: Call Next Patient
   const handleCallNext = () => {
-    if (queueEntries.length === 0) return
+    if (waitingPatients.length === 0) return
+    const nextPatient = waitingPatients[0]
 
-    const next = queueEntries[0]
-    setCurrentlyServing(next)
-    setQueueEntries((prev) => prev.slice(1))
-
-    // In production, send notification to patient
-    console.log(`Calling patient ${next.queue_number}`)
+    // Set previous 'With Doctor' to Completed or keep
+    setQueueItems((prev) =>
+      prev.map((item) => {
+        if (item.id === nextPatient.id) return { ...item, status: 'With Doctor' }
+        if (item.status === 'With Doctor') return { ...item, status: 'Completed' }
+        return item
+      })
+    )
+    setAnnouncedToken(nextPatient.token_number)
   }
 
-  const handleComplete = () => {
-    if (!currentlyServing) return
-
-    // In production, this would update the appointment status
-    console.log(`Completed consultation with patient ${currentlyServing.queue_number}`)
-    handleCallNext()
+  // Action 2: Start Consultation
+  const handleStartConsultation = (id: string) => {
+    setQueueItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status: 'With Doctor' } : item))
+    )
   }
 
-  const handleNoShow = () => {
-    if (!currentlyServing) return
-
-    // In production, this would mark as no-show
-    console.log(`Patient ${currentlyServing.queue_number} marked as no-show`)
-    handleCallNext()
+  // Action 3: Complete Consultation
+  const handleCompleteConsultation = (id: string) => {
+    setQueueItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status: 'Completed' } : item))
+    )
   }
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'mild':
-        return 'bg-blue-100 text-blue-700 border-blue-300'
-      case 'moderate':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-300'
-      case 'severe':
-        return 'bg-red-100 text-red-700 border-red-300'
-      default:
-        return 'bg-gray-100 text-gray-700'
+  // Action 4: Skip Patient
+  const handleSkip = (id: string) => {
+    setQueueItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status: 'Skipped' } : item))
+    )
+  }
+
+  // Action 5: Recall Patient
+  const handleRecall = (id: string) => {
+    const itemToRecall = queueItems.find((q) => q.id === id)
+    if (itemToRecall) {
+      setAnnouncedToken(itemToRecall.token_number)
     }
-  }
-
-  const getWaitTimeColor = (minutes: number) => {
-    if (minutes <= 5) return 'text-green-600'
-    if (minutes <= 15) return 'text-yellow-600'
-    return 'text-red-600'
+    setQueueItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status: 'Waiting' } : item))
+    )
   }
 
   return (
-    <Layout userRole="doctor">
+    <Layout>
       <div className="space-y-6">
-        {/* Page Header */}
-        <div className="flex items-center justify-between">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Patient Queue</h1>
-            <p className="text-gray-600 mt-2">Manage today's patient queue and consultations</p>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Live Department Queue</h1>
+            <p className="text-gray-600 text-sm mt-1">
+              Real-time patient queue for Cardiology & OPD
+            </p>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-300">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded border-gray-300"
-            />
-            <span className="text-sm font-medium text-gray-700">Auto-refresh (30s)</span>
-          </label>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={handleCallNext}
+              disabled={waitingPatients.length === 0}
+              className="shadow-lg shadow-blue-600/30 flex items-center gap-2"
+            >
+              <Volume2 size={20} />
+              Call Next Patient
+            </Button>
+          </div>
         </div>
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="text-center py-6">
-              <div className="text-3xl font-bold text-primary-600">
-                {currentlyServing ? 1 : 0}
+        {/* Announcer Alert */}
+        {announcedToken && (
+          <div className="bg-blue-600 text-white rounded-2xl p-4 shadow-lg flex items-center justify-between border border-blue-500">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-bold">
+                📢
               </div>
-              <p className="text-sm text-gray-600 mt-2">Currently Serving</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="text-center py-6">
-              <div className="text-3xl font-bold text-yellow-600">{queueEntries.length}</div>
-              <p className="text-sm text-gray-600 mt-2">Waiting in Queue</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="text-center py-6">
-              <div className="text-3xl font-bold text-green-600">
-                {queueEntries.length > 0 ? queueEntries[0].estimated_wait_minutes : 0}
+              <div>
+                <p className="text-xs uppercase font-semibold text-blue-200 tracking-wider">Audio Announcement</p>
+                <p className="font-bold text-lg">{announcedToken} — Called to Doctor Consultation Room 1</p>
               </div>
-              <p className="text-sm text-gray-600 mt-2">Next Wait Time (min)</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="text-center py-6">
-              <div className="text-3xl font-bold text-blue-600">
-                {currentlyServing ? queueEntries.length + 1 : queueEntries.length}
-              </div>
-              <p className="text-sm text-gray-600 mt-2">Total in Queue</p>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+            <button
+              onClick={() => setAnnouncedToken(null)}
+              className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg font-medium transition"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
-        {/* Currently Serving */}
-        {currentlyServing ? (
-          <Card className="border-2 border-green-300 bg-green-50">
-            <CardHeader className="bg-gradient-to-r from-green-600 to-green-700 text-white">
+        {/* Currently With Doctor Banner */}
+        {activeDoctorPatient && (
+          <Card className="border-2 border-emerald-500 bg-emerald-50/50">
+            <CardHeader className="bg-emerald-600 text-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <CheckCircle size={24} />
-                  <h2 className="text-2xl font-bold">Currently Serving</h2>
+                  <UserCheck size={22} />
+                  <h2 className="text-xl font-bold">Patient Currently With Doctor</h2>
                 </div>
-                <span className="text-4xl font-bold">{currentlyServing.queue_number}</span>
+                <span className="text-2xl font-black bg-white/20 px-3 py-1 rounded-xl">
+                  {activeDoctorPatient.token_number}
+                </span>
               </div>
             </CardHeader>
-            <CardContent className="py-6">
-              <div className="grid grid-cols-2 gap-6">
+            <CardContent className="py-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Patient</p>
-                  <p className="text-lg font-semibold text-gray-900">{currentlyServing.patient_name}</p>
-                  <p className="text-sm text-gray-600 mt-2">Phone: {currentlyServing.phone}</p>
+                  <h3 className="text-2xl font-bold text-gray-900">{activeDoctorPatient.patient_name}</h3>
+                  <p className="text-sm text-gray-600 mt-1">Phone: {activeDoctorPatient.phone} • Check-in: {activeDoctorPatient.check_in_time}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Check-in Time</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {new Date(currentlyServing.check_in_time).toLocaleTimeString()}
-                  </p>
-                  <div className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold border ${getSeverityColor(currentlyServing.severity)}`}>
-                    {currentlyServing.severity.charAt(0).toUpperCase() + currentlyServing.severity.slice(1)} Priority
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="success" size="md" onClick={() => handleCompleteConsultation(activeDoctorPatient.id)}>
+                    <CheckCircle size={16} /> Complete Consultation
+                  </Button>
+                  <Button variant="secondary" size="md" onClick={() => handleSkip(activeDoctorPatient.id)}>
+                    <SkipForward size={16} /> Skip Patient
+                  </Button>
                 </div>
               </div>
-
-              <div className="flex gap-3 mt-8">
-                <Button variant="success" size="lg" onClick={handleComplete} className="flex-1">
-                  <CheckCircle size={20} />
-                  Mark Consultation Complete
-                </Button>
-                <Button variant="danger" size="lg" onClick={handleNoShow} className="flex-1">
-                  <AlertCircle size={20} />
-                  Mark as No-Show
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-2 border-yellow-300 bg-yellow-50">
-            <CardContent className="text-center py-8">
-              <Clock className="mx-auto text-yellow-600 mb-3" size={40} />
-              <p className="text-lg font-semibold text-yellow-900">No patients currently being served</p>
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={handleCallNext}
-                disabled={queueEntries.length === 0}
-                className="mt-4"
-              >
-                Call Next Patient
-              </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Queue List */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-900">
-              <Users size={20} className="inline mr-2" />
-              Waiting Queue
-            </h3>
-            {queueEntries.length > 0 && (
-              <Button variant="primary" onClick={handleCallNext}>
-                Call Next Patient
-              </Button>
-            )}
-          </div>
-
-          {queueEntries.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8">
-                <Users className="mx-auto text-gray-400 mb-3" size={40} />
-                <p className="text-gray-600">No patients waiting</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {queueEntries.map((entry, index) => (
-                <Card key={entry.id} className="hover">
-                  <div className="px-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100 text-primary-600 font-bold text-lg">
-                          {entry.queue_number}
+        {/* Queue Table */}
+        <Card>
+          <CardHeader title={`Live Queue Table (${queueItems.length} Records)`} />
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-semibold text-gray-500">
+                  <tr>
+                    <th className="px-6 py-3.5">Token Number</th>
+                    <th className="px-6 py-3.5">Patient Name</th>
+                    <th className="px-6 py-3.5">Check-In Time</th>
+                    <th className="px-6 py-3.5">Status</th>
+                    <th className="px-6 py-3.5 text-right">Doctor Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 font-medium">
+                  {queueItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 font-bold text-xs rounded-xl border border-blue-200">
+                          <Ticket size={14} /> {item.token_number}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-900 font-bold text-base">
+                        {item.patient_name}
+                        <p className="text-xs text-gray-400 font-normal">{item.phone}</p>
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">{item.check_in_time}</td>
+                      <td className="px-6 py-4">
+                        {item.status === 'With Doctor' && (
+                          <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full border border-emerald-300">
+                            With Doctor
+                          </span>
+                        )}
+                        {item.status === 'Waiting' && (
+                          <span className="px-3 py-1 bg-amber-100 text-amber-800 font-bold text-xs rounded-full border border-amber-300">
+                            Waiting
+                          </span>
+                        )}
+                        {item.status === 'Completed' && (
+                          <span className="px-3 py-1 bg-gray-100 text-gray-700 font-bold text-xs rounded-full border border-gray-300">
+                            Completed
+                          </span>
+                        )}
+                        {item.status === 'Skipped' && (
+                          <span className="px-3 py-1 bg-rose-100 text-rose-800 font-bold text-xs rounded-full border border-rose-300">
+                            Skipped
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {item.status === 'Waiting' && (
+                            <>
+                              <button
+                                onClick={() => handleStartConsultation(item.id)}
+                                title="Start Consultation"
+                                className="px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                              >
+                                <Play size={12} /> Start
+                              </button>
+                              <button
+                                onClick={() => handleSkip(item.id)}
+                                title="Skip Patient"
+                                className="px-2.5 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                              >
+                                <SkipForward size={12} /> Skip
+                              </button>
+                            </>
+                          )}
+                          {item.status === 'With Doctor' && (
+                            <button
+                              onClick={() => handleCompleteConsultation(item.id)}
+                              className="px-2.5 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                            >
+                              <CheckCircle size={12} /> Complete
+                            </button>
+                          )}
+                          {(item.status === 'Skipped' || item.status === 'Completed') && (
+                            <button
+                              onClick={() => handleRecall(item.id)}
+                              title="Recall Patient"
+                              className="px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                            >
+                              <RotateCcw size={12} /> Recall
+                            </button>
+                          )}
                         </div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-900">
-                            Position {index + 1} • {entry.patient_name}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            Checked in {formatTime(new Date(entry.check_in_time))}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-6">
-                        <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold border ${getSeverityColor(entry.severity)}`}>
-                          {entry.severity.charAt(0).toUpperCase() + entry.severity.slice(1)}
-                        </div>
-                        <div className={`text-center ${getWaitTimeColor(entry.estimated_wait_minutes)}`}>
-                          <Clock size={20} className="inline mb-1" />
-                          <p className="font-semibold">{entry.estimated_wait_minutes} min</p>
-                          <p className="text-xs text-gray-600">est. wait</p>
-                        </div>
-                        <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600">
-                          <X size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Legend */}
-        <Card className="bg-gray-50">
-          <CardContent className="py-4">
-            <p className="font-semibold text-gray-900 mb-3">Severity Levels</p>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500" />
-                <span className="text-sm text-gray-700">Mild - General issues</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                <span className="text-sm text-gray-700">Moderate - Needs attention</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500" />
-                <span className="text-sm text-gray-700">Severe - Priority care</span>
-              </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
       </div>
     </Layout>
   )
-}
-
-function formatTime(date: Date): string {
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins} min ago`
-
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
-
-  return date.toLocaleTimeString()
 }

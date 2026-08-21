@@ -59,11 +59,12 @@ export default function Checkin() {
     )
 
     // Convert age to number if present
-    if (cleanedData.age && typeof cleanedData.age === 'string') {
-      cleanedData.age = parseInt(cleanedData.age, 10)
+    const payload: Record<string, any> = { ...cleanedData }
+    if (payload.age && typeof payload.age === 'string') {
+      payload.age = parseInt(payload.age, 10)
     }
 
-    submitCheckin(cleanedData, {
+    submitCheckin(payload, {
       onSuccess: (data) => {
         setResponse(data.data)
         setStep('success')

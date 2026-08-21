@@ -1,35 +1,83 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import apiClient from './api/client'
+import { AuthProvider } from './context/AuthContext'
+import ProtectedRoute from './components/ProtectedRoute'
+import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Appointments from './pages/Appointments'
 import Checkin from './pages/Checkin'
 import Queue from './pages/Queue'
 import Reports from './pages/Reports'
 import QRKiosk from './pages/QRKiosk'
+import History from './pages/History'
 
 function App() {
   useEffect(() => {
-    // Set clinic ID from local storage or environment
-    const clinicId = localStorage.getItem('clinicId') || 'clinic-001'
-    apiClient.setClinicId(clinicId)
+    const hospitalId = localStorage.getItem('hospital_id') || 'hosp-001'
+    apiClient.setClinicId(hospitalId)
 
-    // Check API health
     apiClient.healthCheck().catch(() => {
-      console.warn('API health check failed - running in offline mode')
+      console.warn('Backend server running locally')
     })
   }, [])
 
   return (
-    <Routes>
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/appointments" element={<Appointments />} />
-      <Route path="/checkin" element={<Checkin />} />
-      <Route path="/queue" element={<Queue />} />
-      <Route path="/reports" element={<Reports />} />
-      <Route path="/qr-kiosk" element={<QRKiosk />} />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/appointments"
+          element={
+            <ProtectedRoute>
+              <Appointments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/queue"
+          element={
+            <ProtectedRoute>
+              <Queue />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/qr-kiosk"
+          element={
+            <ProtectedRoute>
+              <QRKiosk />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <Reports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <ProtectedRoute>
+              <History />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/checkin" element={<Checkin />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AuthProvider>
   )
 }
 

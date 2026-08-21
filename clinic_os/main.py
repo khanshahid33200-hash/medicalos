@@ -12,6 +12,7 @@ from clinic_os.modules.booking import router as booking_router
 from clinic_os.modules.reports import router as reports_router
 from clinic_os.modules.followups import router as followups_router
 from clinic_os.modules.queue_triage import router as queue_router
+from clinic_os.modules.doctor import router as doctor_router
 
 # Configure logging
 logging.basicConfig(level=settings.log_level)
@@ -75,6 +76,12 @@ app.include_router(
     queue_router.router,
     prefix="/api/v1/queue",
     tags=["Module 5: Queue & Triage"],
+)
+
+app.include_router(
+    doctor_router.router,
+    prefix="/api/v1",
+    tags=["Doctor Profile & Multi-Tenant Auth"],
 )
 
 

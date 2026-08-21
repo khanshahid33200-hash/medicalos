@@ -1,157 +1,163 @@
-import { ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { ReactNode, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Calendar,
   Users,
   FileText,
-  Settings,
+  History as HistoryIcon,
   LogOut,
   Menu,
   X,
   QrCode,
+  Building2
 } from 'lucide-react'
-import { useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 
 interface LayoutProps {
   children: ReactNode
-  userRole?: 'admin' | 'doctor' | 'staff' | 'patient'
+  userRole?: string
 }
 
-export default function Layout({ children, userRole = 'doctor' }: LayoutProps) {
+export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const location = useLocation()
+  const navigate = useNavigate()
+  const { doctorProfile, logout } = useAuth()
 
   const isActive = (path: string) => location.pathname === path
 
-  const getNavItems = () => {
-    const common = [
-      { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { path: '/appointments', label: 'Appointments', icon: Calendar },
-    ]
+  const navItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/appointments', label: 'Appointments', icon: Calendar },
+    { path: '/queue', label: 'Live Queue', icon: Users },
+    { path: '/qr-kiosk', label: 'QR Kiosk', icon: QrCode },
+    { path: '/reports', label: 'Reports', icon: FileText },
+    { path: '/history', label: 'History', icon: HistoryIcon },
+  ]
 
-    if (userRole === 'admin') {
-      return [
-        ...common,
-        { path: '/qr-kiosk', label: 'QR Kiosk', icon: QrCode },
-        { path: '/staff', label: 'Staff Management', icon: Users },
-        { path: '/settings', label: 'Settings', icon: Settings },
-      ]
-    }
-
-    if (userRole === 'doctor' || userRole === 'staff') {
-      return [
-        ...common,
-        { path: '/queue', label: 'Queue', icon: Users },
-        { path: '/qr-kiosk', label: 'QR Kiosk', icon: QrCode },
-        { path: '/reports', label: 'Reports', icon: FileText },
-      ]
-    }
-
-    if (userRole === 'patient') {
-      return [
-        { path: '/checkin', label: 'Check-in', icon: Users },
-        { path: '/appointments', label: 'My Appointments', icon: Calendar },
-        { path: '/queue', label: 'Queue Status', icon: LayoutDashboard },
-      ]
-    }
-
-    return common
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
   }
-
-  const navItems = getNavItems()
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transition-transform duration-300 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white transition-transform duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:static md:translate-x-0`}
+        } md:static md:translate-x-0 shadow-xl`}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary-600 rounded text-white flex items-center justify-center font-bold">
+          {/* Logo & Hospital Header */}
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-xl text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20">
                 CO
               </div>
-              <h1 className="font-bold text-lg">Clinic OS</h1>
+              <div>
+                <h1 className="font-bold text-base tracking-wide text-white">Clinic OS</h1>
+                <p className="text-xs text-blue-400 font-medium truncate max-w-[140px]">
+                  {doctorProfile?.hospital_name || 'General Hospital'}
+                </p>
+              </div>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="md:hidden p-1 hover:bg-gray-100 rounded"
+              className="md:hidden p-1 hover:bg-slate-800 rounded text-slate-400"
             >
               <X size={20} />
             </button>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto px-2 py-4">
-            <div className="space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center gap-3 px-4 py-2 rounded-lg transition ${
-                      isActive(item.path)
-                        ? 'bg-primary-50 text-primary-600 font-medium'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Icon size={20} />
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
-            </div>
+          <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              const active = isActive(item.path)
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-150 ${
+                    active
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 font-semibold'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Icon size={19} className={active ? 'text-white' : 'text-slate-400'} />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
           </nav>
 
-          {/* User Profile */}
-          <div className="border-t border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-1">
-                <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-semibold text-primary-600">D</span>
+          {/* Doctor Profile Footer */}
+          <div className="border-t border-slate-800 p-4 bg-slate-950/50">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="w-9 h-9 bg-blue-600/20 border border-blue-500/30 rounded-xl flex items-center justify-center text-blue-400 font-bold text-sm flex-shrink-0">
+                  {doctorProfile?.name ? doctorProfile.name.charAt(4) || 'D' : 'D'}
                 </div>
-                <div className="text-sm">
-                  <p className="font-medium text-gray-900">Dr. Smith</p>
-                  <p className="text-gray-500">{userRole}</p>
+                <div className="text-xs min-w-0 flex-1">
+                  <p className="font-semibold text-white truncate">{doctorProfile?.name || 'Dr. Rahul Sharma'}</p>
+                  <p className="text-slate-400 truncate">{doctorProfile?.department_name || 'Cardiology'}</p>
                 </div>
               </div>
-              <button className="p-1 hover:bg-gray-100 rounded">
-                <LogOut size={18} className="text-gray-600" />
+              <button
+                onClick={handleLogout}
+                title="Sign Out"
+                className="p-2 hover:bg-slate-800 text-slate-400 hover:text-red-400 rounded-lg transition flex-shrink-0"
+              >
+                <LogOut size={18} />
               </button>
             </div>
           </div>
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="md:hidden p-1 hover:bg-gray-100 rounded"
-          >
-            <Menu size={20} />
-          </button>
-          <h2 className="text-xl font-semibold text-gray-900">Clinic OS</h2>
+        {/* Header Bar */}
+        <header className="bg-white border-b border-gray-200 px-6 py-3.5 flex items-center justify-between shadow-sm z-10">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="md:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-600"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="flex items-center gap-2">
+              <Building2 size={18} className="text-blue-600" />
+              <span className="font-semibold text-gray-800 text-sm">
+                {doctorProfile?.hospital_name || 'Metro Care General Hospital'}
+              </span>
+              <span className="text-gray-300">•</span>
+              <span className="text-xs px-2.5 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-full border border-blue-100">
+                {doctorProfile?.department_name || 'Cardiology'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs">
+            <span className="flex items-center gap-1.5 font-semibold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              Doctor Verified
+            </span>
+          </div>
         </header>
 
-        {/* Content */}
+        {/* Dynamic Route Content */}
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">{children}</div>
         </main>
       </div>
 
-      {/* Mobile overlay */}
+      {/* Mobile Backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}

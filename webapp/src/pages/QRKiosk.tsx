@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { QrCode, RefreshCw, Copy, Download } from 'lucide-react'
+import { QrCode, Copy, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import Button from '../components/Button'
 
@@ -202,7 +202,7 @@ export default function QRKiosk() {
                   <button
                     onClick={() => setDisplayMode('fullscreen')}
                     className={`px-4 py-2 rounded-lg font-medium transition ${
-                      displayMode === 'fullscreen'
+                      (displayMode as string) === 'fullscreen'
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
                     }`}

@@ -14,10 +14,12 @@ class ApiClient {
       },
     })
 
-    // Add clinic_id to all requests if set
+    // Add clinic_id to all requests if set (for booking endpoints that use headers)
     this.client.interceptors.request.use((config) => {
       if (this.clinicId) {
         config.headers['clinic_id'] = this.clinicId
+      } else {
+        config.headers['clinic_id'] = 'clinic-001'
       }
       return config
     })
@@ -42,7 +44,8 @@ class ApiClient {
 
   // Check-in endpoints
   async submitCheckin(data: any) {
-    return this.client.post('/checkins/', data)
+    // Send clinic_id as query parameter
+    return this.client.post(`/checkins/?clinic_id=${this.clinicId || 'clinic-001'}`, data)
   }
 
   async getCheckinStats() {
@@ -88,6 +91,11 @@ class ApiClient {
 
   async getAppointmentStats() {
     return this.client.get('/appointments/stats')
+  }
+
+  // Doctor Profile Endpoint (Supabase database query by Firebase UID)
+  async getDoctorProfile(firebaseUid: string) {
+    return this.client.get(`/doctor/profile/${firebaseUid}`)
   }
 
   // Health check
