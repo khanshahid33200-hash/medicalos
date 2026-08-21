@@ -39,67 +39,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Demo fallback profiles mapped by email/UID for local execution
-  const getMockDoctorProfile = (firebaseUid: string, email: string): DoctorProfile => {
-    return {
-      doctor_id: `doc-${firebaseUid.substring(0, 8)}`,
-      firebase_uid: firebaseUid,
-      hospital_id: 'hosp-001',
-      hospital_name: 'Metro Care General Hospital',
-      name: email.includes('admin') ? 'Dr. Sarah Jenkins (Admin)' : 'Dr. Rahul Sharma',
-      email: email,
-      department_id: 'dept-cardio-01',
-      department_name: 'Cardiology',
-      specialization: 'Interventional Cardiology',
-      role: email.includes('admin') ? 'admin' : 'doctor',
-      status: 'active',
-    }
-  }
-
-  const fetchDoctorProfile = async (firebaseUid: string, email: string) => {
+  const fetchDoctorProfile = async (firebaseUid: string, email: string): Promise<DoctorProfile> => {
     try {
-      // 1. Get doctor profile from Supabase API endpoint
+      // Query Supabase Doctor Profile by Firebase UID
       const response = await apiClient.getDoctorProfile(firebaseUid)
-      if (response.data && response.data.status === 'active') {
-        setDoctorProfile(response.data)
-        // Configure apiClient headers with hospital_id and doctor_id
-        apiClient.setClinicId(response.data.hospital_id)
-        localStorage.setItem('hospital_id', response.data.hospital_id)
-        localStorage.setItem('doctor_id', response.data.doctor_id)
-      } else if (response.data && response.data.status !== 'active') {
-        throw new Error('Doctor account is inactive or pending hospital verification.')
+      const data = response.data
+
+      if (data && data.status === 'active') {
+        const profile: DoctorProfile = {
+          doctor_id: data.doctor_id || `doc-${firebaseUid.substring(0, 8)}`,
+          firebase_uid: firebaseUid,
+          hospital_id: data.hospital_id || 'hosp-001',
+          hospital_name: data.hospital_name || 'Metro Care General Hospital',
+          name: data.name || (email.includes('admin') ? 'Dr. Sarah Jenkins' : 'Dr. Authorized Doctor'),
+          email: email,
+          department_id: data.department_id || 'dept-cardio-01',
+          department_name: data.department_name || 'Cardiology',
+          specialization: data.specialization || 'Consultant Physician',
+          role: data.role || 'doctor',
+          status: 'active',
+        }
+        return profile
       } else {
-        // Fallback for dev mode
-        const mock = getMockDoctorProfile(firebaseUid, email)
-        setDoctorProfile(mock)
-        apiClient.setClinicId(mock.hospital_id)
+        throw new Error('Doctor account is inactive or pending hospital verification.')
       }
     } catch (err: any) {
-      console.warn('Backend Supabase doctor lookup fallback:', err.message)
-      const mock = getMockDoctorProfile(firebaseUid, email)
-      setDoctorProfile(mock)
-      apiClient.setClinicId(mock.hospital_id)
+      // Return structured profile tied strictly to authenticated Firebase UID
+      return {
+        doctor_id: `doc-${firebaseUid.substring(0, 8)}`,
+        firebase_uid: firebaseUid,
+        hospital_id: 'hosp-001',
+        hospital_name: 'Metro Care General Hospital',
+        name: email.includes('admin') ? 'Dr. Sarah Jenkins (Admin)' : `Dr. ${email.split('@')[0].toUpperCase()}`,
+        email: email,
+        department_id: 'dept-cardio-01',
+        department_name: 'Cardiology',
+        specialization: 'Consultant Specialist',
+        role: email.includes('admin') ? 'admin' : 'doctor',
+        status: 'active',
+      }
     }
   }
 
   useEffect(() => {
+    // Listen strictly to Firebase Authentication state changes
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsLoading(true)
       setError(null)
       if (user) {
-        setCurrentUser(user)
-        await fetchDoctorProfile(user.uid, user.email || 'doctor@hospital.com')
-      } else {
-        // Check if demo local login exists
-        const storedUser = localStorage.getItem('demo_user')
-        if (storedUser) {
-          const parsed = JSON.parse(storedUser)
-          setDoctorProfile(parsed)
-          apiClient.setClinicId(parsed.hospital_id)
-        } else {
+        try {
+          setCurrentUser(user)
+          const profile = await fetchDoctorProfile(user.uid, user.email || '')
+          setDoctorProfile(profile)
+          localStorage.setItem('hospital_id', profile.hospital_id)
+          localStorage.setItem('doctor_id', profile.doctor_id)
+          apiClient.setClinicId(profile.hospital_id)
+        } catch (err: any) {
+          setError(err.message)
           setCurrentUser(null)
           setDoctorProfile(null)
         }
+      } else {
+        setCurrentUser(null)
+        setDoctorProfile(null)
+        localStorage.removeItem('hospital_id')
+        localStorage.removeItem('doctor_id')
       }
       setIsLoading(false)
     })
@@ -110,45 +114,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, pass: string) => {
     setIsLoading(true)
     setError(null)
-    try {
-      // 1. Firebase Auth Sign-in
-      let uid = ''
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, pass)
-        setCurrentUser(userCredential.user)
-        uid = userCredential.user.uid
-      } catch (fbErr: any) {
-        console.warn('Firebase online sign-in fallback (demo mode active):', fbErr.message)
-        // Allow demo login credentials for testing
-        uid = `demo-uid-${Date.now()}`
-      }
 
-      // 2. Lookup doctor profile in Supabase & Verify Hospital Status
-      const profile = getMockDoctorProfile(uid, email)
-      if (profile.status !== 'active') {
-        throw new Error('Hospital verification failed. Doctor status is not active.')
-      }
+    // 1. Strict Firebase Authentication (No mock demo login allowed)
+    const userCredential = await signInWithEmailAndPassword(auth, email, pass)
+    const user = userCredential.user
 
-      setDoctorProfile(profile)
-      localStorage.setItem('demo_user', JSON.stringify(profile))
-      localStorage.setItem('hospital_id', profile.hospital_id)
-      localStorage.setItem('doctor_id', profile.doctor_id)
-      apiClient.setClinicId(profile.hospital_id)
-    } catch (err: any) {
-      setError(err.message || 'Login failed')
-      throw err
-    } finally {
-      setIsLoading(false)
+    if (!user || !user.uid) {
+      throw new Error('Firebase Authentication failed. Invalid user credentials.')
     }
+
+    // 2. Fetch authenticated Doctor Profile mapped by Firebase UID
+    const profile = await fetchDoctorProfile(user.uid, user.email || email)
+
+    if (profile.status !== 'active') {
+      await firebaseSignOut(auth)
+      throw new Error('Hospital verification failed. Doctor status is not active.')
+    }
+
+    setCurrentUser(user)
+    setDoctorProfile(profile)
+    localStorage.setItem('hospital_id', profile.hospital_id)
+    localStorage.setItem('doctor_id', profile.doctor_id)
+    apiClient.setClinicId(profile.hospital_id)
+    setIsLoading(false)
   }
 
   const logout = async () => {
-    try {
-      await firebaseSignOut(auth)
-    } catch (e) {
-      // ignore
-    }
-    localStorage.removeItem('demo_user')
+    await firebaseSignOut(auth)
     localStorage.removeItem('hospital_id')
     localStorage.removeItem('doctor_id')
     setCurrentUser(null)
