@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import apiClient from './api/client'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import LandingPage from './pages/LandingPage'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Appointments from './pages/Appointments'
@@ -26,11 +27,15 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Unprotected Public Routes */}
+        {/* Public Hospital Info Website */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* Doctor & Hospital Sign In Portal (Hidden link /doctor) */}
+        <Route path="/doctor" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/checkin" element={<Checkin />} />
 
-        {/* Secret Platform Owner Portal */}
+        {/* Secret Platform Owner Control Portal */}
         <Route path="/mrshahidbabu" element={<OwnerAdmin />} />
 
         {/* Protected Doctor Dashboard Routes */}
@@ -82,7 +87,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AuthProvider>
   )
