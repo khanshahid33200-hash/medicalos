@@ -52,6 +52,14 @@ class ApiClient {
     return this.client.get('/checkins/stats')
   }
 
+  async getDoctorQueue(doctorId: string) {
+    return this.client.get(`/checkins/queue/${doctorId}`)
+  }
+
+  async updateDoctorQueueStatus(doctorId: string, itemId: string, status: string) {
+    return this.client.put(`/checkins/queue/${doctorId}/${itemId}/status`, { status })
+  }
+
   // Appointment endpoints
   async bookAppointment(data: any) {
     return this.client.post('/appointments/', data)

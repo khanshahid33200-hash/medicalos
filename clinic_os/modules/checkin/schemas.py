@@ -27,7 +27,8 @@ class CheckInRequest(BaseModel):
     consent_ai_triage: bool = Field(default=False)
 
     # Metadata
-    source: str = Field(default="whatsapp", pattern="^(whatsapp|sms|web|paper)$")
+    doctor_id: Optional[str] = Field(default="doc-001")
+    source: str = Field(default="qr_kiosk")
     form_response_time_sec: Optional[int] = None
 
     @validator("phone")
