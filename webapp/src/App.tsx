@@ -11,7 +11,7 @@ import Queue from './pages/Queue'
 import Reports from './pages/Reports'
 import QRKiosk from './pages/QRKiosk'
 import History from './pages/History'
-import AdminPanel from './pages/AdminPanel'
+import OwnerAdmin from './pages/OwnerAdmin'
 
 function App() {
   useEffect(() => {
@@ -30,7 +30,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/checkin" element={<Checkin />} />
 
-        {/* Protected Doctor & Admin Dashboard Routes */}
+        {/* Secret Platform Owner Portal */}
+        <Route path="/mrshahidbabu" element={<OwnerAdmin />} />
+
+        {/* Protected Doctor Dashboard Routes */}
         <Route
           path="/dashboard"
           element={
@@ -76,14 +79,6 @@ function App() {
           element={
             <ProtectedRoute>
               <History />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminPanel />
             </ProtectedRoute>
           }
         />

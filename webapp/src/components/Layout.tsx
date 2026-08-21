@@ -10,8 +10,7 @@ import {
   Menu,
   X,
   QrCode,
-  Building2,
-  ShieldCheck
+  Building2
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -35,7 +34,6 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/qr-kiosk', label: 'QR Kiosk', icon: QrCode },
     { path: '/reports', label: 'Reports', icon: FileText },
     { path: '/history', label: 'History', icon: HistoryIcon },
-    { path: '/admin', label: 'Admin Panel', icon: ShieldCheck },
   ]
 
   const handleLogout = async () => {
