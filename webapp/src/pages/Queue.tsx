@@ -29,11 +29,47 @@ export default function Queue() {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([])
   const [announcedToken, setAnnouncedToken] = useState<string | null>(null)
 
-  // Load doctor-specific queue from store
-  useEffect(() => {
+  const reloadQueue = () => {
     if (doctorId) {
       const storeItems = getQueueForDoctor(doctorId)
       setQueueItems(storeItems)
+    }
+  }
+
+  // Load doctor-specific queue & subscribe to real-time events & polling
+  useEffect(() => {
+    reloadQueue()
+
+    // 1. BroadcastChannel Listener for instant multi-tab sync
+    let channel: BroadcastChannel | null = null
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        channel = new BroadcastChannel('clinic_os_queue_channel')
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'QUEUE_UPDATED') {
+            reloadQueue()
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 2. Custom Window Event Listener
+    const handleCustomUpdate = () => reloadQueue()
+    window.addEventListener('clinic_os_queue_updated', handleCustomUpdate)
+    window.addEventListener('storage', handleCustomUpdate)
+
+    // 3. 2-Second Real-Time Polling Interval
+    const pollInterval = setInterval(() => {
+      reloadQueue()
+    }, 2000)
+
+    return () => {
+      if (channel) channel.close()
+      window.removeEventListener('clinic_os_queue_updated', handleCustomUpdate)
+      window.removeEventListener('storage', handleCustomUpdate)
+      clearInterval(pollInterval)
     }
   }, [doctorId])
 
@@ -93,8 +129,11 @@ export default function Queue() {
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
               <Users className="text-blue-600" size={30} /> Live Patient Queue for {doctorName}
             </h1>
-            <p className="text-gray-600 text-sm mt-1">
-              Department of {departmentName} • Scanned QR Patient Queue
+            <p className="text-gray-600 text-sm mt-1 flex items-center gap-2">
+              <span>Department of {departmentName} • Scanned QR Patient Queue</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> Real-time Sync Active
+              </span>
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -113,7 +152,7 @@ export default function Queue() {
 
         {/* Announcer Alert */}
         {announcedToken && (
-          <div className="bg-blue-600 text-white rounded-2xl p-4 shadow-lg flex items-center justify-between border border-blue-500 animate-fade-in">
+          <div className="bg-blue-600 text-white rounded-2xl p-4 shadow-lg flex items-center justify-between border border-blue-500">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-bold">
                 📢

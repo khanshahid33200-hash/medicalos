@@ -38,12 +38,39 @@ export interface ReportItem {
   findings: string
 }
 
+const queueChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window ? new BroadcastChannel('clinic_os_queue_channel') : null
+
+function notifyQueueUpdated(doctorId: string) {
+  if (queueChannel) {
+    try {
+      queueChannel.postMessage({ type: 'QUEUE_UPDATED', doctorId })
+    } catch (e) {
+      // ignore
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('clinic_os_queue_updated', { detail: { doctorId } }))
+  }
+}
+
 // Key format: clinic_os_queue_{doctor_id}
 export function getQueueForDoctor(doctorId: string): QueueItem[] {
   if (!doctorId) return []
   try {
     const raw = localStorage.getItem(`clinic_os_queue_${doctorId}`)
-    return raw ? JSON.parse(raw) : []
+    const queue = raw ? JSON.parse(raw) : []
+    // Also merge global check-ins if any
+    const globalRaw = localStorage.getItem('clinic_os_global_checkins')
+    if (globalRaw) {
+      const globalItems: QueueItem[] = JSON.parse(globalRaw)
+      const matchingGlobal = globalItems.filter(item => item.doctor_id === doctorId)
+      for (const item of matchingGlobal) {
+        if (!queue.some((q: QueueItem) => q.id === item.id)) {
+          queue.push(item)
+        }
+      }
+    }
+    return queue
   } catch (e) {
     return []
   }
@@ -52,6 +79,7 @@ export function getQueueForDoctor(doctorId: string): QueueItem[] {
 export function saveQueueForDoctor(doctorId: string, queue: QueueItem[]): void {
   if (!doctorId) return
   localStorage.setItem(`clinic_os_queue_${doctorId}`, JSON.stringify(queue))
+  notifyQueueUpdated(doctorId)
 }
 
 export function addCheckinToDoctorQueue(doctorId: string, payload: any): QueueItem {
@@ -60,6 +88,8 @@ export function addCheckinToDoctorQueue(doctorId: string, payload: any): QueueIt
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
   const tokenNum = `Token ${String(existingQueue.length + 1).padStart(3, '0')}`
+  const receiptRef = `RCP-${Date.now().toString().substring(5)}`
+  
   const newItem: QueueItem = {
     id: `q-${Date.now()}`,
     doctor_id: doctorId,
@@ -78,6 +108,37 @@ export function addCheckinToDoctorQueue(doctorId: string, payload: any): QueueIt
 
   const updatedQueue = [...existingQueue, newItem]
   saveQueueForDoctor(doctorId, updatedQueue)
+
+  // Save to global fallback array so cross-context checkins are available
+  try {
+    const globalRaw = localStorage.getItem('clinic_os_global_checkins')
+    const globalItems = globalRaw ? JSON.parse(globalRaw) : []
+    globalItems.push(newItem)
+    localStorage.setItem('clinic_os_global_checkins', JSON.stringify(globalItems))
+  } catch (e) {
+    // ignore
+  }
+
+  // Also automatically create an Appointment record for doctor's Appointments page!
+  try {
+    const existingApts = getAppointmentsForDoctor(doctorId)
+    const newApt: AppointmentItem = {
+      id: `apt-${Date.now()}`,
+      doctor_id: doctorId,
+      patient_name: newItem.patient_name,
+      phone: newItem.phone,
+      appointment_date: 'Today',
+      appointment_time: timeStr,
+      token_number: tokenNum,
+      receipt_number: receiptRef,
+      department: payload.department || 'Cardiology',
+      status: 'Scheduled',
+    }
+    saveAppointmentsForDoctor(doctorId, [newApt, ...existingApts])
+  } catch (e) {
+    // ignore
+  }
+
   return newItem
 }
 
@@ -102,6 +163,7 @@ export function getAppointmentsForDoctor(doctorId: string): AppointmentItem[] {
 export function saveAppointmentsForDoctor(doctorId: string, items: AppointmentItem[]): void {
   if (!doctorId) return
   localStorage.setItem(`clinic_os_appointments_${doctorId}`, JSON.stringify(items))
+  notifyQueueUpdated(doctorId)
 }
 
 // Doctor-Specific Reports Store
@@ -118,4 +180,5 @@ export function getReportsForDoctor(doctorId: string): ReportItem[] {
 export function saveReportsForDoctor(doctorId: string, items: ReportItem[]): void {
   if (!doctorId) return
   localStorage.setItem(`clinic_os_reports_${doctorId}`, JSON.stringify(items))
+  notifyQueueUpdated(doctorId)
 }

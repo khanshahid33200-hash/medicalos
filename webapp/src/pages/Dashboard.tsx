@@ -19,10 +19,46 @@ export default function Dashboard() {
   const [queueList, setQueueList] = useState<any[]>([])
   const [aptList, setAptList] = useState<any[]>([])
 
-  useEffect(() => {
+  const reloadData = () => {
     if (doctorId) {
       setQueueList(getQueueForDoctor(doctorId))
       setAptList(getAppointmentsForDoctor(doctorId))
+    }
+  }
+
+  useEffect(() => {
+    reloadData()
+
+    // 1. BroadcastChannel Listener
+    let channel: BroadcastChannel | null = null
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        channel = new BroadcastChannel('clinic_os_queue_channel')
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'QUEUE_UPDATED') {
+            reloadData()
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 2. Custom Window Event Listener
+    const handleCustomUpdate = () => reloadData()
+    window.addEventListener('clinic_os_queue_updated', handleCustomUpdate)
+    window.addEventListener('storage', handleCustomUpdate)
+
+    // 3. 2-Second Polling
+    const pollInterval = setInterval(() => {
+      reloadData()
+    }, 2000)
+
+    return () => {
+      if (channel) channel.close()
+      window.removeEventListener('clinic_os_queue_updated', handleCustomUpdate)
+      window.removeEventListener('storage', handleCustomUpdate)
+      clearInterval(pollInterval)
     }
   }, [doctorId])
 
