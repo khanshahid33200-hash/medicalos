@@ -2,23 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  @apply box-border;
-}
-
-html {
-  @apply scroll-smooth;
-}
-
-body {
-  @apply bg-white text-gray-900 antialiased;
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  body {
-    @apply bg-gray-950 text-gray-50;
+@layer base {
+  @font-face {
+    font-family: 'Recoleta';
+    src: local('Recoleta'), local('Instrument Serif'), Georgia, serif;
+    font-weight: 400 900;
   }
+
+  body {
+    font-family: 'Plus Jakarta Sans', 'DM Sans', 'Manrope', sans-serif;
+    @apply bg-white text-slate-800 antialiased;
+  }
+
+  h1, h2, .font-recoleta {
+    font-family: 'Recoleta', 'Instrument Serif', 'Plus Jakarta Sans', serif;
+  }
+}
+
+.font-dm-sans {
+  font-family: 'DM Sans', sans-serif;
+}
+
+.font-manrope {
+  font-family: 'Manrope', sans-serif;
+}
+
+.font-jakarta {
+  font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
 /* Custom scrollbar */
@@ -27,9 +37,9 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+  @apply bg-slate-100;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-400 rounded hover:bg-gray-500;
+  @apply bg-slate-300 rounded-full hover:bg-slate-400;
 }
