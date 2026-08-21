@@ -59,3 +59,5 @@ migrations/versions/*
 !migrations/versions/.gitkeep
 node_modules/
 webapp/node_modules/
+
+.vercel
