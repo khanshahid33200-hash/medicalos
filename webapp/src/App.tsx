@@ -25,7 +25,11 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
+        {/* Unprotected Public Routes */}
         <Route path="/login" element={<Login />} />
+        <Route path="/checkin" element={<Checkin />} />
+
+        {/* Protected Doctor Dashboard Routes */}
         <Route
           path="/dashboard"
           element={
@@ -74,7 +78,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/checkin" element={<Checkin />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AuthProvider>
