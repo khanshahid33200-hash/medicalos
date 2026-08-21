@@ -12,6 +12,7 @@ import Queue from './pages/Queue'
 import Reports from './pages/Reports'
 import QRKiosk from './pages/QRKiosk'
 import History from './pages/History'
+import DoctorProfile from './pages/DoctorProfile'
 import OwnerAdmin from './pages/OwnerAdmin'
 
 function App() {
@@ -27,7 +28,7 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Public Hospital Info Website */}
+        {/* Public Docon SaaS Website */}
         <Route path="/" element={<LandingPage />} />
 
         {/* Doctor & Hospital Sign In Portal (Hidden link /doctor) */}
@@ -84,6 +85,14 @@ function App() {
           element={
             <ProtectedRoute>
               <History />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <DoctorProfile />
             </ProtectedRoute>
           }
         />

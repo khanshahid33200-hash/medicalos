@@ -11,7 +11,7 @@ import {
   X,
   QrCode,
   Building2,
-  Smile
+  User
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -35,6 +35,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/qr-kiosk', label: 'QR Kiosk', icon: QrCode },
     { path: '/reports', label: 'Reports', icon: FileText },
     { path: '/history', label: 'History', icon: HistoryIcon },
+    { path: '/profile', label: 'Doctor Profile', icon: User },
   ]
 
   const handleLogout = async () => {
@@ -51,22 +52,14 @@ export default function Layout({ children }: LayoutProps) {
         } md:static md:translate-x-0 shadow-2xl border-r border-slate-800`}
       >
         <div className="flex flex-col h-full">
-          {/* Docon Logo & Hospital Header */}
-          <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-blue-600 rounded-full text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/30">
-                <Smile size={22} />
-              </div>
-              <div>
-                <span className="text-xl font-black text-white tracking-tight">docon</span>
-                <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider truncate max-w-[130px]">
-                  {doctorProfile?.hospital_name || 'Clinic OS EMR'}
-                </p>
-              </div>
+          {/* Official White Background Logo Header */}
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-white">
+            <Link to="/" className="flex items-center gap-2">
+              <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain" />
             </Link>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="md:hidden p-1 hover:bg-slate-800 rounded-lg text-slate-400"
+              className="md:hidden p-1 hover:bg-slate-100 rounded-lg text-slate-600"
             >
               <X size={20} />
             </button>
@@ -97,15 +90,15 @@ export default function Layout({ children }: LayoutProps) {
           {/* Doctor Profile Footer */}
           <div className="border-t border-slate-800 p-4 bg-slate-950/60">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
+              <Link to="/profile" className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-90 transition">
                 <div className="w-10 h-10 bg-blue-600/20 border border-blue-500/30 rounded-2xl flex items-center justify-center text-blue-400 font-extrabold text-sm flex-shrink-0">
                   {doctorProfile?.name ? doctorProfile.name.charAt(4) || 'D' : 'D'}
                 </div>
                 <div className="text-xs min-w-0 flex-1">
                   <p className="font-extrabold text-white truncate">{doctorProfile?.name || 'Dr. Authorized Doctor'}</p>
-                  <p className="text-slate-400 truncate">{doctorProfile?.department_name || 'Cardiology'}</p>
+                  <p className="text-blue-400 text-[11px] truncate font-medium">Edit Profile →</p>
                 </div>
-              </div>
+              </Link>
               <button
                 onClick={handleLogout}
                 title="Sign Out"
@@ -142,10 +135,10 @@ export default function Layout({ children }: LayoutProps) {
           </div>
 
           <div className="flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1.5 font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+            <Link to="/profile" className="flex items-center gap-1.5 font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 hover:bg-emerald-100 transition">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Verified Doctor
-            </span>
+              Verified Doctor Profile
+            </Link>
           </div>
         </header>
 
