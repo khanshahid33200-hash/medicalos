@@ -10,7 +10,6 @@ import {
   Building2,
   Lock as LockIcon,
   Award,
-  Smile,
   Calendar,
   FlaskConical,
   BarChart2,
@@ -37,9 +36,9 @@ export default function LandingPage() {
     if (!phoneInput) return
 
     try {
-      const existing = JSON.parse(localStorage.getItem('docon_leads') || '[]')
+      const existing = JSON.parse(localStorage.getItem('clinicos_leads') || '[]')
       existing.push({ phone: phoneInput, timestamp: new Date().toISOString() })
-      localStorage.setItem('docon_leads', JSON.stringify(existing))
+      localStorage.setItem('clinicos_leads', JSON.stringify(existing))
     } catch (e) {
       // ignore
     }
@@ -52,9 +51,9 @@ export default function LandingPage() {
     if (!leadForm.phone || !leadForm.name) return
 
     try {
-      const existing = JSON.parse(localStorage.getItem('docon_leads') || '[]')
+      const existing = JSON.parse(localStorage.getItem('clinicos_leads') || '[]')
       existing.push({ ...leadForm, timestamp: new Date().toISOString() })
-      localStorage.setItem('docon_leads', JSON.stringify(existing))
+      localStorage.setItem('clinicos_leads', JSON.stringify(existing))
     } catch (e) {
       // ignore
     }
@@ -64,17 +63,12 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-sans selection:bg-blue-600 selection:text-white">
-      {/* 1. Top Minimal Header (DocOn Design) */}
+      {/* 1. Top Header with Official White Logo */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 bg-blue-600 rounded-full text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/20 group-hover:scale-105 transition">
-              <Smile size={22} />
-            </div>
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              docon <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">Clinic OS</span>
-            </span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex items-center justify-between">
+          {/* Official White Logo */}
+          <Link to="/" className="flex items-center gap-2">
+            <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain" />
           </Link>
 
           {/* Navigation Links */}
@@ -92,7 +86,7 @@ export default function LandingPage() {
               className="text-slate-700 hover:text-blue-600 transition flex items-center gap-1.5"
             >
               <Lock size={15} className="text-blue-600" />
-              <span>Login</span>
+              <span>Doctor Login</span>
             </Link>
 
             <a
@@ -105,19 +99,19 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* 2. Docon Hero Section */}
+      {/* 2. Hero Section */}
       <section id="product" className="relative pt-12 pb-20 lg:pt-16 lg:pb-24 bg-gradient-to-b from-blue-50/40 via-white to-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Column: Hero Text & Lead Form */}
             <div className="lg:col-span-6 space-y-6 text-left">
-              <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
+              <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight leading-[1.1] font-recoleta">
                 Your one stop <br />
-                <span className="text-blue-600">digital Clinic.</span>
+                <span className="text-blue-600">digital Clinic OS.</span>
               </h1>
 
               <p className="text-slate-600 text-base sm:text-lg leading-relaxed font-medium max-w-md">
-                Transform your practice with our user-friendly interface to provide better patient care.
+                Transform your clinic & hospital reception with our user-friendly EMR interface to provide better patient care.
               </p>
 
               {/* Mobile Lead Box (+91 Enter your Phone Number Enroll Now) */}
@@ -128,7 +122,7 @@ export default function LandingPage() {
                       <CheckCircle className="text-emerald-600" size={18} /> Request Submitted Successfully!
                     </p>
                     <p className="text-xs text-emerald-700">
-                      Our digitalization team will contact you at <strong>+91-{phoneInput}</strong>.
+                      Our Clinic OS digitalization team will contact you at <strong>+91-{phoneInput}</strong>.
                     </p>
                     <Link to="/doctor" className="inline-block mt-2 px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl shadow">
                       Log in to Doctor Workspace (/doctor) →
@@ -159,14 +153,14 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Right Column: Hero Doctor Photo with Curved Shape */}
+            {/* Right Column: Hero Doctor Photo */}
             <div className="lg:col-span-6 relative">
               <div className="relative mx-auto max-w-lg">
                 <div className="absolute -inset-4 bg-blue-100/60 rounded-full blur-2xl -z-10" />
                 <div className="rounded-[40px] overflow-hidden border-4 border-white shadow-2xl bg-white">
                   <img
                     src="/assets/docon_doctor.jpg"
-                    alt="DocOn Doctor Consultation"
+                    alt="Clinic OS Doctor Consultation"
                     className="w-full h-[400px] object-cover"
                   />
                 </div>
@@ -174,7 +168,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* 5 Key Docon Stats Badges */}
+          {/* 5 Key Stat Badges */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-6 mt-20 pt-10 border-t border-slate-100 text-center">
             <div className="space-y-1">
               <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2 font-bold">
@@ -186,7 +180,7 @@ export default function LandingPage() {
 
             <div className="space-y-1">
               <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2 font-bold">
-                <Smile size={20} />
+                <Building2 size={20} />
               </div>
               <p className="text-3xl sm:text-4xl font-extrabold text-slate-900">12M+</p>
               <p className="text-xs font-semibold text-slate-500">Happy Patients</p>
@@ -227,7 +221,7 @@ export default function LandingPage() {
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 text-center space-y-12">
           <div className="space-y-2">
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight font-recoleta">
               Manage your <span className="text-blue-600">medical records,</span> easily
             </h2>
           </div>
@@ -270,7 +264,7 @@ export default function LandingPage() {
       <section className="py-20 bg-slate-50/80 border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-12">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight font-recoleta">
               Simplified <span className="text-blue-600">clinic management</span>
             </h2>
           </div>
@@ -313,7 +307,7 @@ export default function LandingPage() {
                     Increase patient retention by effectively using various tools that improve patient experience and outcomes. Continue to take care of them, even after consultation!
                   </p>
                   <Link to="/checkin" className="inline-flex items-center gap-1.5 font-bold text-xs text-blue-600 hover:text-blue-700">
-                    <span>Explore the new Docon feature</span>
+                    <span>Explore the new Clinic OS feature</span>
                     <ArrowRight size={14} />
                   </Link>
                 </div>
@@ -337,7 +331,7 @@ export default function LandingPage() {
                     Our technology enables doctors to maintain patient records more efficiently and effectively, encouraging them to deliver better patient care.
                   </p>
                   <Link to="/doctor" className="inline-flex items-center gap-1.5 font-bold text-xs text-blue-600 hover:text-blue-700">
-                    <span>Explore the new Docon feature</span>
+                    <span>Explore the new Clinic OS feature</span>
                     <ArrowRight size={14} />
                   </Link>
                 </div>
@@ -356,7 +350,7 @@ export default function LandingPage() {
                     With planned appointments, you can easily manage your queue and consult patients remotely from anywhere and on any device.
                   </p>
                   <Link to="/doctor" className="inline-flex items-center gap-1.5 font-bold text-xs text-blue-600 hover:text-blue-700">
-                    <span>Explore the new Docon feature</span>
+                    <span>Explore the new Clinic OS feature</span>
                     <ArrowRight size={14} />
                   </Link>
                 </div>
@@ -375,7 +369,7 @@ export default function LandingPage() {
                     Our partners enable doctors to provide additional services like e-pharmacy and e-diagnostic services at discounted prices.
                   </p>
                   <Link to="/doctor" className="inline-flex items-center gap-1.5 font-bold text-xs text-blue-600 hover:text-blue-700">
-                    <span>Explore the new Docon feature</span>
+                    <span>Explore the new Clinic OS feature</span>
                     <ArrowRight size={14} />
                   </Link>
                 </div>
@@ -394,7 +388,7 @@ export default function LandingPage() {
                     Our advanced tools can help you understand your practice better and generate actionable clinical insights.
                   </p>
                   <Link to="/doctor" className="inline-flex items-center gap-1.5 font-bold text-xs text-blue-600 hover:text-blue-700">
-                    <span>Explore the new Docon feature</span>
+                    <span>Explore the new Clinic OS feature</span>
                     <ArrowRight size={14} />
                   </Link>
                 </div>
@@ -412,11 +406,11 @@ export default function LandingPage() {
       <section id="security" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-12">
           <div className="text-center space-y-3 max-w-2xl mx-auto">
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight font-recoleta">
               Your data is in <span className="text-blue-600">safe hands</span>
             </h2>
             <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              Health should never come at the expense of privacy. With Docon, you decide what you want to share. We use the latest encryption technologies and comply with the NDHM Act 2018.
+              Health should never come at the expense of privacy. With Clinic OS, you decide what you want to share. We use the latest encryption technologies and comply with the NDHM Act 2018.
             </p>
           </div>
 
@@ -428,7 +422,7 @@ export default function LandingPage() {
               <div className="space-y-1 text-left">
                 <h3 className="font-extrabold text-slate-900 text-base">ABDM compliant</h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Docon is ABDM milestone-3 compliant. Authorised healthcare workers can view patient's medical history with the consent of the patient.
+                  Clinic OS is ABDM milestone-3 compliant. Authorised healthcare workers can view patient's medical history with the consent of the patient.
                 </p>
               </div>
             </div>
@@ -452,7 +446,7 @@ export default function LandingPage() {
               <div className="space-y-1 text-left">
                 <h3 className="font-extrabold text-slate-900 text-base">Adherence to Guidelines</h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Docon complies with the guidelines for tele-consultation, issued by Niti Aayog in 2020.
+                  Clinic OS complies with the guidelines for tele-consultation, issued by Niti Aayog in 2020.
                 </p>
               </div>
             </div>
@@ -472,13 +466,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 6. Section: Working with Docon is simple (3 Steps) */}
+      {/* 6. Section: Working with Clinic OS is simple (3 Steps) */}
       <section id="how-it-works" className="py-20 bg-slate-50/60 border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 text-center space-y-12">
           <div className="space-y-2">
             <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Start Your Journey</p>
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">
-              Working with <span className="text-blue-600">Docon is simple</span>
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight font-recoleta">
+              Working with <span className="text-blue-600">Clinic OS is simple</span>
             </h2>
           </div>
 
@@ -509,34 +503,34 @@ export default function LandingPage() {
               </div>
               <h3 className="font-extrabold text-slate-900 text-lg">Share Rx</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Patients can view the prescription or e-Rx on the Docon patient app or on the web portal.
+                Patients can view the prescription or e-Rx on the Clinic OS patient app or on the web portal.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 7. Section: Why use Docon & Doctor Testimonials */}
+      {/* 7. Section: Why use Clinic OS & Doctor Testimonials */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-4 space-y-4 text-left">
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 leading-tight">
-                Why use <br /><span className="text-blue-600">Docon?</span>
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 leading-tight font-recoleta">
+                Why use <br /><span className="text-blue-600">Clinic OS?</span>
               </h2>
             </div>
             <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
               <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
                 <p className="text-4xl font-black text-blue-600">1M+</p>
-                <p className="text-xs font-semibold text-slate-600 mt-2">Monthly Rx generated by doctors using Docon</p>
+                <p className="text-xs font-semibold text-slate-600 mt-2">Monthly Rx generated by doctors using Clinic OS</p>
               </div>
               <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
                 <p className="text-4xl font-black text-blue-600">1.5x</p>
-                <p className="text-xs font-semibold text-slate-600 mt-2">Increase in doctor's efficiency using docon</p>
+                <p className="text-xs font-semibold text-slate-600 mt-2">Increase in doctor's efficiency using Clinic OS</p>
               </div>
               <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
                 <p className="text-4xl font-black text-blue-600">2x</p>
-                <p className="text-xs font-semibold text-slate-600 mt-2">Follow ups increased after using Docon</p>
+                <p className="text-xs font-semibold text-slate-600 mt-2">Follow ups increased after using Clinic OS</p>
               </div>
             </div>
           </div>
@@ -551,20 +545,20 @@ export default function LandingPage() {
               <Star size={18} fill="currentColor" />
             </div>
             <p className="text-lg font-medium text-slate-800 italic leading-relaxed">
-              "Fabulous initiative! I started using Docon after struggling with other desktop based software for my clinic. Now with Docon I conduct my OPD faster than when I was writing or typing. Docon is improving itself faster with new features that are being added."
+              "Fabulous initiative! I started using Clinic OS after struggling with other desktop based software for my clinic. Now with Clinic OS I conduct my OPD faster than when I was writing or typing. Clinic OS is improving itself faster with new features that are being added."
             </p>
             <p className="font-extrabold text-slate-900 text-sm">
-              Sushila Kataria | <span className="text-blue-600 font-semibold">Internal Medicine, Gurgaon</span>
+              Dr. Sushila Kataria | <span className="text-blue-600 font-semibold">Internal Medicine, Gurgaon</span>
             </p>
           </div>
         </div>
       </section>
 
-      {/* 8. Lead Enrollment Form: Achieve your best performance with us */}
+      {/* 8. Lead Enrollment Form */}
       <section className="py-20 bg-slate-50 border-t border-slate-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-8 text-center space-y-8">
           <div className="space-y-2">
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight font-recoleta">
               Achieve your <span className="text-blue-600">best performance</span> with us
             </h2>
             <p className="text-xs text-slate-600 max-w-xl mx-auto font-medium">
@@ -649,16 +643,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 9. Footer (DocOn Style) */}
+      {/* 9. Footer */}
       <footer className="bg-white text-slate-600 py-16 text-xs border-t border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
           <div className="space-y-3 text-left">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-full text-white flex items-center justify-center font-bold">
-                <Smile size={20} />
-              </div>
-              <span className="text-xl font-extrabold text-slate-900">docon</span>
-            </div>
+            <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain" />
             <p className="text-slate-500 leading-relaxed">
               Block-1, 4th Floor, Prestige Blue Chip Software Park Adugodi, Dairy Colony. Karnataka - 560029
             </p>
@@ -695,7 +684,7 @@ export default function LandingPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-400">
-          <p>© All rights reserved. Docon technologies Pvt. Ltd 2026</p>
+          <p>© All rights reserved. Clinic OS Technologies Pvt. Ltd 2026</p>
           <Link to="/doctor" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
             <Lock size={12} /> Doctor Sign In Portal (/doctor)
           </Link>
