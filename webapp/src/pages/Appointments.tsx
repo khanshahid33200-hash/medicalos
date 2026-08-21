@@ -1,92 +1,42 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, X, Calendar, Clock, Ticket, Receipt, CheckCircle, XCircle } from 'lucide-react'
 import Layout from '../components/Layout'
 import { Card, CardContent } from '../components/Card'
 import Button from '../components/Button'
+import { useAuth } from '../context/AuthContext'
+import { getAppointmentsForDoctor, saveAppointmentsForDoctor, AppointmentItem } from '../utils/doctorStore'
 
 export default function Appointments() {
+  const { doctorProfile } = useAuth()
+  const doctorId = doctorProfile?.doctor_id || 'doc-001'
+  const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
+
   const [filterTab, setFilterTab] = useState<'todays' | 'upcoming' | 'completed' | 'cancelled'>('todays')
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [bookingForm, setBookingForm] = useState({
     patient_name: '',
     phone: '',
     appointment_date: '',
-    department: 'Cardiology',
+    department: doctorProfile?.department_name || 'Cardiology',
     reason_for_visit: '',
-    confirmation_method: 'whatsapp',
   })
 
-  // Sample Appointments dataset matching user requirement
-  const [appointmentsList, setAppointmentsList] = useState([
-    {
-      id: 'apt-001',
-      token_number: 'Token 001',
-      receipt_number: 'RCP-2026-0819',
-      patient_name: 'Rahul Sharma',
-      phone: '+91-9876543210',
-      appointment_time: '10:00 AM Today',
-      category: 'todays',
-      status: 'scheduled',
-      is_confirmed: true,
-    },
-    {
-      id: 'apt-002',
-      token_number: 'Token 002',
-      receipt_number: 'RCP-2026-0820',
-      patient_name: 'Amit Khan',
-      phone: '+91-9876543211',
-      appointment_time: '10:30 AM Today',
-      category: 'todays',
-      status: 'scheduled',
-      is_confirmed: true,
-    },
-    {
-      id: 'apt-003',
-      token_number: 'Token 003',
-      receipt_number: 'RCP-2026-0821',
-      patient_name: 'Priya Sharma',
-      phone: '+91-9876543212',
-      appointment_time: '11:00 AM Today',
-      category: 'todays',
-      status: 'scheduled',
-      is_confirmed: false,
-    },
-    {
-      id: 'apt-004',
-      token_number: 'Token 004',
-      receipt_number: 'RCP-2026-0822',
-      patient_name: 'Vikram Singh',
-      phone: '+91-9876543213',
-      appointment_time: '2026-08-21 02:00 PM',
-      category: 'upcoming',
-      status: 'scheduled',
-      is_confirmed: true,
-    },
-    {
-      id: 'apt-005',
-      token_number: 'Token 005',
-      receipt_number: 'RCP-2026-0818',
-      patient_name: 'Ananya Verma',
-      phone: '+91-9876543214',
-      appointment_time: '2026-08-19 04:30 PM',
-      category: 'completed',
-      status: 'completed',
-      is_confirmed: true,
-    },
-    {
-      id: 'apt-006',
-      token_number: 'Token 006',
-      receipt_number: 'RCP-2026-0817',
-      patient_name: 'Deepak Kumar',
-      phone: '+91-9876543215',
-      appointment_time: '2026-08-19 01:00 PM',
-      category: 'cancelled',
-      status: 'cancelled',
-      is_confirmed: false,
-    },
-  ])
+  const [appointmentsList, setAppointmentsList] = useState<AppointmentItem[]>([])
 
-  const filteredAppointments = appointmentsList.filter((apt) => apt.category === filterTab)
+  useEffect(() => {
+    if (doctorId) {
+      const storeAppointments = getAppointmentsForDoctor(doctorId)
+      setAppointmentsList(storeAppointments)
+    }
+  }, [doctorId])
+
+  const filteredAppointments = appointmentsList.filter((apt) => {
+    if (filterTab === 'todays') return apt.status === 'Scheduled'
+    if (filterTab === 'upcoming') return apt.status === 'Scheduled'
+    if (filterTab === 'completed') return apt.status === 'Completed'
+    if (filterTab === 'cancelled') return apt.status === 'Cancelled'
+    return true
+  })
 
   const handleBookingChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -98,28 +48,32 @@ export default function Appointments() {
 
   const handleSubmitBooking = (e: React.FormEvent) => {
     e.preventDefault()
-    const nextTokenNum = `Token 00${appointmentsList.length + 1}`
-    const nextReceiptNum = `RCP-2026-08${20 + appointmentsList.length}`
-    const newApt = {
-      id: `apt-00${appointmentsList.length + 1}`,
+    const nextTokenNum = `Token ${String(appointmentsList.length + 1).padStart(3, '0')}`
+    const nextReceiptNum = `RCP-${Date.now().toString().substring(5)}`
+
+    const newApt: AppointmentItem = {
+      id: `apt-${Date.now()}`,
+      doctor_id: doctorId,
       token_number: nextTokenNum,
       receipt_number: nextReceiptNum,
       patient_name: bookingForm.patient_name,
       phone: bookingForm.phone,
-      appointment_time: bookingForm.appointment_date || '11:30 AM Today',
-      category: 'todays' as const,
-      status: 'scheduled',
-      is_confirmed: true,
+      appointment_date: bookingForm.appointment_date || 'Today',
+      appointment_time: '11:00 AM',
+      department: bookingForm.department,
+      status: 'Scheduled',
     }
-    setAppointmentsList([newApt, ...appointmentsList])
+
+    const updated = [newApt, ...appointmentsList]
+    setAppointmentsList(updated)
+    saveAppointmentsForDoctor(doctorId, updated)
     setShowBookingModal(false)
     setBookingForm({
       patient_name: '',
       phone: '',
       appointment_date: '',
-      department: 'Cardiology',
+      department: doctorProfile?.department_name || 'Cardiology',
       reason_for_visit: '',
-      confirmation_method: 'whatsapp',
     })
   }
 
@@ -129,7 +83,7 @@ export default function Appointments() {
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Appointments Management</h1>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Appointments Management for {doctorName}</h1>
             <p className="text-gray-600 text-sm mt-1">
               View and filter patient appointments by Token Number, Receipt Reference, and Status
             </p>
@@ -143,10 +97,10 @@ export default function Appointments() {
         {/* 4 Tabs: Today's, Upcoming, Completed, Cancelled */}
         <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
           {[
-            { id: 'todays', label: "Today's Appointments", count: appointmentsList.filter(a => a.category === 'todays').length },
-            { id: 'upcoming', label: 'Upcoming', count: appointmentsList.filter(a => a.category === 'upcoming').length },
-            { id: 'completed', label: 'Completed', count: appointmentsList.filter(a => a.category === 'completed').length },
-            { id: 'cancelled', label: 'Cancelled', count: appointmentsList.filter(a => a.category === 'cancelled').length },
+            { id: 'todays', label: "Today's Appointments", count: appointmentsList.filter(a => a.status === 'Scheduled').length },
+            { id: 'upcoming', label: 'Upcoming', count: appointmentsList.filter(a => a.status === 'Scheduled').length },
+            { id: 'completed', label: 'Completed', count: appointmentsList.filter(a => a.status === 'Completed').length },
+            { id: 'cancelled', label: 'Cancelled', count: appointmentsList.filter(a => a.status === 'Cancelled').length },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -171,7 +125,8 @@ export default function Appointments() {
             <Card>
               <CardContent className="text-center py-12">
                 <Calendar size={40} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-gray-600 font-medium">No appointments found in this category.</p>
+                <p className="text-gray-600 font-medium">No appointments found for {doctorName}.</p>
+                <p className="text-xs text-gray-400 mt-1">Book an appointment or share your doctor QR code for patient check-in.</p>
               </CardContent>
             </Card>
           ) : (
@@ -197,24 +152,24 @@ export default function Appointments() {
                         <p className="text-xs text-gray-500 mt-1 flex items-center gap-3">
                           <span>Phone: {apt.phone}</span>
                           <span>•</span>
-                          <span className="flex items-center gap-1"><Clock size={13} /> {apt.appointment_time}</span>
+                          <span className="flex items-center gap-1"><Clock size={13} /> {apt.appointment_date} ({apt.appointment_time})</span>
                         </p>
                       </div>
                     </div>
 
                     {/* Status Badges */}
                     <div className="flex items-center gap-3">
-                      {apt.status === 'scheduled' && (
+                      {apt.status === 'Scheduled' && (
                         <span className="px-3 py-1 bg-blue-50 text-blue-700 font-semibold text-xs rounded-full border border-blue-200 flex items-center gap-1">
                           <Clock size={13} /> Scheduled
                         </span>
                       )}
-                      {apt.status === 'completed' && (
+                      {apt.status === 'Completed' && (
                         <span className="px-3 py-1 bg-green-50 text-green-700 font-semibold text-xs rounded-full border border-green-200 flex items-center gap-1">
                           <CheckCircle size={13} /> Completed
                         </span>
                       )}
-                      {apt.status === 'cancelled' && (
+                      {apt.status === 'Cancelled' && (
                         <span className="px-3 py-1 bg-red-50 text-red-700 font-semibold text-xs rounded-full border border-red-200 flex items-center gap-1">
                           <XCircle size={13} /> Cancelled
                         </span>
@@ -232,7 +187,7 @@ export default function Appointments() {
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100">
               <div className="flex items-center justify-between px-6 py-4 bg-blue-600 text-white">
-                <h2 className="text-lg font-bold">Book New Patient Appointment</h2>
+                <h2 className="text-lg font-bold">Book Appointment for {doctorName}</h2>
                 <button onClick={() => setShowBookingModal(false)} className="p-1 hover:bg-blue-700 rounded-lg">
                   <X size={20} />
                 </button>
@@ -267,26 +222,23 @@ export default function Appointments() {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Department</label>
-                  <select
+                  <input
+                    type="text"
                     name="department"
                     value={bookingForm.department}
-                    onChange={handleBookingChange}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 font-medium"
-                  >
-                    <option value="Cardiology">Cardiology</option>
-                    <option value="General OPD">General OPD</option>
-                    <option value="Pediatrics">Pediatrics</option>
-                  </select>
+                    readOnly
+                    className="w-full px-3.5 py-2.5 border border-gray-300 bg-gray-50 rounded-xl text-sm font-semibold text-gray-700"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Appointment Time</label>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Appointment Date / Time</label>
                   <input
                     type="text"
                     name="appointment_date"
                     value={bookingForm.appointment_date}
                     onChange={handleBookingChange}
-                    placeholder="e.g. 11:30 AM Today"
+                    placeholder="e.g. Tomorrow at 10:30 AM"
                     className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
                   />
                 </div>

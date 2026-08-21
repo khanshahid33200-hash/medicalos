@@ -1,243 +1,150 @@
-import { BarChart, TrendingUp, Calendar } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { FileText, Calendar, TrendingUp, Users, Building2, Download } from 'lucide-react'
 import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import Button from '../components/Button'
+import { useAuth } from '../context/AuthContext'
+import { getQueueForDoctor } from '../utils/doctorStore'
 
 export default function Reports() {
+  const { doctorProfile } = useAuth()
+  const doctorId = doctorProfile?.doctor_id || 'doc-001'
+  const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
+  const departmentName = doctorProfile?.department_name || 'Cardiology'
+
+  const [queueList, setQueueList] = useState<any[]>([])
+
+  useEffect(() => {
+    if (doctorId) {
+      setQueueList(getQueueForDoctor(doctorId))
+    }
+  }, [doctorId])
+
+  const completedCount = queueList.filter((q) => q.status === 'Completed').length
+  const waitingCount = queueList.filter((q) => q.status === 'Waiting').length
+  const totalCheckins = queueList.length
+
   return (
-    <Layout userRole="doctor">
+    <Layout>
       <div className="space-y-6">
         {/* Page Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-gray-600 mt-2">View clinic performance and patient insights</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+              <FileText className="text-blue-600" size={30} /> Clinical Reports for {doctorName}
+            </h1>
+            <p className="text-gray-600 text-sm mt-1">
+              Department of {departmentName} • Dynamic Scanned Patient Analytics
+            </p>
+          </div>
+          <Button variant="primary" size="lg" className="shadow-lg shadow-blue-600/20 flex items-center gap-2">
+            <Download size={18} /> Download Clinical Summary
+          </Button>
         </div>
 
-        {/* Date Range Selector */}
-        <Card>
-          <CardContent className="py-4 flex gap-3 items-center">
-            <Calendar size={20} className="text-primary-600" />
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Report Period</label>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  defaultValue={new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                />
-                <span className="flex items-center text-gray-500">to</span>
-                <input
-                  type="date"
-                  defaultValue={new Date().toISOString().split('T')[0]}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                />
-                <Button variant="primary">Generate Report</Button>
+        {/* Dynamic Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border border-gray-200">
+            <CardContent className="py-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase text-gray-500 tracking-wider">Total Patient Check-ins</p>
+                  <p className="text-3xl font-black text-gray-900 mt-2">{totalCheckins}</p>
+                  <p className="text-xs text-blue-600 mt-1 font-medium">Scanned via Doctor QR Code</p>
+                </div>
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                  <Users size={24} />
+                </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-gray-200">
+            <CardContent className="py-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase text-gray-500 tracking-wider">Completed Consultations</p>
+                  <p className="text-3xl font-black text-emerald-600 mt-2">{completedCount}</p>
+                  <p className="text-xs text-emerald-700 mt-1 font-medium">Consulted by {doctorName}</p>
+                </div>
+                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                  <TrendingUp size={24} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-gray-200">
+            <CardContent className="py-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase text-gray-500 tracking-wider">Currently Waiting Patients</p>
+                  <p className="text-3xl font-black text-amber-600 mt-2">{waitingCount}</p>
+                  <p className="text-xs text-amber-700 mt-1 font-medium">In waiting room</p>
+                </div>
+                <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
+                  <Calendar size={24} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Detailed Patient Records Table */}
+        <Card className="border border-gray-200">
+          <CardHeader title={`Scanned Patient Check-in Archive (${queueList.length} Records)`} />
+          <CardContent className="p-0">
+            {queueList.length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto border border-blue-100">
+                  <Building2 size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">No Patient Reports Yet</h3>
+                <p className="text-sm text-gray-500 max-w-md mx-auto">
+                  When patients check in via <strong>{doctorName}</strong>'s QR code, their symptom reports will be generated here automatically.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase font-semibold text-gray-500">
+                    <tr>
+                      <th className="px-6 py-3.5">Token Number</th>
+                      <th className="px-6 py-3.5">Patient Name & Phone</th>
+                      <th className="px-6 py-3.5">Reported Symptoms</th>
+                      <th className="px-6 py-3.5">Severity</th>
+                      <th className="px-6 py-3.5">Check-in Time</th>
+                      <th className="px-6 py-3.5">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 font-medium">
+                    {queueList.map((q) => (
+                      <tr key={q.id} className="hover:bg-gray-50 transition">
+                        <td className="px-6 py-4 font-mono text-xs font-bold text-blue-700">{q.token_number}</td>
+                        <td className="px-6 py-4 font-bold text-gray-900">
+                          {q.patient_name}
+                          <p className="text-xs text-gray-400 font-normal">{q.phone}</p>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-gray-700">{q.symptoms || 'Routine Checkup'}</td>
+                        <td className="px-6 py-4">
+                          <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                            {q.severity || 'Moderate'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 text-xs">{q.check_in_time}</td>
+                        <td className="px-6 py-4">
+                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-full border border-emerald-200">
+                            {q.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
-
-        {/* Key Metrics */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="py-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Check-ins</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">248</p>
-                  <p className="text-xs text-green-600 mt-2">↑ 12% from last period</p>
-                </div>
-                <BarChart className="text-primary-600" size={24} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="py-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Appointments</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">186</p>
-                  <p className="text-xs text-green-600 mt-2">↑ 8% completion rate</p>
-                </div>
-                <TrendingUp className="text-primary-600" size={24} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="py-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">No-shows</p>
-                  <p className="text-3xl font-bold text-red-600 mt-2">12</p>
-                  <p className="text-xs text-red-600 mt-2">4.8% rate</p>
-                </div>
-                <BarChart className="text-red-600" size={24} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="py-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Avg. Wait Time</p>
-                  <p className="text-3xl font-bold text-blue-600 mt-2">8.5 min</p>
-                  <p className="text-xs text-green-600 mt-2">↓ 15% improvement</p>
-                </div>
-                <Calendar className="text-blue-600" size={24} />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Report Sections */}
-        <div className="grid grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Symptom Distribution</h3>
-            </CardHeader>
-            <CardContent className="py-6">
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Fever</span>
-                    <span className="font-semibold">35%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-red-500 h-2 rounded-full" style={{ width: '35%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Cough</span>
-                    <span className="font-semibold">28%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-yellow-500 h-2 rounded-full" style={{ width: '28%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Headache</span>
-                    <span className="font-semibold">18%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '18%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Others</span>
-                    <span className="font-semibold">19%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-gray-500 h-2 rounded-full" style={{ width: '19%' }} />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Severity Distribution</h3>
-            </CardHeader>
-            <CardContent className="py-6">
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Mild</span>
-                    <span className="font-semibold">52%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '52%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Moderate</span>
-                    <span className="font-semibold">35%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-yellow-500 h-2 rounded-full" style={{ width: '35%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Severe</span>
-                    <span className="font-semibold">13%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-red-500 h-2 rounded-full" style={{ width: '13%' }} />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Hourly Patient Traffic</h3>
-            </CardHeader>
-            <CardContent className="py-6">
-              <div className="space-y-2">
-                <div className="flex items-end gap-2 h-48">
-                  {[12, 18, 25, 32, 28, 35, 22, 15, 10].map((value, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center">
-                      <div className="w-full bg-primary-500 rounded-t" style={{ height: `${(value / 35) * 100}%` }} />
-                      <span className="text-xs text-gray-600 mt-2">{9 + i}AM</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Doctor Performance</h3>
-            </CardHeader>
-            <CardContent className="py-6">
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Dr. Smith</span>
-                    <span className="font-semibold">45 patients</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: '90%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Dr. Johnson</span>
-                    <span className="font-semibold">38 patients</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: '76%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700">Dr. Patel</span>
-                    <span className="font-semibold">32 patients</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: '64%' }} />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Export Button */}
-        <div className="flex gap-3 justify-end">
-          <Button variant="secondary">Download PDF</Button>
-          <Button variant="primary">Send to Email</Button>
-        </div>
       </div>
     </Layout>
   )

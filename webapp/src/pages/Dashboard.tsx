@@ -1,17 +1,35 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users, Calendar, Building2, Stethoscope, Clock, ShieldCheck } from 'lucide-react'
 import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import { useAuth } from '../context/AuthContext'
 import Button from '../components/Button'
+import { getQueueForDoctor, getAppointmentsForDoctor } from '../utils/doctorStore'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const { doctorProfile } = useAuth()
 
+  const doctorId = doctorProfile?.doctor_id || 'doc-001'
   const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
   const hospitalName = doctorProfile?.hospital_name || 'Metro Care General Hospital'
   const departmentName = doctorProfile?.department_name || 'Cardiology'
+
+  const [queueList, setQueueList] = useState<any[]>([])
+  const [aptList, setAptList] = useState<any[]>([])
+
+  useEffect(() => {
+    if (doctorId) {
+      setQueueList(getQueueForDoctor(doctorId))
+      setAptList(getAppointmentsForDoctor(doctorId))
+    }
+  }, [doctorId])
+
+  const totalCheckins = queueList.length
+  const scheduledApts = aptList.filter((a) => a.status === 'Scheduled').length
+  const completedConsultations = queueList.filter((q) => q.status === 'Completed').length
+  const waitingCount = queueList.filter((q) => q.status === 'Waiting').length
 
   return (
     <Layout>
@@ -50,7 +68,7 @@ export default function Dashboard() {
             <CardContent className="flex items-start justify-between pt-6">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Today's Queue Check-ins</p>
-                <p className="text-3xl font-extrabold text-gray-900 mt-1">4 Patients</p>
+                <p className="text-3xl font-extrabold text-gray-900 mt-1">{totalCheckins} Patients</p>
               </div>
               <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
                 <Users size={24} />
@@ -62,7 +80,7 @@ export default function Dashboard() {
             <CardContent className="flex items-start justify-between pt-6">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Scheduled Appointments</p>
-                <p className="text-3xl font-extrabold text-gray-900 mt-1">3 Today</p>
+                <p className="text-3xl font-extrabold text-gray-900 mt-1">{scheduledApts} Active</p>
               </div>
               <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
                 <Calendar size={24} />
@@ -74,7 +92,7 @@ export default function Dashboard() {
             <CardContent className="flex items-start justify-between pt-6">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Completed Consultations</p>
-                <p className="text-3xl font-extrabold text-gray-900 mt-1">1 Patient</p>
+                <p className="text-3xl font-extrabold text-gray-900 mt-1">{completedConsultations} Patients</p>
               </div>
               <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100">
                 <Users size={24} />
@@ -85,8 +103,8 @@ export default function Dashboard() {
           <Card className="border border-gray-200 hover:shadow-md transition">
             <CardContent className="flex items-start justify-between pt-6">
               <div>
-                <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Est. Next Wait Time</p>
-                <p className="text-3xl font-extrabold text-amber-600 mt-1">10 mins</p>
+                <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Waiting Room Queue</p>
+                <p className="text-3xl font-extrabold text-amber-600 mt-1">{waitingCount} Waiting</p>
               </div>
               <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100">
                 <Clock size={24} />

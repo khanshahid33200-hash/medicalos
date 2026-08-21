@@ -4,12 +4,13 @@ import { Phone, User, AlertCircle, CheckCircle, Stethoscope, Building2, Ticket, 
 import { Card, CardContent, CardHeader } from '../components/Card'
 import Button from '../components/Button'
 import { useSubmitCheckin } from '../hooks/useApi'
+import { addCheckinToDoctorQueue } from '../utils/doctorStore'
 
 export default function Checkin() {
   const [searchParams] = useSearchParams()
 
   // Extract doctor and hospital details from QR Code parameters
-  const doctorName = searchParams.get('doctor_name') || searchParams.get('doctor') || 'Dr. Rahul Sharma'
+  const doctorName = searchParams.get('doctor_name') || searchParams.get('doctor') || 'Dr. Authorized Doctor'
   const doctorId = searchParams.get('doctor_id') || 'doc-001'
   const departmentName = searchParams.get('department') || 'Cardiology'
   const hospitalName = searchParams.get('hospital_name') || searchParams.get('hospital') || 'Metro Care General Hospital'
@@ -61,26 +62,32 @@ export default function Checkin() {
       Object.entries(formData).filter(([_, value]) => value !== '' && value !== null)
     )
 
-    const payload: Record<string, any> = { ...cleanedData }
+    const payload: Record<string, any> = { ...cleanedData, doctor_id: doctorId }
     if (payload.age && typeof payload.age === 'string') {
       payload.age = parseInt(payload.age, 10)
     }
 
+    // Save directly to Doctor-Specific Queue Store
+    const newItem = addCheckinToDoctorQueue(doctorId, payload)
+
     submitCheckin(payload, {
       onSuccess: (data) => {
-        setResponse(data.data)
+        setResponse({
+          ...data.data,
+          queue_number: newItem.token_number,
+          receipt_number: `RCP-${Date.now().toString().substring(5)}`,
+        })
         setStep('success')
         window.scrollTo({ top: 0, behavior: 'smooth' })
       },
       onError: () => {
-        // Fallback demo response for seamless patient experience
-        const demoResp = {
-          queue_number: 'Token 004',
-          receipt_number: 'RCP-2026-0824',
-          estimated_wait_minutes: 15,
-          message: `Check-in successful! Please wait in room 1 for ${doctorName}.`
-        }
-        setResponse(demoResp)
+        // Fallback store confirmation
+        setResponse({
+          queue_number: newItem.token_number,
+          receipt_number: `RCP-${Date.now().toString().substring(5)}`,
+          estimated_wait_minutes: 10,
+          message: `Check-in successful! Please wait in room for ${doctorName}.`
+        })
         setStep('success')
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }
@@ -115,7 +122,7 @@ export default function Checkin() {
               <div className="bg-emerald-600 text-white text-center py-6 px-4">
                 <CheckCircle size={56} className="mx-auto mb-2" />
                 <h2 className="text-2xl font-bold">Check-in Confirmed!</h2>
-                <p className="text-emerald-100 text-sm mt-1">Your details have been sent directly to {doctorName}'s queue.</p>
+                <p className="text-emerald-100 text-sm mt-1">Your details have been sent directly to {doctorName}'s live queue.</p>
               </div>
 
               <CardContent className="py-8 px-6 space-y-6 text-center">
@@ -123,13 +130,13 @@ export default function Checkin() {
                 <div className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-md space-y-3">
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Your Live Queue Token</p>
                   <div className="inline-flex items-center gap-2 px-6 py-2 bg-blue-50 text-blue-700 font-extrabold text-4xl rounded-2xl border border-blue-200 shadow-inner">
-                    <Ticket size={32} /> {response.queue_number || 'Token 004'}
+                    <Ticket size={32} /> {response.queue_number}
                   </div>
-                  <p className="text-xs font-mono text-gray-500">Receipt Ref: {response.receipt_number || 'RCP-2026-0824'}</p>
+                  <p className="text-xs font-mono text-gray-500">Receipt Ref: {response.receipt_number}</p>
 
                   <div className="pt-3 border-t border-gray-100 flex items-center justify-center gap-2 text-gray-700 font-semibold text-sm">
                     <Clock className="text-blue-600" size={18} />
-                    <span>Estimated Wait Time: {response.estimated_wait_minutes || 15} mins</span>
+                    <span>Estimated Wait Time: {response.estimated_wait_minutes || 10} mins</span>
                   </div>
                 </div>
 
@@ -192,7 +199,7 @@ export default function Checkin() {
                         name="name"
                         value={formData.name}
                         onChange={handleChange}
-                        placeholder="Rahul Sharma"
+                        placeholder="Patient Full Name"
                         required
                         className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
                       />
@@ -207,7 +214,7 @@ export default function Checkin() {
                         name="age"
                         value={formData.age}
                         onChange={handleChange}
-                        placeholder="42"
+                        placeholder="35"
                         className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
@@ -242,7 +249,7 @@ export default function Checkin() {
                       name="symptoms"
                       value={formData.symptoms}
                       onChange={handleChange}
-                      placeholder="e.g. Mild chest pain and headache for 2 days"
+                      placeholder="Describe symptoms here..."
                       required
                       rows={3}
                       className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
@@ -291,7 +298,7 @@ export default function Checkin() {
                       name="allergies"
                       value={formData.allergies}
                       onChange={handleChange}
-                      placeholder="e.g. Aspirin, Penicillin"
+                      placeholder="e.g. Penicillin"
                       className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -303,7 +310,7 @@ export default function Checkin() {
                       name="current_medications"
                       value={formData.current_medications}
                       onChange={handleChange}
-                      placeholder="e.g. Metformin 500mg"
+                      placeholder="e.g. Paracetamol"
                       className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
