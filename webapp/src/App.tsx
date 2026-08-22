@@ -4,6 +4,9 @@ import apiClient from './api/client'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import LandingPage from './pages/LandingPage'
+import FeaturesPage from './pages/FeaturesPage'
+import PricingPage from './pages/PricingPage'
+import ContactPage from './pages/ContactPage'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Appointments from './pages/Appointments'
@@ -28,8 +31,11 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Public Docon SaaS Website */}
+        {/* Public Clinic OS SaaS Pages */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/contact" element={<ContactPage />} />
 
         {/* Doctor & Hospital Sign In Portal (Hidden link /doctor) */}
         <Route path="/doctor" element={<Login />} />

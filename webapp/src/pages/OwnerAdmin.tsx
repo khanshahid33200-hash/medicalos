@@ -13,7 +13,9 @@ import {
   Layers,
   Crown,
   LogOut,
-  AlertCircle
+  AlertCircle,
+  Inbox,
+  Phone
 } from 'lucide-react'
 import Button from '../components/Button'
 import apiClient from '../api/client'
@@ -43,6 +45,19 @@ interface DoctorItem {
   status: 'active' | 'inactive' | 'on_leave'
 }
 
+interface LeadItem {
+  id?: string
+  name?: string
+  phone?: string
+  email?: string
+  clinic_name?: string
+  city?: string
+  speciality?: string
+  plan?: string
+  message?: string
+  timestamp?: string
+}
+
 export default function OwnerAdmin() {
   const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(false)
   const [loginForm, setLoginForm] = useState({
@@ -51,7 +66,7 @@ export default function OwnerAdmin() {
   })
   const [loginError, setLoginError] = useState('')
 
-  const [activeTab, setActiveTab] = useState<'hospitals' | 'doctors' | 'analytics'>('hospitals')
+  const [activeTab, setActiveTab] = useState<'hospitals' | 'doctors' | 'leads' | 'analytics'>('hospitals')
   const [notice, setNotice] = useState<string | null>(null)
 
   // Hospital State
@@ -80,6 +95,7 @@ export default function OwnerAdmin() {
 
   // Doctor State
   const [doctorsList, setDoctorsList] = useState<DoctorItem[]>([])
+  const [leadsList, setLeadsList] = useState<LeadItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
@@ -111,7 +127,17 @@ export default function OwnerAdmin() {
       setIsOwnerAuthenticated(true)
     }
     fetchDoctors()
+    fetchLeads()
   }, [])
+
+  const fetchLeads = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('clinicos_leads') || '[]')
+      setLeadsList(saved)
+    } catch (e) {
+      setLeadsList([])
+    }
+  }
 
   const fetchDoctors = async () => {
     try {
@@ -262,6 +288,12 @@ export default function OwnerAdmin() {
     setTimeout(() => setNotice(null), 4000)
   }
 
+  const handleClearLeads = () => {
+    if (!window.confirm('Are you sure you want to clear lead submissions?')) return
+    localStorage.removeItem('clinicos_leads')
+    setLeadsList([])
+  }
+
   // 1. OWNER UNAUTHENTICATED VIEW
   if (!isOwnerAuthenticated) {
     return (
@@ -368,7 +400,7 @@ export default function OwnerAdmin() {
               Website & Multi-Hospital Management
             </h2>
             <p className="text-slate-300 text-sm mt-1">
-              Register Hospitals, Onboard Doctors, set passwords, and manage multi-tenant access across the platform.
+              Register Hospitals, Onboard Doctors, set passwords, and collect all sales lead inquiries.
             </p>
           </div>
 
@@ -395,6 +427,7 @@ export default function OwnerAdmin() {
           {[
             { id: 'hospitals', label: 'Registered Hospitals', icon: Building2, count: hospitalsList.length },
             { id: 'doctors', label: 'Doctor Profiles', icon: Stethoscope, count: doctorsList.length },
+            { id: 'leads', label: 'Inquiries & Sales Leads', icon: Inbox, count: leadsList.length },
             { id: 'analytics', label: 'Platform System Stats', icon: Layers },
           ].map((tab) => {
             const Icon = tab.icon
@@ -567,7 +600,76 @@ export default function OwnerAdmin() {
           </div>
         )}
 
-        {/* TAB 3: PLATFORM SYSTEM STATS */}
+        {/* TAB 3: INQUIRIES & SALES LEADS */}
+        {activeTab === 'leads' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Inbox size={20} className="text-blue-400" /> Website Buy Now & Contact Form Submissions ({leadsList.length})
+              </h3>
+              {leadsList.length > 0 && (
+                <button
+                  onClick={handleClearLeads}
+                  className="px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg text-xs font-bold transition"
+                >
+                  Clear Leads Log
+                </button>
+              )}
+            </div>
+
+            {leadsList.length === 0 ? (
+              <div className="bg-slate-950 border border-slate-800 rounded-3xl p-12 text-center text-slate-500 space-y-2">
+                <Inbox size={48} className="mx-auto text-slate-700" />
+                <p className="text-base font-bold text-slate-400">No Sales Inquiries Received Yet</p>
+                <p className="text-xs">When website visitors submit the Buy Now or Contact forms, their details will appear here.</p>
+              </div>
+            ) : (
+              <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="bg-slate-900 border-b border-slate-800 text-xs uppercase font-bold text-slate-400">
+                    <tr>
+                      <th className="px-6 py-4">Doctor / Lead Name</th>
+                      <th className="px-6 py-4">Phone & City</th>
+                      <th className="px-6 py-4">Clinic & Speciality</th>
+                      <th className="px-6 py-4">Requested Plan</th>
+                      <th className="px-6 py-4">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                    {leadsList.map((lead, idx) => (
+                      <tr key={idx} className="hover:bg-slate-900/60 transition">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-white text-base">{lead.name || 'Anonymous Doctor'}</p>
+                          <p className="text-xs text-slate-400 font-mono">{lead.email || 'No email provided'}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-blue-400 flex items-center gap-1.5">
+                            <Phone size={14} /> +91-{lead.phone}
+                          </p>
+                          <p className="text-xs text-slate-400">{lead.city || 'Not specified'}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-slate-200">{lead.clinic_name || 'Clinic N/A'}</p>
+                          <p className="text-xs text-slate-400">{lead.speciality || 'General'}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-3 py-1 bg-blue-500/20 text-blue-300 font-bold text-xs rounded-full border border-blue-500/30">
+                            {lead.plan || 'Enroll Now'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-slate-400">
+                          {lead.timestamp || 'Just now'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: PLATFORM SYSTEM STATS */}
         {activeTab === 'analytics' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
@@ -579,8 +681,8 @@ export default function OwnerAdmin() {
               <p className="text-5xl font-black text-emerald-400">{doctorsList.length}</p>
             </div>
             <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Platform Isolation</p>
-              <p className="text-xl font-bold text-purple-400 mt-4">Super Admin Key Verified</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Sales Lead Submissions</p>
+              <p className="text-5xl font-black text-purple-400">{leadsList.length}</p>
             </div>
           </div>
         )}
