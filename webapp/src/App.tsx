@@ -7,6 +7,10 @@ import LandingPage from './pages/LandingPage'
 import FeaturesPage from './pages/FeaturesPage'
 import PricingPage from './pages/PricingPage'
 import ContactPage from './pages/ContactPage'
+import IntakePage from './pages/IntakePage'
+import TrackPage from './pages/TrackPage'
+import RxPage from './pages/RxPage'
+import DisplayBoard from './pages/DisplayBoard'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Appointments from './pages/Appointments'
@@ -37,10 +41,16 @@ function App() {
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/contact" element={<ContactPage />} />
 
+        {/* Med Rapidly Public Patient Workflows (No Login Required) */}
+        <Route path="/a/:token" element={<IntakePage />} />
+        <Route path="/track" element={<TrackPage />} />
+        <Route path="/rx" element={<RxPage />} />
+        <Route path="/display/:token" element={<DisplayBoard />} />
+        <Route path="/checkin" element={<Checkin />} />
+
         {/* Doctor & Hospital Sign In Portal (Hidden link /doctor) */}
         <Route path="/doctor" element={<Login />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/checkin" element={<Checkin />} />
 
         {/* Secret Platform Owner Control Portal */}
         <Route path="/mrshahidbabu" element={<OwnerAdmin />} />
