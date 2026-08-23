@@ -9,7 +9,7 @@ export default function Login() {
 
   const [selectedRole, setSelectedRole] = useState<'doctor' | 'hospital_admin'>('doctor')
   const [formData, setFormData] = useState({
-    email: 'doctor@hospital.com',
+    email: '',
     password: '',
   })
   const [error, setError] = useState('')
@@ -34,17 +34,15 @@ export default function Login() {
       return
     }
 
+    const cleanEmail = formData.email.trim().toLowerCase()
+    const cleanPass = formData.password.trim()
+
     try {
-      // Direct Supabase Auth Query for Doctor role
-      await loginWithSupabase(formData.email, formData.password, 'doctor')
+      // Direct Supabase Auth Query & Local Registry for Doctor role
+      await loginWithSupabase(cleanEmail, cleanPass, 'doctor')
       navigate('/dashboard')
     } catch (err: any) {
-      if (err.message.includes('Invalid login credentials') || err.message.includes('Invalid credentials')) {
-        setError('Supabase Auth Query Result: Invalid email or password. Please verify credentials.')
-      } else {
-        localStorage.setItem('user_role', 'doctor')
-        navigate('/dashboard')
-      }
+      setError(err.message || 'Supabase Auth Query Result: Invalid Doctor email or password. Please verify credentials.')
     } finally {
       setIsLoading(false)
     }
@@ -84,7 +82,6 @@ export default function Login() {
               type="button"
               onClick={() => {
                 setSelectedRole('doctor')
-                setFormData({ ...formData, email: 'doctor@hospital.com' })
               }}
               className={`py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 ${
                 selectedRole === 'doctor'

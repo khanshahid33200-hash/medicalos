@@ -106,14 +106,6 @@ export default function OwnerAdmin() {
   const [newPasswordForm, setNewPasswordForm] = useState('')
 
   useEffect(() => {
-    const isCleaned = localStorage.getItem('clinicos_demo_purged_v1')
-    if (!isCleaned) {
-      localStorage.removeItem('clinicos_hospitals')
-      localStorage.removeItem('clinicos_hospital_doctors')
-      localStorage.setItem('clinicos_demo_purged_v1', 'true')
-      setHospitalsList([])
-    }
-
     const ownerAuth = localStorage.getItem('owner_authenticated')
     if (ownerAuth === 'true') {
       setIsOwnerAuthenticated(true)
