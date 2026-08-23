@@ -1,12 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Building2,
-  UserPlus,
   ShieldCheck,
-  Stethoscope,
-  Trash2,
-  CheckCircle,
-  XCircle,
   Lock,
   Mail,
   Search,
@@ -15,10 +10,10 @@ import {
   LogOut,
   AlertCircle,
   Inbox,
-  Phone
+  Phone,
+  Sliders
 } from 'lucide-react'
 import Button from '../components/Button'
-import apiClient from '../api/client'
 
 interface HospitalItem {
   id: string
@@ -27,22 +22,9 @@ interface HospitalItem {
   phone: string
   email: string
   address: string
+  doctor_limit: number // Set by Platform Owner (e.g. 5 doctors for H1, 1 doctor for H2)
   doctor_count: number
   status: 'active' | 'suspended'
-}
-
-interface DoctorItem {
-  doctor_id: string
-  firebase_uid: string
-  hospital_id: string
-  hospital_name: string
-  name: string
-  email: string
-  department_id: string
-  department_name: string
-  specialization: string
-  role: 'doctor' | 'admin'
-  status: 'active' | 'inactive' | 'on_leave'
 }
 
 interface LeadItem {
@@ -66,40 +48,39 @@ export default function OwnerAdmin() {
   })
   const [loginError, setLoginError] = useState('')
 
-  const [activeTab, setActiveTab] = useState<'hospitals' | 'doctors' | 'leads' | 'analytics'>('hospitals')
+  const [activeTab, setActiveTab] = useState<'hospitals' | 'leads' | 'analytics'>('hospitals')
   const [notice, setNotice] = useState<string | null>(null)
 
-  // Hospital State
+  // Hospital State with Doctor Seat Limits (Set by Owner)
   const [hospitalsList, setHospitalsList] = useState<HospitalItem[]>([
     {
       id: 'hosp-001',
-      name: 'Metro Care General Hospital',
+      name: 'Metro Care General Hospital (H1)',
       license: 'HOSP-2026-LIC-9921',
       phone: '+91-9876543210',
-      email: 'contact@metrocare.com',
+      email: 'admin@metrocare.com',
       address: '123 Healthcare Boulevard, Medical District',
+      doctor_limit: 5, // Owner set limit: up to 5 doctors
       doctor_count: 3,
       status: 'active',
     },
     {
       id: 'hosp-002',
-      name: 'City Heart & Cardiac Specialty Clinic',
+      name: 'City Heart & Cardiac Specialty Clinic (H2)',
       license: 'HOSP-2026-LIC-4410',
       phone: '+91-9876543211',
-      email: 'info@cityheartclinic.com',
+      email: 'admin@cityheartclinic.com',
       address: '45 Cardiac Street, Central Plaza',
-      doctor_count: 2,
+      doctor_limit: 1, // Owner set limit: up to 1 doctor
+      doctor_count: 1,
       status: 'active',
     },
   ])
 
-  // Doctor State
-  const [doctorsList, setDoctorsList] = useState<DoctorItem[]>([])
   const [leadsList, setLeadsList] = useState<LeadItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
 
-  // Modals State
+  // Hospital Modal State
   const [showHospitalModal, setShowHospitalModal] = useState(false)
   const [hospitalForm, setHospitalForm] = useState({
     name: '',
@@ -107,26 +88,18 @@ export default function OwnerAdmin() {
     phone: '',
     email: '',
     address: '',
+    doctor_limit: 5, // Default doctor seat limit
   })
 
-  const [showDoctorModal, setShowDoctorModal] = useState(false)
-  const [doctorForm, setDoctorForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    hospital_id: 'hosp-001',
-    department_name: 'Cardiology',
-    specialization: 'General Physician',
-    role: 'doctor' as const,
-  })
+  // Edit Limit Modal State
+  const [editingHospital, setEditingHospital] = useState<HospitalItem | null>(null)
+  const [newLimit, setNewLimit] = useState(5)
 
   useEffect(() => {
-    // Check if owner session exists in localStorage
     const ownerAuth = localStorage.getItem('owner_authenticated')
     if (ownerAuth === 'true') {
       setIsOwnerAuthenticated(true)
     }
-    fetchDoctors()
     fetchLeads()
   }, [])
 
@@ -136,44 +109,6 @@ export default function OwnerAdmin() {
       setLeadsList(saved)
     } catch (e) {
       setLeadsList([])
-    }
-  }
-
-  const fetchDoctors = async () => {
-    try {
-      const response = await apiClient.listDoctors()
-      if (response.data && Array.isArray(response.data)) {
-        setDoctorsList(response.data)
-      }
-    } catch (e) {
-      setDoctorsList([
-        {
-          doctor_id: 'doc-001',
-          firebase_uid: 'fb-uid-doc-001',
-          hospital_id: 'hosp-001',
-          hospital_name: 'Metro Care General Hospital',
-          name: 'Dr. Rahul Sharma',
-          email: 'doctor@hospital.com',
-          department_id: 'dept-cardio-01',
-          department_name: 'Cardiology',
-          specialization: 'Interventional Cardiology',
-          role: 'doctor',
-          status: 'active',
-        },
-        {
-          doctor_id: 'doc-002',
-          firebase_uid: 'fb-uid-doc-002',
-          hospital_id: 'hosp-001',
-          hospital_name: 'Metro Care General Hospital',
-          name: 'Dr. Vikram Seth',
-          email: 'vikram@hospital.com',
-          department_id: 'dept-opd-02',
-          department_name: 'General OPD',
-          specialization: 'Internal Medicine',
-          role: 'doctor',
-          status: 'active',
-        },
-      ])
     }
   }
 
@@ -195,7 +130,7 @@ export default function OwnerAdmin() {
     localStorage.removeItem('owner_authenticated')
   }
 
-  // Create Hospital Handler
+  // Create Hospital Profile Handler (Owner sets name, admin email, phone, and doctor seat limit)
   const handleCreateHospital = (e: React.FormEvent) => {
     e.preventDefault()
     const newHosp: HospitalItem = {
@@ -205,87 +140,41 @@ export default function OwnerAdmin() {
       phone: hospitalForm.phone,
       email: hospitalForm.email,
       address: hospitalForm.address,
+      doctor_limit: Number(hospitalForm.doctor_limit) || 5,
       doctor_count: 0,
       status: 'active',
     }
-    setHospitalsList([...hospitalsList, newHosp])
+    const updated = [...hospitalsList, newHosp]
+    setHospitalsList(updated)
+    localStorage.setItem('clinicos_hospitals', JSON.stringify(updated))
+
     setShowHospitalModal(false)
-    setHospitalForm({ name: '', license: '', phone: '', email: '', address: '' })
-    setNotice(`Hospital "${newHosp.name}" registered successfully!`)
+    setHospitalForm({ name: '', license: '', phone: '', email: '', address: '', doctor_limit: 5 })
+    setNotice(`Hospital profile "${newHosp.name}" registered with limit of ${newHosp.doctor_limit} doctors!`)
     setTimeout(() => setNotice(null), 4000)
   }
 
-  // Create Doctor Handler
-  const handleCreateDoctor = async (e: React.FormEvent) => {
+  const handleUpdateDoctorLimit = (e: React.FormEvent) => {
     e.preventDefault()
-    const selectedHosp = hospitalsList.find((h) => h.id === doctorForm.hospital_id)
-    const hospitalName = selectedHosp ? selectedHosp.name : 'Metro Care General Hospital'
+    if (!editingHospital) return
 
-    try {
-      const response = await apiClient.createDoctor({
-        ...doctorForm,
-        hospital_id: doctorForm.hospital_id,
-      })
-      if (response.data) {
-        setDoctorsList((prev) => [...prev, response.data])
-      }
-    } catch (e) {
-      const newDoc: DoctorItem = {
-        doctor_id: `doc-00${doctorsList.length + 1}`,
-        firebase_uid: `fb-uid-doc-${doctorsList.length + 1}`,
-        hospital_id: doctorForm.hospital_id,
-        hospital_name: hospitalName,
-        name: doctorForm.name,
-        email: doctorForm.email,
-        department_id: `dept-${doctorForm.department_name.toLowerCase()}`,
-        department_name: doctorForm.department_name,
-        specialization: doctorForm.specialization,
-        role: doctorForm.role,
-        status: 'active',
-      }
-      setDoctorsList((prev) => [...prev, newDoc])
-    }
-
-    // Update doctor count in hospital list
-    setHospitalsList((prev) =>
-      prev.map((h) => (h.id === doctorForm.hospital_id ? { ...h, doctor_count: h.doctor_count + 1 } : h))
+    const updated = hospitalsList.map((h) =>
+      h.id === editingHospital.id ? { ...h, doctor_limit: Number(newLimit) } : h
     )
+    setHospitalsList(updated)
+    localStorage.setItem('clinicos_hospitals', JSON.stringify(updated))
 
-    setShowDoctorModal(false)
-    setDoctorForm({
-      name: '',
-      email: '',
-      password: '',
-      hospital_id: 'hosp-001',
-      department_name: 'Cardiology',
-      specialization: 'General Physician',
-      role: 'doctor',
-    })
-    setNotice(`Doctor profile for ${doctorForm.name} onboarded successfully!`)
+    setEditingHospital(null)
+    setNotice(`Doctor seat limit updated to ${newLimit} for ${editingHospital.name}.`)
     setTimeout(() => setNotice(null), 4000)
   }
 
-  const handleStatusChange = async (doctorId: string, newStatus: 'active' | 'inactive' | 'on_leave') => {
-    try {
-      await apiClient.updateDoctorStatus(doctorId, newStatus)
-    } catch (e) {
-      // ignore
-    }
-    setDoctorsList((prev) =>
-      prev.map((doc) => (doc.doctor_id === doctorId ? { ...doc, status: newStatus } : doc))
+  const handleToggleHospitalStatus = (hospId: string) => {
+    const updated = hospitalsList.map((h) =>
+      h.id === hospId ? { ...h, status: (h.status === 'active' ? 'suspended' : 'active') as any } : h
     )
-  }
-
-  const handleDeleteDoctor = async (doctorId: string, doctorName: string) => {
-    if (!window.confirm(`Are you sure you want to remove ${doctorName} from the platform?`)) return
-    try {
-      await apiClient.deleteDoctor(doctorId)
-    } catch (e) {
-      // ignore
-    }
-    setDoctorsList((prev) => prev.filter((d) => d.doctor_id !== doctorId))
-    setNotice(`Doctor profile for ${doctorName} deleted.`)
-    setTimeout(() => setNotice(null), 4000)
+    setHospitalsList(updated)
+    localStorage.setItem('clinicos_hospitals', JSON.stringify(updated))
   }
 
   const handleClearLeads = () => {
@@ -358,17 +247,13 @@ export default function OwnerAdmin() {
   }
 
   // 2. OWNER AUTHENTICATED ADMIN DASHBOARD
-  const filteredDoctors = doctorsList.filter((doc) => {
-    const matchSearch =
-      doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.hospital_name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchStatus = statusFilter === 'all' || doc.status === statusFilter
-    return matchSearch && matchStatus
-  })
+  const filteredHospitals = hospitalsList.filter((hosp) =>
+    hosp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    hosp.email.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 pb-12">
+    <div className="min-h-screen bg-slate-900 text-slate-100 pb-12 font-sans">
       {/* Top Navbar */}
       <header className="bg-slate-950 border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-xl">
         <div className="flex items-center gap-3">
@@ -397,21 +282,16 @@ export default function OwnerAdmin() {
               Platform Master Admin
             </span>
             <h2 className="text-3xl font-black text-white tracking-tight mt-2">
-              Website & Multi-Hospital Management
+              Hospital Profile & Doctor Seat Limit Management
             </h2>
             <p className="text-slate-300 text-sm mt-1">
-              Register Hospitals, Onboard Doctors, set passwords, and collect all sales lead inquiries.
+              Create Hospital Profiles and assign custom Doctor Seat Limits (e.g. H1 = 5 doctors, H2 = 1 doctor).
             </p>
           </div>
 
-          <div className="flex gap-3">
-            <Button variant="primary" onClick={() => setShowHospitalModal(true)} className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/30 text-white font-bold flex items-center gap-2">
-              <Building2 size={18} /> Register Hospital
-            </Button>
-            <Button variant="success" onClick={() => setShowDoctorModal(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-2">
-              <UserPlus size={18} /> Onboard Doctor
-            </Button>
-          </div>
+          <Button variant="primary" onClick={() => setShowHospitalModal(true)} className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/30 text-white font-bold flex items-center gap-2">
+            <Building2 size={18} /> Register Hospital Profile
+          </Button>
         </div>
 
         {/* Notice Alert */}
@@ -425,8 +305,7 @@ export default function OwnerAdmin() {
         {/* Console Navigation Tabs */}
         <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
           {[
-            { id: 'hospitals', label: 'Registered Hospitals', icon: Building2, count: hospitalsList.length },
-            { id: 'doctors', label: 'Doctor Profiles', icon: Stethoscope, count: doctorsList.length },
+            { id: 'hospitals', label: 'Hospital Profiles & Doctor Limits', icon: Building2, count: hospitalsList.length },
             { id: 'leads', label: 'Inquiries & Sales Leads', icon: Inbox, count: leadsList.length },
             { id: 'analytics', label: 'Platform System Stats', icon: Layers },
           ].map((tab) => {
@@ -454,11 +333,22 @@ export default function OwnerAdmin() {
           })}
         </div>
 
-        {/* TAB 1: REGISTERED HOSPITALS */}
+        {/* TAB 1: HOSPITAL PROFILES & DOCTOR LIMITS */}
         {activeTab === 'hospitals' && (
           <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-3 text-slate-500" size={18} />
+              <input
+                type="text"
+                placeholder="Search Hospital Profile by Name or Email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:border-blue-500 text-sm text-white"
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {hospitalsList.map((hosp) => (
+              {filteredHospitals.map((hosp) => (
                 <div key={hosp.id} className="bg-slate-950 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-blue-500/40 transition shadow-xl">
                   <div className="flex items-start justify-between">
                     <div>
@@ -468,29 +358,52 @@ export default function OwnerAdmin() {
                       <h3 className="text-xl font-bold text-white mt-1">{hosp.name}</h3>
                       <p className="text-xs text-slate-400 font-mono mt-0.5">License: {hosp.license}</p>
                     </div>
-                    <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 font-bold text-xs rounded-full border border-emerald-500/20">
-                      Active Facility
-                    </span>
+                    {hosp.status === 'active' ? (
+                      <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 font-bold text-xs rounded-full border border-emerald-500/20">
+                        Active Facility
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 bg-red-500/10 text-red-400 font-bold text-xs rounded-full border border-red-500/20">
+                        Suspended
+                      </span>
+                    )}
                   </div>
 
-                  <div className="space-y-1.5 text-xs text-slate-300 bg-slate-900 p-3.5 rounded-2xl border border-slate-800 font-medium">
+                  <div className="space-y-2 text-xs text-slate-300 bg-slate-900 p-4 rounded-2xl border border-slate-800 font-medium">
                     <p>📍 Address: {hosp.address}</p>
-                    <p>📞 Phone: {hosp.phone} • ✉️ Email: {hosp.email}</p>
-                    <p>🩺 Registered Doctors: <strong className="text-blue-400 font-bold">{hosp.doctor_count} Doctors</strong></p>
+                    <p>📞 Phone: {hosp.phone} • ✉️ Admin: {hosp.email}</p>
+                    
+                    {/* Owner Configured Doctor Seat Limit */}
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-400">Doctor Seat Limit (Owner Set):</p>
+                        <p className="text-base font-black text-emerald-400 font-mono">
+                          {hosp.doctor_count} / {hosp.doctor_limit} Doctors Added
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setEditingHospital(hosp)
+                          setNewLimit(hosp.doctor_limit)
+                        }}
+                        className="px-3 py-1.5 bg-blue-600/20 text-blue-300 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1 border border-blue-500/30"
+                      >
+                        <Sliders size={14} /> Adjust Limit
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => {
-                        setDoctorForm((prev) => ({ ...prev, hospital_id: hosp.id }))
-                        setShowDoctorModal(true)
-                      }}
-                      className="w-full bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 text-xs font-bold"
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => handleToggleHospitalStatus(hosp.id)}
+                      className={`w-full py-2 rounded-xl text-xs font-bold transition ${
+                        hosp.status === 'active'
+                          ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                      }`}
                     >
-                      + Onboard Doctor to {hosp.name.split(' ')[0]}
-                    </Button>
+                      {hosp.status === 'active' ? 'Suspend Hospital' : 'Reactivate Hospital'}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -498,109 +411,7 @@ export default function OwnerAdmin() {
           </div>
         )}
 
-        {/* TAB 2: DOCTOR PROFILES */}
-        {activeTab === 'doctors' && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-3 text-slate-500" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search Doctor by Name, Email, or Hospital..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:border-blue-500 text-sm text-white"
-                />
-              </div>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-medium text-white"
-              >
-                <option value="all">All Doctor Statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-
-            <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-900 border-b border-slate-800 text-xs uppercase font-bold text-slate-400">
-                  <tr>
-                    <th className="px-6 py-4">Doctor & Email</th>
-                    <th className="px-6 py-4">Assigned Hospital</th>
-                    <th className="px-6 py-4">Department & Specialization</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Owner Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-medium">
-                  {filteredDoctors.map((doc) => (
-                    <tr key={doc.doctor_id} className="hover:bg-slate-900/60 transition">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-xl flex items-center justify-center font-bold text-sm">
-                            {doc.name.charAt(4) || 'D'}
-                          </div>
-                          <div>
-                            <p className="font-bold text-white text-base">{doc.name}</p>
-                            <p className="text-xs text-slate-400 font-mono">{doc.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-200">{doc.hospital_name}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-xs font-bold text-blue-400">{doc.department_name}</p>
-                        <p className="text-xs text-slate-400">{doc.specialization}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        {doc.status === 'active' ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">
-                            <CheckCircle size={13} /> Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 bg-red-500/10 text-red-400 rounded-full border border-red-500/20">
-                            <XCircle size={13} /> Inactive
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {doc.status !== 'active' ? (
-                            <button
-                              onClick={() => handleStatusChange(doc.doctor_id, 'active')}
-                              className="px-3 py-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-lg text-xs font-bold transition"
-                            >
-                              Activate
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleStatusChange(doc.doctor_id, 'inactive')}
-                              className="px-3 py-1 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 rounded-lg text-xs font-bold transition"
-                            >
-                              Deactivate
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteDoctor(doc.doctor_id, doc.name)}
-                            className="p-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: INQUIRIES & SALES LEADS */}
+        {/* TAB 2: INQUIRIES & SALES LEADS */}
         {activeTab === 'leads' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -669,7 +480,7 @@ export default function OwnerAdmin() {
           </div>
         )}
 
-        {/* TAB 4: PLATFORM SYSTEM STATS */}
+        {/* TAB 3: PLATFORM SYSTEM STATS */}
         {activeTab === 'analytics' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
@@ -677,23 +488,23 @@ export default function OwnerAdmin() {
               <p className="text-5xl font-black text-blue-400">{hospitalsList.length}</p>
             </div>
             <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Onboarded Doctors</p>
-              <p className="text-5xl font-black text-emerald-400">{doctorsList.length}</p>
-            </div>
-            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Sales Lead Submissions</p>
               <p className="text-5xl font-black text-purple-400">{leadsList.length}</p>
+            </div>
+            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Owner System Status</p>
+              <p className="text-2xl font-black text-emerald-400">✓ Multi-Tenant Active</p>
             </div>
           </div>
         )}
 
-        {/* MODAL 1: REGISTER HOSPITAL */}
+        {/* MODAL 1: REGISTER HOSPITAL WITH DOCTOR SEAT LIMIT */}
         {showHospitalModal && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full shadow-2xl p-6 space-y-4 text-slate-100">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="text-lg font-bold flex items-center gap-2">
-                  <Building2 className="text-blue-400" size={20} /> Register New Hospital
+                  <Building2 className="text-blue-400" size={20} /> Create Hospital Profile
                 </h3>
                 <button onClick={() => setShowHospitalModal(false)} className="text-slate-400 hover:text-white">✕</button>
               </div>
@@ -705,21 +516,25 @@ export default function OwnerAdmin() {
                     type="text"
                     value={hospitalForm.name}
                     onChange={(e) => setHospitalForm({ ...hospitalForm, name: e.target.value })}
-                    placeholder="e.g. Apollo Multi-Specialty Hospital"
+                    placeholder="e.g. Metro Care General Hospital (H1)"
                     required
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">License Number</label>
+                  <label className="block font-bold text-slate-300 uppercase mb-1">Doctor Seat Limit (Owner Set) *</label>
                   <input
-                    type="text"
-                    value={hospitalForm.license}
-                    onChange={(e) => setHospitalForm({ ...hospitalForm, license: e.target.value })}
-                    placeholder="HOSP-2026-LIC-9921"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm font-mono"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={hospitalForm.doctor_limit}
+                    onChange={(e) => setHospitalForm({ ...hospitalForm, doctor_limit: Number(e.target.value) })}
+                    placeholder="e.g. 5 for H1, 1 for H2"
+                    required
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-sm"
                   />
+                  <p className="text-[11px] text-slate-400 mt-1">Hospital admin will be allowed to onboard up to this number of doctors.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -734,12 +549,13 @@ export default function OwnerAdmin() {
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Email</label>
+                    <label className="block font-bold text-slate-300 uppercase mb-1">Admin Email *</label>
                     <input
                       type="email"
                       value={hospitalForm.email}
                       onChange={(e) => setHospitalForm({ ...hospitalForm, email: e.target.value })}
-                      placeholder="info@hospital.com"
+                      placeholder="admin@hospital.com"
+                      required
                       className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
                     />
                   </div>
@@ -761,7 +577,7 @@ export default function OwnerAdmin() {
                     Cancel
                   </Button>
                   <Button type="submit" variant="primary" className="flex-1 bg-blue-600 text-white font-bold">
-                    Register Facility
+                    Create Hospital Profile
                   </Button>
                 </div>
               </form>
@@ -769,97 +585,39 @@ export default function OwnerAdmin() {
           </div>
         )}
 
-        {/* MODAL 2: ONBOARD DOCTOR */}
-        {showDoctorModal && (
+        {/* MODAL 2: EDIT DOCTOR SEAT LIMIT */}
+        {editingHospital && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full shadow-2xl p-6 space-y-4 text-slate-100">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl p-6 space-y-4 text-slate-100">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-lg font-bold flex items-center gap-2">
-                  <UserPlus className="text-emerald-400" size={20} /> Onboard Doctor Profile
+                <h3 className="text-base font-bold flex items-center gap-2">
+                  <Sliders className="text-blue-400" size={18} /> Adjust Doctor Seat Limit
                 </h3>
-                <button onClick={() => setShowDoctorModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                <button onClick={() => setEditingHospital(null)} className="text-slate-400 hover:text-white">✕</button>
               </div>
 
-              <form onSubmit={handleCreateDoctor} className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">Assigned Hospital *</label>
-                  <select
-                    value={doctorForm.hospital_id}
-                    onChange={(e) => setDoctorForm({ ...doctorForm, hospital_id: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm font-semibold"
-                  >
-                    {hospitalsList.map((h) => (
-                      <option key={h.id} value={h.id}>{h.name}</option>
-                    ))}
-                  </select>
-                </div>
+              <form onSubmit={handleUpdateDoctorLimit} className="space-y-3 text-xs">
+                <p className="text-slate-300">Adjust allowed doctor seat limit for <strong>{editingHospital.name}</strong>:</p>
 
                 <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">Doctor Full Name *</label>
+                  <label className="block font-bold text-slate-300 uppercase mb-1">Allowed Doctor Limit *</label>
                   <input
-                    type="text"
-                    value={doctorForm.name}
-                    onChange={(e) => setDoctorForm({ ...doctorForm, name: e.target.value })}
-                    placeholder="e.g. Dr. Anish Kapoor"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={newLimit}
+                    onChange={(e) => setNewLimit(Number(e.target.value))}
                     required
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-lg text-center"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Doctor Email *</label>
-                    <input
-                      type="email"
-                      value={doctorForm.email}
-                      onChange={(e) => setDoctorForm({ ...doctorForm, email: e.target.value })}
-                      placeholder="doctor@hospital.com"
-                      required
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Password *</label>
-                    <input
-                      type="password"
-                      value={doctorForm.password}
-                      onChange={(e) => setDoctorForm({ ...doctorForm, password: e.target.value })}
-                      placeholder="••••••••"
-                      required
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Department</label>
-                    <input
-                      type="text"
-                      value={doctorForm.department_name}
-                      onChange={(e) => setDoctorForm({ ...doctorForm, department_name: e.target.value })}
-                      placeholder="Cardiology"
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Specialization</label>
-                    <input
-                      type="text"
-                      value={doctorForm.specialization}
-                      onChange={(e) => setDoctorForm({ ...doctorForm, specialization: e.target.value })}
-                      placeholder="Interventional Cardiology"
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
-                    />
-                  </div>
-                </div>
-
                 <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="secondary" onClick={() => setShowDoctorModal(false)} className="flex-1 bg-slate-800 text-slate-300">
+                  <Button type="button" variant="secondary" onClick={() => setEditingHospital(null)} className="flex-1 bg-slate-800 text-slate-300">
                     Cancel
                   </Button>
-                  <Button type="submit" variant="primary" className="flex-1 bg-emerald-600 text-white font-bold">
-                    Create & Onboard Doctor
+                  <Button type="submit" variant="primary" className="flex-1 bg-blue-600 text-white font-bold">
+                    Save New Limit
                   </Button>
                 </div>
               </form>
