@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { QrCode, Copy, Download, Stethoscope, Building2, ExternalLink } from 'lucide-react'
+import { Copy, Download, Building2, ExternalLink, Printer, ShieldAlert } from 'lucide-react'
 import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import Button from '../components/Button'
@@ -12,80 +12,72 @@ const generateQRCode = (text: string): string => {
 
 export default function QRKiosk() {
   const { doctorProfile } = useAuth()
-  const [qrUrl, setQrUrl] = useState('')
-  const [checkInUrl, setCheckInUrl] = useState('')
-  const [displayMode, setDisplayMode] = useState<'fullscreen' | 'tablet' | 'settings'>('fullscreen')
-  const [copied, setCopied] = useState(false)
+  const hospitalName = doctorProfile?.hospital_name || 'City Care Hospital'
 
-  const doctorName = doctorProfile?.name || 'Dr. Rahul Sharma'
-  const doctorId = doctorProfile?.doctor_id || 'doc-001'
-  const hospitalName = doctorProfile?.hospital_name || 'Metro Care General Hospital'
-  const departmentName = doctorProfile?.department_name || 'Cardiology'
+  const [intakeToken, setIntakeToken] = useState('abc123xyz78924charsstring')
+  const [intakeUrl, setIntakeUrl] = useState('')
+  const [qrUrl, setQrUrl] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [displayMode, setDisplayMode] = useState<'kiosk' | 'fullscreen' | 'poster'>('kiosk')
 
   useEffect(() => {
-    // Generate doctor-specific check-in URL for patient QR scanning
     const baseUrl = window.location.origin
-    const url = `${baseUrl}/checkin?doctor_id=${encodeURIComponent(doctorId)}&doctor_name=${encodeURIComponent(doctorName)}&department=${encodeURIComponent(departmentName)}&hospital_name=${encodeURIComponent(hospitalName)}`
-    setCheckInUrl(url)
-
-    // Generate QR code image
-    const qr = generateQRCode(url)
-    setQrUrl(qr)
-  }, [doctorId, doctorName, departmentName, hospitalName])
+    const url = `${baseUrl}/a/${intakeToken}`
+    setIntakeUrl(url)
+    setQrUrl(generateQRCode(url))
+  }, [intakeToken])
 
   const handleCopyUrl = () => {
-    navigator.clipboard.writeText(checkInUrl)
+    navigator.clipboard.writeText(intakeUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleDownloadQR = () => {
+  const handleDownloadQR = (format: 'png' | 'svg') => {
     const link = document.createElement('a')
     link.href = qrUrl
-    link.download = `checkin-qr-${doctorId}.png`
+    link.download = `hospital-entrance-qr-${hospitalName.toLowerCase().replace(/\s+/g, '-')}.${format}`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
+  const handleRegenerateToken = () => {
+    if (window.confirm('Are you sure you want to regenerate the hospital QR token? The old poster QR code will immediately be invalidated!')) {
+      const newToken = Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join('')
+      setIntakeToken(newToken)
+      alert('Hospital Single QR Token regenerated. Please print and mount the new poster at the entrance.')
+    }
+  }
+
+  // Fullscreen Reception Tablet Kiosk Mode
   if (displayMode === 'fullscreen') {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-blue-700 via-indigo-800 to-slate-900 flex items-center justify-center p-6 z-50">
-        <div className="text-center max-w-xl w-full">
-          {/* Header */}
-          <div className="text-white mb-8">
-            <p className="text-sm font-semibold uppercase tracking-widest text-blue-300 flex items-center justify-center gap-1.5 mb-2">
-              <Building2 size={16} /> {hospitalName}
-            </p>
-            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-2">Patient Check-in</h1>
-            <div className="inline-flex items-center gap-2 bg-blue-500/30 text-blue-100 px-4 py-1.5 rounded-full font-semibold text-sm border border-blue-400/30">
-              <Stethoscope size={16} /> {doctorName} • {departmentName}
-            </div>
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-700 via-indigo-800 to-slate-950 flex items-center justify-center p-6 z-50 font-sans selection:bg-blue-600 selection:text-white">
+        <div className="text-center max-w-xl w-full space-y-6">
+          <div className="text-white space-y-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-blue-300 bg-blue-500/20 px-3.5 py-1.5 rounded-full border border-blue-400/30">
+              <Building2 size={14} className="inline mr-1" /> Hospital Entrance Self Check-in
+            </span>
+            <h1 className="text-4xl font-black font-recoleta text-white">{hospitalName}</h1>
+            <p className="text-xs text-slate-300 font-medium">Scan with smartphone camera to join queue & pay consultation fee</p>
           </div>
 
-          {/* QR Code Card */}
-          <div className="bg-white p-8 rounded-3xl shadow-2xl border border-white/20">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl border-4 border-white/20">
             <div className="flex flex-col items-center">
-              <QrCode size={50} className="text-blue-600 mb-3" />
-              <p className="text-gray-900 text-xl font-bold mb-4">Scan QR to Fill Check-in Form</p>
-              <img src={qrUrl} alt="Check-in QR Code" className="w-80 h-80 shadow-md rounded-2xl border border-gray-100" />
-              <p className="text-xs text-gray-500 mt-4 font-mono truncate max-w-xs">{checkInUrl}</p>
+              <p className="text-slate-900 text-lg font-black uppercase tracking-wider mb-3">SCAN TO BOOK APPOINTMENT</p>
+              <img src={qrUrl} alt="Hospital Entrance Single QR Code" className="w-80 h-80 shadow-md rounded-2xl border border-slate-100" />
+              <p className="text-[11px] text-slate-400 mt-4 font-mono truncate max-w-xs">{intakeUrl}</p>
             </div>
           </div>
 
-          {/* Instructions */}
-          <div className="text-white mt-8 space-y-2 text-sm bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
-            <p className="font-bold text-base text-blue-200">📱 How to Check In:</p>
-            <div className="grid grid-cols-2 gap-2 text-left text-xs font-medium text-slate-200">
-              <p>1️⃣ Scan QR with phone camera</p>
-              <p>2️⃣ Open patient form link</p>
-              <p>3️⃣ Enter your name & symptoms</p>
-              <p>4️⃣ Receive live Queue Token</p>
-            </div>
+          <div className="text-white text-xs bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-sm space-y-1">
+            <p className="font-extrabold text-blue-200">📱 No App Needed • No Account Required</p>
+            <p className="text-slate-300">Works on all Android & iPhone cameras. Track live queue on phone.</p>
           </div>
 
           <button
-            onClick={() => setDisplayMode('settings')}
+            onClick={() => setDisplayMode('kiosk')}
             className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full transition border border-white/20"
           >
             ⚙️
@@ -95,77 +87,137 @@ export default function QRKiosk() {
     )
   }
 
+  // Printable A4 Entrance Poster Mode
+  if (displayMode === 'poster') {
+    return (
+      <div className="min-h-screen bg-slate-100 p-8 flex items-center justify-center">
+        <div className="bg-white max-w-lg w-full p-12 rounded-3xl shadow-2xl border-4 border-slate-900 text-center space-y-6">
+          <div className="space-y-2">
+            <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-14 mx-auto object-contain" />
+            <h1 className="text-3xl font-black text-slate-900 font-recoleta">{hospitalName}</h1>
+            <p className="text-sm font-bold text-blue-700 uppercase tracking-widest">Digital Reception System</p>
+          </div>
+
+          <div className="border-4 border-slate-900 p-6 rounded-3xl bg-slate-50 space-y-3">
+            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-wider">SCAN TO JOIN QUEUE</h2>
+            <img src={qrUrl} alt="Entrance Poster QR" className="w-72 h-72 mx-auto border-2 border-slate-900 rounded-2xl" />
+            <p className="text-xs font-mono font-bold text-slate-700">{intakeUrl}</p>
+          </div>
+
+          <div className="space-y-1 text-xs text-slate-600 font-bold">
+            <p>1. Open Phone Camera & Scan QR</p>
+            <p>2. Select Date & Doctor</p>
+            <p>3. Pay Fee & Track Live Queue on Phone</p>
+          </div>
+
+          <div className="no-print flex gap-3 justify-center pt-4">
+            <Button variant="primary" onClick={() => window.print()}>
+              <Printer size={16} /> Print A4 Entrance Poster
+            </Button>
+            <Button variant="secondary" onClick={() => setDisplayMode('kiosk')}>
+              Back to Settings
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <Layout>
-      <div className="space-y-6">
-        {/* Header */}
+      <div className="space-y-6 font-sans">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">QR Kiosk Generator</h1>
-            <p className="text-gray-600 text-sm mt-1">
-              Display or print doctor-specific QR code for patient self-check-in
+            <h1 className="text-3xl font-bold font-recoleta text-slate-900">Hospital Single QR Kiosk</h1>
+            <p className="text-xs text-slate-500 mt-1">
+              One QR Code for the entire hospital building (`/a/${intakeToken}`)
             </p>
           </div>
-          <Button variant="primary" size="lg" onClick={() => setDisplayMode('fullscreen')} className="shadow-lg shadow-blue-600/30">
-            Open Kiosk Display Mode
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setDisplayMode('poster')}>
+              <Printer size={16} /> A4 Entrance Poster
+            </Button>
+            <Button variant="primary" onClick={() => setDisplayMode('fullscreen')} className="shadow-lg shadow-blue-600/30">
+              📺 Fullscreen Tablet Mode
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* QR Display */}
-          <Card className="lg:col-span-1 border border-gray-200">
-            <CardHeader title="Live QR Code" />
+          {/* Live Single Hospital QR Code */}
+          <Card className="lg:col-span-1 border border-slate-200 rounded-3xl shadow-md">
+            <CardHeader title="Entrance QR Code" />
             <CardContent className="py-6 text-center space-y-4">
-              <img src={qrUrl} alt="Check-in QR Code" className="w-full max-w-xs mx-auto shadow-md rounded-2xl border border-gray-200" />
-              <div className="bg-blue-50 text-blue-900 p-3 rounded-xl text-xs font-semibold border border-blue-100">
-                Directly opens patient form for {doctorName}
+              <img src={qrUrl} alt="Hospital Single QR Code" className="w-full max-w-xs mx-auto shadow-md rounded-2xl border border-slate-200" />
+              <div className="bg-blue-50 text-blue-900 p-3 rounded-2xl text-xs font-semibold border border-blue-100">
+                Single QR Code valid for all doctors & departments
               </div>
             </CardContent>
           </Card>
 
-          {/* Configuration & Links */}
-          <Card className="lg:col-span-2 border border-gray-200">
-            <CardHeader title="Kiosk URL Configuration" />
-            <CardContent className="py-6 space-y-5">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Doctor & Hospital</label>
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-sm font-semibold text-gray-800">
-                  {doctorName} ({departmentName}) • {hospitalName}
+          {/* Configuration & Printing Guide */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="border border-slate-200 rounded-3xl shadow-md">
+              <CardHeader title="Single Intake URL Configuration" />
+              <CardContent className="py-6 space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Facility Name</label>
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-sm font-extrabold text-slate-900">
+                    {hospitalName}
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Patient Check-in URL</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={checkInUrl}
-                    readOnly
-                    className="flex-1 px-3.5 py-2.5 border border-gray-300 rounded-xl bg-gray-50 text-xs font-mono text-gray-700"
-                  />
-                  <Button variant="secondary" onClick={handleCopyUrl}>
-                    <Copy size={16} />
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Entrance Single QR URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={intakeUrl}
+                      readOnly
+                      className="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-2xl bg-slate-50 text-xs font-mono font-bold text-slate-800"
+                    />
+                    <Button variant="secondary" onClick={handleCopyUrl}>
+                      <Copy size={16} />
+                    </Button>
+                    <Button variant="primary" onClick={() => window.open(intakeUrl, '_blank')}>
+                      <ExternalLink size={16} />
+                    </Button>
+                  </div>
+                  {copied && <p className="text-xs font-semibold text-emerald-600 mt-1">✓ Copied to clipboard!</p>}
+                </div>
+
+                <div className="flex gap-3 flex-wrap pt-2">
+                  <Button variant="primary" onClick={() => handleDownloadQR('png')}>
+                    <Download size={16} /> Download PNG (Print)
                   </Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => window.open(checkInUrl, '_blank')}
+                  <Button variant="secondary" onClick={() => handleDownloadQR('svg')}>
+                    <Download size={16} /> Download SVG (Vector)
+                  </Button>
+                  <button
+                    onClick={handleRegenerateToken}
+                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-2xl text-xs transition border border-red-200 flex items-center gap-1.5"
                   >
-                    <ExternalLink size={16} />
-                  </Button>
+                    <ShieldAlert size={16} /> Regenerate Token
+                  </button>
                 </div>
-                {copied && <p className="text-xs font-semibold text-emerald-600 mt-1">✓ Copied to clipboard!</p>}
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="pt-4 border-t border-gray-100 flex gap-3 flex-wrap">
-                <Button variant="primary" onClick={handleDownloadQR}>
-                  <Download size={16} /> Download QR PNG
-                </Button>
-                <Button variant="secondary" onClick={() => setDisplayMode('fullscreen')}>
-                  📺 Fullscreen Kiosk Mode
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Printing Guide (Specification) */}
+            <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 space-y-3 text-xs text-amber-900">
+              <h3 className="font-bold text-sm text-amber-950 flex items-center gap-2">
+                📋 Hospital Entrance QR Printing Guide
+              </h3>
+              <ul className="list-disc list-inside space-y-1.5 font-medium text-amber-900">
+                <li><strong>Minimum size:</strong> 4cm × 4cm (for smartphone camera focus)</li>
+                <li><strong>Recommended size:</strong> 10cm × 10cm or full A4 entrance poster</li>
+                <li><strong>Scale:</strong> Print in black & white at 100% scale (no shrinking or distortion)</li>
+                <li><strong>Protection:</strong> Laminate poster to protect from scratches, moisture, and glare</li>
+                <li><strong>Placement:</strong> Mount at eye level near the main reception or hospital entrance door</li>
+                <li><strong>Header Text:</strong> Include clear text above: <em>"SCAN TO BOOK APPOINTMENT & JOIN QUEUE"</em></li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>
