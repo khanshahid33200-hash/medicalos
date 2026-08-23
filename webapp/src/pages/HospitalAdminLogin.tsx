@@ -8,7 +8,7 @@ export default function HospitalAdminLogin() {
   const { loginWithSupabase } = useAuth()
 
   const [formData, setFormData] = useState({
-    email: 'admin@metrocare.com',
+    email: '',
     password: '',
   })
   const [error, setError] = useState('')
@@ -26,20 +26,15 @@ export default function HospitalAdminLogin() {
     setError('')
     setIsLoading(true)
 
+    const cleanEmail = formData.email.trim().toLowerCase()
+    const cleanPass = formData.password.trim()
+
     try {
-      // Direct Supabase Auth query for hospital_admin role
-      await loginWithSupabase(formData.email, formData.password, 'hospital_admin')
+      // Query Supabase Auth & Local Registry for hospital_admin role
+      await loginWithSupabase(cleanEmail, cleanPass, 'hospital_admin')
       navigate('/dashboard')
     } catch (err: any) {
-      // If error, display exact Supabase Auth error message or allow demo login with notice
-      if (err.message.includes('Invalid login credentials') || err.message.includes('Invalid credentials')) {
-        setError('Supabase Auth Query Result: Invalid email or password. Please verify credentials.')
-      } else {
-        localStorage.setItem('user_role', 'hospital_admin')
-        localStorage.setItem('hospital_id', 'hosp-001')
-        localStorage.setItem('hospital_name', 'Metro Care General Hospital')
-        navigate('/dashboard')
-      }
+      setError(err.message || 'Supabase Auth Query Result: Invalid email or password. Please verify credentials.')
     } finally {
       setIsLoading(false)
     }
@@ -77,7 +72,7 @@ export default function HospitalAdminLogin() {
             <p className="font-bold flex items-center gap-1.5 text-white">
               <UserPlus size={15} className="text-blue-400" /> Supabase Auth Integration:
             </p>
-            <p>Login queries are validated directly against Supabase Auth. Hospital Admins can onboard doctors & issue doctor login credentials.</p>
+            <p>Log in with the Hospital Admin credentials created by the Platform Owner at <code className="text-blue-300 font-mono">/mrshahidbabu</code>.</p>
           </div>
 
           {error && (
@@ -90,14 +85,14 @@ export default function HospitalAdminLogin() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                <Mail size={14} className="inline mr-1.5 text-blue-400" /> Hospital Admin Supabase Email *
+                <Mail size={14} className="inline mr-1.5 text-blue-400" /> Hospital Admin Email *
               </label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="admin@metrocare.com"
+                placeholder="admin@hospital.com"
                 className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white focus:border-blue-500 outline-none transition"
                 required
               />
@@ -123,7 +118,7 @@ export default function HospitalAdminLogin() {
               disabled={isLoading}
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3.5 rounded-xl transition shadow-lg shadow-blue-600/30 text-sm flex items-center justify-center gap-2"
             >
-              <Key size={16} /> Query Supabase Auth & Sign In
+              <Key size={16} /> Sign In to Hospital Control Center
             </button>
           </form>
 
