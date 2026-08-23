@@ -12,9 +12,10 @@ const generateQRCode = (text: string): string => {
 
 export default function QRKiosk() {
   const { doctorProfile } = useAuth()
-  const hospitalName = doctorProfile?.hospital_name || 'City Care Hospital'
+  const hospitalName = doctorProfile?.hospital_name || localStorage.getItem('hospital_name') || 'City Care Hospital'
+  const hospitalId = doctorProfile?.hospital_id || localStorage.getItem('hospital_id') || 'hosp-001'
 
-  const [intakeToken, setIntakeToken] = useState('abc123xyz78924charsstring')
+  const [intakeToken, setIntakeToken] = useState(`tok_${hospitalId}`)
   const [intakeUrl, setIntakeUrl] = useState('')
   const [qrUrl, setQrUrl] = useState('')
   const [copied, setCopied] = useState(false)
@@ -22,7 +23,7 @@ export default function QRKiosk() {
 
   useEffect(() => {
     const baseUrl = window.location.origin
-    const url = `${baseUrl}/a/${intakeToken}`
+    const url = `${baseUrl}/book/${intakeToken}`
     setIntakeUrl(url)
     setQrUrl(generateQRCode(url))
   }, [intakeToken])
@@ -44,7 +45,7 @@ export default function QRKiosk() {
 
   const handleRegenerateToken = () => {
     if (window.confirm('Are you sure you want to regenerate the hospital QR token? The old poster QR code will immediately be invalidated!')) {
-      const newToken = Array.from({ length: 24 }, () => Math.floor(Math.random() * 36).toString(36)).join('')
+      const newToken = `tok_${hospitalId}_${Math.floor(1000 + Math.random() * 9000)}`
       setIntakeToken(newToken)
       alert('Hospital Single QR Token regenerated. Please print and mount the new poster at the entrance.')
     }
@@ -53,32 +54,32 @@ export default function QRKiosk() {
   // Fullscreen Reception Tablet Kiosk Mode
   if (displayMode === 'fullscreen') {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-blue-700 via-indigo-800 to-slate-950 flex items-center justify-center p-6 z-50 font-sans selection:bg-blue-600 selection:text-white">
+      <div className="fixed inset-0 bg-slate-950 flex items-center justify-center p-6 z-50 font-sans selection:bg-blue-600 selection:text-white">
         <div className="text-center max-w-xl w-full space-y-6">
           <div className="text-white space-y-2">
             <span className="text-xs font-bold uppercase tracking-widest text-blue-300 bg-blue-500/20 px-3.5 py-1.5 rounded-full border border-blue-400/30">
               <Building2 size={14} className="inline mr-1" /> Hospital Entrance Self Check-in
             </span>
             <h1 className="text-4xl font-black font-recoleta text-white">{hospitalName}</h1>
-            <p className="text-xs text-slate-300 font-medium">Scan with smartphone camera to join queue & pay consultation fee</p>
+            <p className="text-xs text-slate-400 font-medium">Scan with smartphone camera to book appointment & join queue</p>
           </div>
 
           <div className="bg-white p-8 rounded-3xl shadow-2xl border-4 border-white/20">
             <div className="flex flex-col items-center">
               <p className="text-slate-900 text-lg font-black uppercase tracking-wider mb-3">SCAN TO BOOK APPOINTMENT</p>
               <img src={qrUrl} alt="Hospital Entrance Single QR Code" className="w-80 h-80 shadow-md rounded-2xl border border-slate-100" />
-              <p className="text-[11px] text-slate-400 mt-4 font-mono truncate max-w-xs">{intakeUrl}</p>
+              <p className="text-[11px] text-slate-500 mt-4 font-mono truncate max-w-xs">{intakeUrl}</p>
             </div>
           </div>
 
-          <div className="text-white text-xs bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-sm space-y-1">
-            <p className="font-extrabold text-blue-200">📱 No App Needed • No Account Required</p>
-            <p className="text-slate-300">Works on all Android & iPhone cameras. Track live queue on phone.</p>
+          <div className="text-white text-xs bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
+            <p className="font-extrabold text-blue-400">📱 No App Needed • Direct Browser Booking</p>
+            <p className="text-slate-400">Works on all smartphone cameras. Live queue position updates automatically.</p>
           </div>
 
           <button
             onClick={() => setDisplayMode('kiosk')}
-            className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full transition border border-white/20"
+            className="absolute top-6 right-6 bg-slate-900 hover:bg-slate-800 text-white p-3 rounded-full transition border border-slate-800"
           >
             ⚙️
           </button>
@@ -90,7 +91,7 @@ export default function QRKiosk() {
   // Printable A4 Entrance Poster Mode
   if (displayMode === 'poster') {
     return (
-      <div className="min-h-screen bg-slate-100 p-8 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-100 p-8 flex items-center justify-center font-sans">
         <div className="bg-white max-w-lg w-full p-12 rounded-3xl shadow-2xl border-4 border-slate-900 text-center space-y-6">
           <div className="space-y-2">
             <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-14 mx-auto object-contain" />
@@ -105,9 +106,9 @@ export default function QRKiosk() {
           </div>
 
           <div className="space-y-1 text-xs text-slate-600 font-bold">
-            <p>1. Open Phone Camera & Scan QR</p>
-            <p>2. Select Date & Doctor</p>
-            <p>3. Pay Fee & Track Live Queue on Phone</p>
+            <p>1. Open Phone Camera & Scan QR Code</p>
+            <p>2. Select Registered Doctor at {hospitalName}</p>
+            <p>3. Pay Fee & Track Live Queue Number</p>
           </div>
 
           <div className="no-print flex gap-3 justify-center pt-4">
@@ -115,7 +116,7 @@ export default function QRKiosk() {
               <Printer size={16} /> Print A4 Entrance Poster
             </Button>
             <Button variant="secondary" onClick={() => setDisplayMode('kiosk')}>
-              Back to Settings
+              Back to Console
             </Button>
           </div>
         </div>
@@ -128,9 +129,9 @@ export default function QRKiosk() {
       <div className="space-y-6 font-sans">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold font-recoleta text-slate-900">Hospital Single QR Kiosk</h1>
+            <h1 className="text-3xl font-bold font-recoleta text-slate-900">Hospital QR Code Kiosk</h1>
             <p className="text-xs text-slate-500 mt-1">
-              One QR Code for the entire hospital building (`/a/${intakeToken}`)
+              Unique entrance QR code for {hospitalName} (`/book/${intakeToken}`)
             </p>
           </div>
           <div className="flex gap-2">
@@ -138,19 +139,19 @@ export default function QRKiosk() {
               <Printer size={16} /> A4 Entrance Poster
             </Button>
             <Button variant="primary" onClick={() => setDisplayMode('fullscreen')} className="shadow-lg shadow-blue-600/30">
-              📺 Fullscreen Tablet Mode
+              📺 Fullscreen Kiosk Mode
             </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Live Single Hospital QR Code */}
+          {/* Live Hospital Specific QR Code */}
           <Card className="lg:col-span-1 border border-slate-200 rounded-3xl shadow-md">
-            <CardHeader title="Entrance QR Code" />
+            <CardHeader title="Hospital Specific QR Code" />
             <CardContent className="py-6 text-center space-y-4">
-              <img src={qrUrl} alt="Hospital Single QR Code" className="w-full max-w-xs mx-auto shadow-md rounded-2xl border border-slate-200" />
+              <img src={qrUrl} alt="Hospital Entrance QR Code" className="w-full max-w-xs mx-auto shadow-md rounded-2xl border border-slate-200" />
               <div className="bg-blue-50 text-blue-900 p-3 rounded-2xl text-xs font-semibold border border-blue-100">
-                Single QR Code valid for all doctors & departments
+                Shows ONLY registered doctors belonging to {hospitalName}
               </div>
             </CardContent>
           </Card>
@@ -158,7 +159,7 @@ export default function QRKiosk() {
           {/* Configuration & Printing Guide */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="border border-slate-200 rounded-3xl shadow-md">
-              <CardHeader title="Single Intake URL Configuration" />
+              <CardHeader title="Hospital Intake URL Configuration" />
               <CardContent className="py-6 space-y-5">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Facility Name</label>
@@ -188,10 +189,10 @@ export default function QRKiosk() {
 
                 <div className="flex gap-3 flex-wrap pt-2">
                   <Button variant="primary" onClick={() => handleDownloadQR('png')}>
-                    <Download size={16} /> Download PNG (Print)
+                    <Download size={16} /> Download PNG
                   </Button>
                   <Button variant="secondary" onClick={() => handleDownloadQR('svg')}>
-                    <Download size={16} /> Download SVG (Vector)
+                    <Download size={16} /> Download SVG
                   </Button>
                   <button
                     onClick={handleRegenerateToken}
@@ -203,7 +204,7 @@ export default function QRKiosk() {
               </CardContent>
             </Card>
 
-            {/* Printing Guide (Specification) */}
+            {/* Printing Guide */}
             <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 space-y-3 text-xs text-amber-900">
               <h3 className="font-bold text-sm text-amber-950 flex items-center gap-2">
                 📋 Hospital Entrance QR Printing Guide
@@ -211,10 +212,8 @@ export default function QRKiosk() {
               <ul className="list-disc list-inside space-y-1.5 font-medium text-amber-900">
                 <li><strong>Minimum size:</strong> 4cm × 4cm (for smartphone camera focus)</li>
                 <li><strong>Recommended size:</strong> 10cm × 10cm or full A4 entrance poster</li>
-                <li><strong>Scale:</strong> Print in black & white at 100% scale (no shrinking or distortion)</li>
-                <li><strong>Protection:</strong> Laminate poster to protect from scratches, moisture, and glare</li>
-                <li><strong>Placement:</strong> Mount at eye level near the main reception or hospital entrance door</li>
-                <li><strong>Header Text:</strong> Include clear text above: <em>"SCAN TO BOOK APPOINTMENT & JOIN QUEUE"</em></li>
+                <li><strong>Protection:</strong> Laminate poster to protect from scratches and glare</li>
+                <li><strong>Placement:</strong> Mount at eye level near main reception door</li>
               </ul>
             </div>
           </div>

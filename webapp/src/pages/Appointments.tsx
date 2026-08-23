@@ -24,10 +24,28 @@ export default function Appointments() {
   const [appointmentsList, setAppointmentsList] = useState<AppointmentItem[]>([])
 
   const reloadAppointments = () => {
-    if (doctorId) {
-      const storeAppointments = getAppointmentsForDoctor(doctorId)
-      setAppointmentsList(storeAppointments)
+    const userRole = localStorage.getItem('user_role')
+    const currentHospId = doctorProfile?.hospital_id || localStorage.getItem('hospital_id') || 'hosp-001'
+
+    const storeAppointments = getAppointmentsForDoctor(doctorId)
+    const savedAptsRaw = localStorage.getItem('clinicos_appointments')
+    const globalApts: any[] = savedAptsRaw ? JSON.parse(savedAptsRaw) : []
+
+    let filtered: AppointmentItem[] = []
+
+    if (userRole === 'hospital_admin') {
+      // Hospital Admin sees all appointments for their hospital
+      const matchedGlobal = globalApts.filter((a) => a.hospital_id === currentHospId || !a.hospital_id)
+      filtered = [...matchedGlobal, ...storeAppointments]
+    } else {
+      // Doctor D1 sees ONLY appointments where doctor_id === D1.id
+      const matchedGlobal = globalApts.filter((a) => a.doctor_id === doctorId && (a.hospital_id === currentHospId || !a.hospital_id))
+      filtered = [...matchedGlobal, ...storeAppointments]
     }
+
+    // Deduplicate by ID
+    const unique = Array.from(new Map(filtered.map((item) => [item.id, item])).values())
+    setAppointmentsList(unique)
   }
 
   useEffect(() => {

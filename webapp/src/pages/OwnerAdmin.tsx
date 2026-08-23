@@ -29,6 +29,7 @@ interface HospitalItem {
   phone: string
   email: string
   password?: string
+  intake_token?: string
   address: string
   doctor_limit: number
   doctor_count: number
@@ -174,6 +175,7 @@ export default function OwnerAdmin() {
       phone: hospitalForm.phone,
       email: hospitalForm.email,
       password: hospitalForm.password.trim(),
+      intake_token: `tok_${hospId}`,
       address: hospitalForm.address,
       doctor_limit: Number(hospitalForm.doctor_limit) || 5,
       doctor_count: 0,
