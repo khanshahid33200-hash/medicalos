@@ -1,16 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import {
-  User as FirebaseUser,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  onAuthStateChanged
-} from 'firebase/auth'
-import { auth } from '../lib/firebase'
-import apiClient from '../api/client'
+import { supabase } from '../lib/supabase'
 
 export interface DoctorProfile {
   doctor_id: string
-  firebase_uid: string
   hospital_id: string
   hospital_name: string
   name: string
@@ -18,133 +10,162 @@ export interface DoctorProfile {
   department_id: string
   department_name: string
   specialization: string
-  role: 'doctor' | 'admin' | 'staff'
+  role: 'doctor' | 'hospital_admin' | 'super_admin'
   status: 'active' | 'inactive' | 'on_leave'
 }
 
 interface AuthContextType {
-  currentUser: FirebaseUser | null
+  currentUser: any | null
   doctorProfile: DoctorProfile | null
+  userRole: 'hospital_admin' | 'doctor' | 'super_admin' | null
   isLoading: boolean
   error: string | null
-  login: (email: string, pass: string) => Promise<void>
+  loginWithSupabase: (email: string, pass: string, expectedRole?: 'hospital_admin' | 'doctor') => Promise<any>
+  registerUserInSupabase: (email: string, pass: string, metadata: { role: string; name: string; hospital_id?: string; dept?: string }) => Promise<any>
   logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null)
+  const [currentUser, setCurrentUser] = useState<any | null>(null)
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null)
+  const [userRole, setUserRole] = useState<'hospital_admin' | 'doctor' | 'super_admin' | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchDoctorProfile = async (firebaseUid: string, email: string): Promise<DoctorProfile> => {
-    try {
-      // Query Supabase Doctor Profile by Firebase UID
-      const response = await apiClient.getDoctorProfile(firebaseUid)
-      const data = response.data
-
-      if (data && data.status === 'active') {
-        const profile: DoctorProfile = {
-          doctor_id: data.doctor_id || `doc-${firebaseUid.substring(0, 8)}`,
-          firebase_uid: firebaseUid,
-          hospital_id: data.hospital_id || 'hosp-001',
-          hospital_name: data.hospital_name || 'Metro Care General Hospital',
-          name: data.name || (email.includes('admin') ? 'Dr. Sarah Jenkins' : 'Dr. Authorized Doctor'),
-          email: email,
-          department_id: data.department_id || 'dept-cardio-01',
-          department_name: data.department_name || 'Cardiology',
-          specialization: data.specialization || 'Consultant Physician',
-          role: data.role || 'doctor',
-          status: 'active',
+  useEffect(() => {
+    // Check initial Supabase Session
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session && session.user) {
+          setCurrentUser(session.user)
+          const role = session.user.user_metadata?.role || (localStorage.getItem('user_role') as any) || 'doctor'
+          setUserRole(role)
+          
+          setDoctorProfile({
+            doctor_id: session.user.id,
+            hospital_id: session.user.user_metadata?.hospital_id || 'hosp-001',
+            hospital_name: session.user.user_metadata?.hospital_name || 'Metro Care General Hospital',
+            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email || '',
+            department_id: 'dept-cardio-01',
+            department_name: session.user.user_metadata?.department || 'Cardiology',
+            specialization: 'Consultant Specialist',
+            role: role,
+            status: 'active',
+          })
         }
-        return profile
-      } else {
-        throw new Error('Doctor account is inactive or pending hospital verification.')
-      }
-    } catch (err: any) {
-      // Return structured profile tied strictly to authenticated Firebase UID
-      return {
-        doctor_id: `doc-${firebaseUid.substring(0, 8)}`,
-        firebase_uid: firebaseUid,
-        hospital_id: 'hosp-001',
-        hospital_name: 'Metro Care General Hospital',
-        name: email.includes('admin') ? 'Dr. Sarah Jenkins (Admin)' : `Dr. ${email.split('@')[0].toUpperCase()}`,
-        email: email,
-        department_id: 'dept-cardio-01',
-        department_name: 'Cardiology',
-        specialization: 'Consultant Specialist',
-        role: email.includes('admin') ? 'admin' : 'doctor',
-        status: 'active',
+      } catch (e) {
+        console.warn('Supabase Auth init:', e)
+      } finally {
+        setIsLoading(false)
       }
     }
-  }
 
-  useEffect(() => {
-    // Listen strictly to Firebase Authentication state changes
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setIsLoading(true)
-      setError(null)
-      if (user) {
-        try {
-          setCurrentUser(user)
-          const profile = await fetchDoctorProfile(user.uid, user.email || '')
-          setDoctorProfile(profile)
-          localStorage.setItem('hospital_id', profile.hospital_id)
-          localStorage.setItem('doctor_id', profile.doctor_id)
-          apiClient.setClinicId(profile.hospital_id)
-        } catch (err: any) {
-          setError(err.message)
-          setCurrentUser(null)
-          setDoctorProfile(null)
-        }
+    initAuth()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setCurrentUser(session.user)
+        const role = session.user.user_metadata?.role || (localStorage.getItem('user_role') as any) || 'doctor'
+        setUserRole(role)
       } else {
         setCurrentUser(null)
         setDoctorProfile(null)
-        localStorage.removeItem('hospital_id')
-        localStorage.removeItem('doctor_id')
+        setUserRole(null)
       }
-      setIsLoading(false)
     })
 
-    return () => unsubscribe()
+    return () => subscription.unsubscribe()
   }, [])
 
-  const login = async (email: string, pass: string) => {
+  // Login Query directly to Supabase Auth
+  const loginWithSupabase = async (email: string, pass: string, expectedRole?: 'hospital_admin' | 'doctor') => {
     setIsLoading(true)
     setError(null)
 
-    // 1. Strict Firebase Authentication (No mock demo login allowed)
-    const userCredential = await signInWithEmailAndPassword(auth, email, pass)
-    const user = userCredential.user
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password: pass,
+      })
 
-    if (!user || !user.uid) {
-      throw new Error('Firebase Authentication failed. Invalid user credentials.')
+      if (authError) {
+        throw new Error(authError.message)
+      }
+
+      if (!data.user) {
+        throw new Error('Supabase Auth failed. Invalid credentials.')
+      }
+
+      const role = data.user.user_metadata?.role || expectedRole || 'doctor'
+      
+      // Role enforcement: Hospital admin can only log in at /login/hospitaladmin009
+      if (expectedRole && role !== expectedRole && role !== 'super_admin') {
+        await supabase.auth.signOut()
+        throw new Error(`Unauthorized role access. This portal is strictly for ${expectedRole === 'hospital_admin' ? 'Hospital Administrators' : 'Doctors'}.`)
+      }
+
+      setCurrentUser(data.user)
+      setUserRole(role)
+      localStorage.setItem('user_role', role)
+
+      const profile: DoctorProfile = {
+        doctor_id: data.user.id,
+        hospital_id: data.user.user_metadata?.hospital_id || 'hosp-001',
+        hospital_name: data.user.user_metadata?.hospital_name || 'Metro Care General Hospital',
+        name: data.user.user_metadata?.full_name || email.split('@')[0],
+        email: email,
+        department_id: 'dept-cardio-01',
+        department_name: data.user.user_metadata?.department || 'Cardiology',
+        specialization: 'Consultant Specialist',
+        role: role,
+        status: 'active',
+      }
+      setDoctorProfile(profile)
+      setIsLoading(false)
+      return data
+    } catch (err: any) {
+      setIsLoading(false)
+      throw err
     }
+  }
 
-    // 2. Fetch authenticated Doctor Profile mapped by Firebase UID
-    const profile = await fetchDoctorProfile(user.uid, user.email || email)
+  // Register User Credentials in Supabase Auth (Platform Owner or Hospital Admin)
+  const registerUserInSupabase = async (
+    email: string,
+    pass: string,
+    metadata: { role: string; name: string; hospital_id?: string; dept?: string }
+  ) => {
+    const { data, error: regError } = await supabase.auth.signUp({
+      email,
+      password: pass,
+      options: {
+        data: {
+          full_name: metadata.name,
+          role: metadata.role,
+          hospital_id: metadata.hospital_id || 'hosp-001',
+          department: metadata.dept || 'General',
+        },
+      },
+    })
 
-    if (profile.status !== 'active') {
-      await firebaseSignOut(auth)
-      throw new Error('Hospital verification failed. Doctor status is not active.')
+    if (regError) {
+      throw new Error(regError.message)
     }
-
-    setCurrentUser(user)
-    setDoctorProfile(profile)
-    localStorage.setItem('hospital_id', profile.hospital_id)
-    localStorage.setItem('doctor_id', profile.doctor_id)
-    apiClient.setClinicId(profile.hospital_id)
-    setIsLoading(false)
+    return data
   }
 
   const logout = async () => {
-    await firebaseSignOut(auth)
+    await supabase.auth.signOut()
+    localStorage.removeItem('user_role')
     localStorage.removeItem('hospital_id')
     localStorage.removeItem('doctor_id')
     setCurrentUser(null)
     setDoctorProfile(null)
+    setUserRole(null)
   }
 
   return (
@@ -152,9 +173,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         currentUser,
         doctorProfile,
+        userRole,
         isLoading,
         error,
-        login,
+        loginWithSupabase,
+        registerUserInSupabase,
         logout,
       }}
     >

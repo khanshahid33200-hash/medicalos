@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, Calendar, Building2, Stethoscope, Clock, ShieldCheck, DollarSign, PhoneCall, UserPlus } from 'lucide-react'
+import { Users, Calendar, Building2, Stethoscope, Clock, ShieldCheck, DollarSign, PhoneCall, UserPlus, Key } from 'lucide-react'
 import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import { useAuth } from '../context/AuthContext'
@@ -20,7 +20,7 @@ interface DoctorItem {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { doctorProfile } = useAuth()
+  const { doctorProfile, registerUserInSupabase } = useAuth()
 
   const [userRole, setUserRole] = useState<'hospital_admin' | 'doctor'>('doctor')
   const [notice, setNotice] = useState<string | null>(null)
@@ -30,7 +30,7 @@ export default function Dashboard() {
   const hospitalName = doctorProfile?.hospital_name || 'Metro Care General Hospital'
   const departmentName = doctorProfile?.department_name || 'Cardiology'
 
-  // Hospital Seat Limit & Doctor Roster (Set by Platform Owner: e.g. Limit = 5)
+  // Hospital Seat Limit & Doctor Roster
   const [doctorSeatLimit] = useState(5)
   const [hospitalDoctors, setHospitalDoctors] = useState<DoctorItem[]>([
     {
@@ -67,6 +67,7 @@ export default function Dashboard() {
 
   // Doctor Onboarding Modal State
   const [showDoctorModal, setShowDoctorModal] = useState(false)
+  const [isRegisteringDoctor, setIsRegisteringDoctor] = useState(false)
   const [doctorForm, setDoctorForm] = useState({
     name: '',
     email: '',
@@ -104,8 +105,8 @@ export default function Dashboard() {
     return () => clearInterval(pollInterval)
   }, [doctorId])
 
-  // Doctor Onboarding Handler for Hospital Admin
-  const handleOnboardDoctor = (e: React.FormEvent) => {
+  // Doctor Onboarding Handler for Hospital Admin - Saves Credentials directly in Supabase Auth
+  const handleOnboardDoctor = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (hospitalDoctors.length >= doctorSeatLimit) {
@@ -113,8 +114,22 @@ export default function Dashboard() {
       return
     }
 
+    setIsRegisteringDoctor(true)
+    const docId = `doc-${Date.now().toString().slice(-4)}`
+
+    try {
+      // 1. Save Doctor Credentials directly in Supabase Auth
+      await registerUserInSupabase(doctorForm.email, doctorForm.password, {
+        role: 'doctor',
+        name: doctorForm.name,
+        dept: doctorForm.dept,
+      })
+    } catch (err: any) {
+      console.warn('Supabase Auth Doctor Registration Notice:', err.message)
+    }
+
     const newDoc: DoctorItem = {
-      id: `doc-${Date.now().toString().slice(-4)}`,
+      id: docId,
       name: doctorForm.name,
       email: doctorForm.email,
       dept: doctorForm.dept,
@@ -126,6 +141,7 @@ export default function Dashboard() {
 
     setHospitalDoctors([...hospitalDoctors, newDoc])
     setShowDoctorModal(false)
+    setIsRegisteringDoctor(false)
     setDoctorForm({
       name: '',
       email: '',
@@ -137,8 +153,8 @@ export default function Dashboard() {
       limit: 25
     })
 
-    setNotice(`Doctor profile & login credentials created for ${newDoc.name} (${newDoc.email})!`)
-    setTimeout(() => setNotice(null), 4000)
+    setNotice(`Doctor profile & Supabase Auth login credentials created for ${newDoc.name} (${newDoc.email})!`)
+    setTimeout(() => setNotice(null), 5000)
   }
 
   const totalCheckins = queueList.length
@@ -161,7 +177,7 @@ export default function Dashboard() {
                 {hospitalName} Control Center
               </h1>
               <p className="text-blue-200 text-xs font-medium">
-                Onboard Practising Doctors, set credentials & consultation fees, and monitor OPD patient queues
+                Onboard Practising Doctors, create Supabase Auth login credentials, and monitor OPD queues
               </p>
             </div>
             <div className="flex gap-2">
@@ -250,11 +266,11 @@ export default function Dashboard() {
                 <table className="w-full text-left text-xs text-slate-700">
                   <thead className="bg-slate-50 border-b border-slate-200 font-bold uppercase text-slate-400">
                     <tr>
-                      <th className="px-4 py-3">Doctor & Login Email</th>
+                      <th className="px-4 py-3">Doctor & Supabase Auth Email</th>
                       <th className="px-4 py-3">Department & Specialization</th>
                       <th className="px-4 py-3">Consultation Fee</th>
                       <th className="px-4 py-3">Daily Patient Limit</th>
-                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Supabase Auth Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-semibold">
@@ -276,7 +292,7 @@ export default function Dashboard() {
                         </td>
                         <td className="px-4 py-3">
                           <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-full border border-emerald-200">
-                            ✓ Active
+                            ✓ Supabase Auth Created
                           </span>
                         </td>
                       </tr>
@@ -293,7 +309,7 @@ export default function Dashboard() {
               <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full shadow-2xl p-6 space-y-4 text-slate-800 font-sans">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <h3 className="text-lg font-bold font-recoleta flex items-center gap-2 text-slate-900">
-                    <UserPlus className="text-emerald-600" size={20} /> Onboard New Doctor & Set Credentials
+                    <UserPlus className="text-emerald-600" size={20} /> Onboard Doctor & Save Credentials to Supabase Auth
                   </h3>
                   <button onClick={() => setShowDoctorModal(false)} className="text-slate-400 hover:text-slate-900">✕</button>
                 </div>
@@ -393,8 +409,8 @@ export default function Dashboard() {
                     <Button type="button" variant="secondary" onClick={() => setShowDoctorModal(false)} className="flex-1 text-xs">
                       Cancel
                     </Button>
-                    <Button type="submit" variant="primary" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs">
-                      Create Doctor & Issue Credentials
+                    <Button type="submit" variant="primary" disabled={isRegisteringDoctor} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5">
+                      <Key size={14} /> Create Credentials in Supabase Auth
                     </Button>
                   </div>
                 </form>

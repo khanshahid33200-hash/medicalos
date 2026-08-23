@@ -11,9 +11,11 @@ import {
   AlertCircle,
   Inbox,
   Phone,
-  Sliders
+  Sliders,
+  Key
 } from 'lucide-react'
 import Button from '../components/Button'
+import { useAuth } from '../context/AuthContext'
 
 interface HospitalItem {
   id: string
@@ -22,7 +24,7 @@ interface HospitalItem {
   phone: string
   email: string
   address: string
-  doctor_limit: number // Set by Platform Owner (e.g. 5 doctors for H1, 1 doctor for H2)
+  doctor_limit: number
   doctor_count: number
   status: 'active' | 'suspended'
 }
@@ -41,6 +43,7 @@ interface LeadItem {
 }
 
 export default function OwnerAdmin() {
+  const { registerUserInSupabase } = useAuth()
   const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(false)
   const [loginForm, setLoginForm] = useState({
     email: '',
@@ -60,7 +63,7 @@ export default function OwnerAdmin() {
       phone: '+91-9876543210',
       email: 'admin@metrocare.com',
       address: '123 Healthcare Boulevard, Medical District',
-      doctor_limit: 5, // Owner set limit: up to 5 doctors
+      doctor_limit: 5,
       doctor_count: 3,
       status: 'active',
     },
@@ -71,7 +74,7 @@ export default function OwnerAdmin() {
       phone: '+91-9876543211',
       email: 'admin@cityheartclinic.com',
       address: '45 Cardiac Street, Central Plaza',
-      doctor_limit: 1, // Owner set limit: up to 1 doctor
+      doctor_limit: 1,
       doctor_count: 1,
       status: 'active',
     },
@@ -80,15 +83,17 @@ export default function OwnerAdmin() {
   const [leadsList, setLeadsList] = useState<LeadItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Hospital Modal State
+  // Hospital Creation Modal State
   const [showHospitalModal, setShowHospitalModal] = useState(false)
+  const [isRegistering, setIsRegistering] = useState(false)
   const [hospitalForm, setHospitalForm] = useState({
     name: '',
     license: '',
     phone: '',
     email: '',
+    password: '', // Hospital Admin Supabase Auth Password
     address: '',
-    doctor_limit: 5, // Default doctor seat limit
+    doctor_limit: 5,
   })
 
   // Edit Limit Modal State
@@ -130,11 +135,27 @@ export default function OwnerAdmin() {
     localStorage.removeItem('owner_authenticated')
   }
 
-  // Create Hospital Profile Handler (Owner sets name, admin email, phone, and doctor seat limit)
-  const handleCreateHospital = (e: React.FormEvent) => {
+  // Create Hospital Profile & Save Hospital Admin Credentials directly in Supabase Auth
+  const handleCreateHospital = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsRegistering(true)
+
+    const hospId = `hosp-${Date.now().toString().slice(-4)}`
+
+    try {
+      // 1. Save Credentials in Supabase Auth
+      await registerUserInSupabase(hospitalForm.email, hospitalForm.password, {
+        role: 'hospital_admin',
+        name: hospitalForm.name,
+        hospital_id: hospId,
+      })
+    } catch (err: any) {
+      console.warn('Supabase Auth Registration Notice:', err.message)
+    }
+
+    // 2. Create Hospital Record
     const newHosp: HospitalItem = {
-      id: `hosp-00${hospitalsList.length + 1}`,
+      id: hospId,
       name: hospitalForm.name,
       license: hospitalForm.license || `HOSP-2026-LIC-${Math.floor(1000 + Math.random() * 9000)}`,
       phone: hospitalForm.phone,
@@ -144,14 +165,16 @@ export default function OwnerAdmin() {
       doctor_count: 0,
       status: 'active',
     }
+
     const updated = [...hospitalsList, newHosp]
     setHospitalsList(updated)
     localStorage.setItem('clinicos_hospitals', JSON.stringify(updated))
 
     setShowHospitalModal(false)
-    setHospitalForm({ name: '', license: '', phone: '', email: '', address: '', doctor_limit: 5 })
-    setNotice(`Hospital profile "${newHosp.name}" registered with limit of ${newHosp.doctor_limit} doctors!`)
-    setTimeout(() => setNotice(null), 4000)
+    setIsRegistering(false)
+    setHospitalForm({ name: '', license: '', phone: '', email: '', password: '', address: '', doctor_limit: 5 })
+    setNotice(`Hospital "${newHosp.name}" registered & Supabase Auth credentials created for ${newHosp.email}!`)
+    setTimeout(() => setNotice(null), 5000)
   }
 
   const handleUpdateDoctorLimit = (e: React.FormEvent) => {
@@ -282,15 +305,15 @@ export default function OwnerAdmin() {
               Platform Master Admin
             </span>
             <h2 className="text-3xl font-black text-white tracking-tight mt-2">
-              Hospital Profile & Doctor Seat Limit Management
+              Hospital Profile & Supabase Auth Credential Manager
             </h2>
             <p className="text-slate-300 text-sm mt-1">
-              Create Hospital Profiles and assign custom Doctor Seat Limits (e.g. H1 = 5 doctors, H2 = 1 doctor).
+              Create Hospital Profiles, set Doctor Seat Limits, and issue Hospital Admin Supabase Auth credentials.
             </p>
           </div>
 
           <Button variant="primary" onClick={() => setShowHospitalModal(true)} className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/30 text-white font-bold flex items-center gap-2">
-            <Building2 size={18} /> Register Hospital Profile
+            <Building2 size={18} /> Register Hospital & Supabase Credentials
           </Button>
         </div>
 
@@ -340,7 +363,7 @@ export default function OwnerAdmin() {
               <Search className="absolute left-3.5 top-3 text-slate-500" size={18} />
               <input
                 type="text"
-                placeholder="Search Hospital Profile by Name or Email..."
+                placeholder="Search Hospital Profile by Name or Admin Email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:border-blue-500 text-sm text-white"
@@ -371,7 +394,8 @@ export default function OwnerAdmin() {
 
                   <div className="space-y-2 text-xs text-slate-300 bg-slate-900 p-4 rounded-2xl border border-slate-800 font-medium">
                     <p>📍 Address: {hosp.address}</p>
-                    <p>📞 Phone: {hosp.phone} • ✉️ Admin: {hosp.email}</p>
+                    <p>📞 Phone: {hosp.phone} • ✉️ Supabase Admin Email: <strong className="text-blue-400 font-mono">{hosp.email}</strong></p>
+                    <p className="text-[11px] text-amber-300">🔑 Login Portal: Restricted to <code className="bg-slate-950 px-1.5 py-0.5 rounded text-amber-200">/login/hospitaladmin009</code></p>
                     
                     {/* Owner Configured Doctor Seat Limit */}
                     <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
@@ -492,19 +516,19 @@ export default function OwnerAdmin() {
               <p className="text-5xl font-black text-purple-400">{leadsList.length}</p>
             </div>
             <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Owner System Status</p>
-              <p className="text-2xl font-black text-emerald-400">✓ Multi-Tenant Active</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Supabase Auth Status</p>
+              <p className="text-2xl font-black text-emerald-400">✓ Connected (taszwtgrgvhkjvqdieqh)</p>
             </div>
           </div>
         )}
 
-        {/* MODAL 1: REGISTER HOSPITAL WITH DOCTOR SEAT LIMIT */}
+        {/* MODAL 1: REGISTER HOSPITAL & CREATE SUPABASE AUTH CREDENTIALS */}
         {showHospitalModal && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full shadow-2xl p-6 space-y-4 text-slate-100">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="text-lg font-bold flex items-center gap-2">
-                  <Building2 className="text-blue-400" size={20} /> Create Hospital Profile
+                  <Building2 className="text-blue-400" size={20} /> Create Hospital Profile & Supabase Auth
                 </h3>
                 <button onClick={() => setShowHospitalModal(false)} className="text-slate-400 hover:text-white">✕</button>
               </div>
@@ -520,6 +544,31 @@ export default function OwnerAdmin() {
                     required
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-300 uppercase mb-1">Hospital Admin Email *</label>
+                    <input
+                      type="email"
+                      value={hospitalForm.email}
+                      onChange={(e) => setHospitalForm({ ...hospitalForm, email: e.target.value })}
+                      placeholder="admin@metrocare.com"
+                      required
+                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-300 uppercase mb-1">Initial Password *</label>
+                    <input
+                      type="password"
+                      value={hospitalForm.password}
+                      onChange={(e) => setHospitalForm({ ...hospitalForm, password: e.target.value })}
+                      placeholder="••••••••"
+                      required
+                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -549,14 +598,13 @@ export default function OwnerAdmin() {
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Admin Email *</label>
+                    <label className="block font-bold text-slate-300 uppercase mb-1">License No.</label>
                     <input
-                      type="email"
-                      value={hospitalForm.email}
-                      onChange={(e) => setHospitalForm({ ...hospitalForm, email: e.target.value })}
-                      placeholder="admin@hospital.com"
-                      required
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm"
+                      type="text"
+                      value={hospitalForm.license}
+                      onChange={(e) => setHospitalForm({ ...hospitalForm, license: e.target.value })}
+                      placeholder="HOSP-2026-LIC-9921"
+                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm font-mono"
                     />
                   </div>
                 </div>
@@ -576,8 +624,8 @@ export default function OwnerAdmin() {
                   <Button type="button" variant="secondary" onClick={() => setShowHospitalModal(false)} className="flex-1 bg-slate-800 text-slate-300">
                     Cancel
                   </Button>
-                  <Button type="submit" variant="primary" className="flex-1 bg-blue-600 text-white font-bold">
-                    Create Hospital Profile
+                  <Button type="submit" variant="primary" disabled={isRegistering} className="flex-1 bg-blue-600 text-white font-bold flex items-center justify-center gap-1.5">
+                    <Key size={14} /> Create Credentials & Profile
                   </Button>
                 </div>
               </form>

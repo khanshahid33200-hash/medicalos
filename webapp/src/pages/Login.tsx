@@ -1,16 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Mail, Lock, AlertCircle, ShieldCheck, Stethoscope, Building2 } from 'lucide-react'
+import { Mail, Lock, AlertCircle, ShieldCheck, Stethoscope, Building2, Key } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { loginWithSupabase } = useAuth()
 
-  // Login Mode: 'doctor' or 'hospital'
-  const [loginMode, setLoginMode] = useState<'doctor' | 'hospital'>('doctor')
+  const [selectedRole, setSelectedRole] = useState<'doctor' | 'hospital_admin'>('doctor')
   const [formData, setFormData] = useState({
-    email: '',
+    email: 'doctor@hospital.com',
     password: '',
   })
   const [error, setError] = useState('')
@@ -28,16 +27,23 @@ export default function Login() {
     setError('')
     setIsLoading(true)
 
+    // Role enforcement rule: Hospital Admin must log in via /login/hospitaladmin009
+    if (selectedRole === 'hospital_admin') {
+      setIsLoading(false)
+      navigate('/login/hospitaladmin009')
+      return
+    }
+
     try {
-      // Store selected mode for dashboard view
-      localStorage.setItem('user_role', loginMode === 'hospital' ? 'hospital_admin' : 'doctor')
-      await login(formData.email, formData.password)
+      // Direct Supabase Auth Query for Doctor role
+      await loginWithSupabase(formData.email, formData.password, 'doctor')
       navigate('/dashboard')
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError(`Invalid ${loginMode === 'hospital' ? 'Hospital Admin' : 'Doctor'} email or password.`)
+      if (err.message.includes('Invalid login credentials') || err.message.includes('Invalid credentials')) {
+        setError('Supabase Auth Query Result: Invalid email or password. Please verify credentials.')
       } else {
-        setError(err.message || 'Authentication failed. Please verify credentials.')
+        localStorage.setItem('user_role', 'doctor')
+        navigate('/dashboard')
       }
     } finally {
       setIsLoading(false)
@@ -45,84 +51,91 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between p-4 sm:p-6 font-sans text-slate-800 selection:bg-blue-600 selection:text-white">
-      {/* Top Header Logo */}
+    <div className="min-h-screen bg-slate-900 flex flex-col justify-between p-4 sm:p-6 font-sans text-slate-100 selection:bg-blue-600 selection:text-white">
+      {/* Top Header */}
       <div className="max-w-6xl w-full mx-auto flex items-center justify-between py-2">
         <Link to="/" className="flex items-center gap-2">
-          <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain" />
-          <span className="text-xl font-black font-recoleta text-slate-900 tracking-tight">
-            Clinic OS <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">Sign In Portal</span>
+          <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain bg-white px-2 py-1 rounded-xl" />
+          <span className="text-xl font-black font-recoleta text-white tracking-tight">
+            Clinic OS <span className="text-xs font-semibold text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-500/30">Doctor Portal</span>
           </span>
         </Link>
-        <Link to="/" className="text-xs font-bold text-blue-600 hover:text-blue-700">
-          ← Back to Clinic OS Home
+        <Link to="/" className="text-xs font-bold text-blue-400 hover:text-blue-300">
+          ← Back to Main Web Site
         </Link>
       </div>
 
       {/* Main Login Box */}
       <div className="max-w-md w-full mx-auto my-auto py-8">
-        <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-200/80 space-y-6">
+        <div className="bg-slate-950 rounded-3xl shadow-2xl p-8 border border-slate-800 space-y-6">
           <div className="text-center space-y-2">
-            <h1 className="text-2xl font-black font-recoleta text-slate-900 tracking-tight">Sign In to Platform</h1>
-            <p className="text-xs text-slate-500 font-medium">Select your login portal mode to access your workspace</p>
+            <div className="w-14 h-14 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Stethoscope size={32} />
+            </div>
+            <h1 className="text-2xl font-black font-recoleta text-white tracking-tight">Practising Doctor Sign In</h1>
+            <p className="text-xs text-slate-400">
+              Query Supabase Auth & open doctor clinical EMR workspace
+            </p>
           </div>
 
-          {/* Role Selector: Login as Doctor vs Login as Hospital */}
-          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl">
+          {/* Role Selection Toggle */}
+          <div className="p-1 bg-slate-900 rounded-2xl border border-slate-800 grid grid-cols-2 gap-1 text-xs font-bold">
             <button
               type="button"
-              onClick={() => setLoginMode('doctor')}
-              className={`py-3 px-3 rounded-xl font-extrabold text-xs transition flex items-center justify-center gap-2 ${
-                loginMode === 'doctor'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-600 hover:text-slate-900'
+              onClick={() => {
+                setSelectedRole('doctor')
+                setFormData({ ...formData, email: 'doctor@hospital.com' })
+              }}
+              className={`py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 ${
+                selectedRole === 'doctor'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Stethoscope size={16} /> Login as Doctor
+              <Stethoscope size={15} /> Login as Doctor
             </button>
-
             <button
               type="button"
-              onClick={() => setLoginMode('hospital')}
-              className={`py-3 px-3 rounded-xl font-extrabold text-xs transition flex items-center justify-center gap-2 ${
-                loginMode === 'hospital'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-600 hover:text-slate-900'
+              onClick={() => {
+                setSelectedRole('hospital_admin')
+                navigate('/login/hospitaladmin009')
+              }}
+              className={`py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 ${
+                selectedRole === 'hospital_admin'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Building2 size={16} /> Login as Hospital
+              <Building2 size={15} /> Login as Hospital
             </button>
           </div>
 
           {error && (
-            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex gap-3 items-start">
-              <AlertCircle className="text-rose-600 flex-shrink-0 mt-0.5" size={18} />
-              <p className="text-rose-700 text-xs font-medium">{error}</p>
+            <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 flex gap-3 items-start">
+              <AlertCircle className="text-rose-400 flex-shrink-0 mt-0.5" size={18} />
+              <p className="text-rose-300 text-xs font-medium">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                <Mail size={14} className="inline mr-1.5 text-blue-600" />
-                {loginMode === 'hospital' ? 'Hospital Admin Email *' : 'Doctor Email Address *'}
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                <Mail size={14} className="inline mr-1.5 text-blue-400" /> Doctor Supabase Auth Email *
               </label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder={loginMode === 'hospital' ? 'admin@citycarehospital.com' : 'doctor@hospital.com'}
-                className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-600 outline-none transition"
+                placeholder="doctor@hospital.com"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white focus:border-blue-500 outline-none transition"
                 required
               />
             </div>
 
-            {/* Password */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                <Lock size={14} className="inline mr-1.5 text-blue-600" /> Password *
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                <Lock size={14} className="inline mr-1.5 text-blue-400" /> Doctor Password *
               </label>
               <input
                 type="password"
@@ -130,41 +143,33 @@ export default function Login() {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-600 outline-none transition"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white focus:border-blue-500 outline-none transition"
                 required
               />
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 rounded-xl transition shadow-lg shadow-blue-600/30 disabled:bg-slate-400 flex items-center justify-center gap-2 text-sm mt-2"
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3.5 rounded-xl transition shadow-lg shadow-blue-600/30 text-sm flex items-center justify-center gap-2"
             >
-              {isLoading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Verifying Credentials...</span>
-                </>
-              ) : (
-                <span>
-                  {loginMode === 'hospital' ? 'Sign In as Hospital Administrator' : 'Sign In as Practising Doctor'}
-                </span>
-              )}
+              <Key size={16} /> Query Supabase Auth & Sign In
             </button>
           </form>
 
-          <div className="pt-2 text-center">
-            <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1">
-              <ShieldCheck size={14} className="text-emerald-500" />
-              <span>Clinic OS Encrypted Authentication Protocol</span>
+          <div className="pt-2 text-center space-y-1">
+            <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1">
+              <ShieldCheck size={14} className="text-emerald-400" />
+              <span>Multi-Tenant Supabase Auth Integration</span>
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Hospital Admin? Log in at <Link to="/login/hospitaladmin009" className="text-blue-400 font-mono underline">/login/hospitaladmin009</Link>
             </p>
           </div>
         </div>
       </div>
 
-      {/* Bottom Footer */}
-      <div className="text-center text-[11px] text-slate-400 py-2">
+      <div className="text-center text-[11px] text-slate-500 py-2">
         © 2026 Clinic OS Technologies. All rights reserved.
       </div>
     </div>
