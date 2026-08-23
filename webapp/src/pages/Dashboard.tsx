@@ -32,38 +32,14 @@ export default function Dashboard() {
 
   // Hospital Seat Limit & Doctor Roster
   const [doctorSeatLimit] = useState(5)
-  const [hospitalDoctors, setHospitalDoctors] = useState<DoctorItem[]>([
-    {
-      id: 'doc-001',
-      name: 'Dr. Rahul Sharma',
-      email: 'rahul@hospital.com',
-      dept: 'Cardiology',
-      specialization: 'Interventional Cardiology',
-      fee: 800,
-      limit: 25,
-      status: 'active'
-    },
-    {
-      id: 'doc-002',
-      name: 'Dr. Sunita Rao',
-      email: 'sunita@hospital.com',
-      dept: 'General OPD',
-      specialization: 'Internal Medicine',
-      fee: 500,
-      limit: 40,
-      status: 'active'
-    },
-    {
-      id: 'doc-003',
-      name: 'Dr. Imran Qureshi',
-      email: 'imran@hospital.com',
-      dept: 'Paediatrics',
-      specialization: 'Child Specialist',
-      fee: 600,
-      limit: 20,
-      status: 'active'
+  const [hospitalDoctors, setHospitalDoctors] = useState<DoctorItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('clinicos_hospital_doctors')
+      return saved ? JSON.parse(saved) : []
+    } catch (e) {
+      return []
     }
-  ])
+  })
 
   // Doctor Onboarding Modal State
   const [showDoctorModal, setShowDoctorModal] = useState(false)

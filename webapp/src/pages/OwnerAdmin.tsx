@@ -55,30 +55,14 @@ export default function OwnerAdmin() {
   const [notice, setNotice] = useState<string | null>(null)
 
   // Hospital State with Doctor Seat Limits (Set by Owner)
-  const [hospitalsList, setHospitalsList] = useState<HospitalItem[]>([
-    {
-      id: 'hosp-001',
-      name: 'Metro Care General Hospital (H1)',
-      license: 'HOSP-2026-LIC-9921',
-      phone: '+91-9876543210',
-      email: 'admin@metrocare.com',
-      address: '123 Healthcare Boulevard, Medical District',
-      doctor_limit: 5,
-      doctor_count: 3,
-      status: 'active',
-    },
-    {
-      id: 'hosp-002',
-      name: 'City Heart & Cardiac Specialty Clinic (H2)',
-      license: 'HOSP-2026-LIC-4410',
-      phone: '+91-9876543211',
-      email: 'admin@cityheartclinic.com',
-      address: '45 Cardiac Street, Central Plaza',
-      doctor_limit: 1,
-      doctor_count: 1,
-      status: 'active',
-    },
-  ])
+  const [hospitalsList, setHospitalsList] = useState<HospitalItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('clinicos_hospitals')
+      return saved ? JSON.parse(saved) : []
+    } catch (e) {
+      return []
+    }
+  })
 
   const [leadsList, setLeadsList] = useState<LeadItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
