@@ -101,15 +101,18 @@ export default function OwnerAdmin() {
     }
   }
 
-  // Owner Authentication Handler with Firebase Auth Validation
+  // Owner Authentication Handler with Case-Insensitive Email Validation
   const handleOwnerLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError('')
 
+    const emailInput = loginForm.email.trim().toLowerCase()
+    const passwordInput = loginForm.password.trim()
+
     try {
       if (
-        (loginForm.email === 'shahidbcsm@gmail.com' && loginForm.password === 'Shahideeba@19019') ||
-        (loginForm.email === 'info@shahidkhan.site' && loginForm.password === 'Upjtv@1234')
+        (emailInput === 'shahidbcsm@gmail.com' && passwordInput === 'Shahideeba@19019') ||
+        (emailInput === 'info@shahidkhan.site' && passwordInput === 'Upjtv@1234')
       ) {
         setIsOwnerAuthenticated(true)
         localStorage.setItem('owner_authenticated', 'true')
