@@ -376,7 +376,7 @@ export default function OwnerAdmin() {
             <Crown size={22} />
           </div>
           <div>
-            <h1 className="font-bold text-lg text-white tracking-wide">Clinic OS Master Control Console</h1>
+            <span className="font-bold text-lg text-white tracking-wide block">Clinic OS Master Control Console</span>
             <p className="text-xs text-blue-400 font-mono">Logged in as shahidbcsm@gmail.com</p>
           </div>
         </div>
@@ -396,9 +396,9 @@ export default function OwnerAdmin() {
             <span className="px-3 py-1 bg-blue-500/20 text-blue-200 rounded-full text-xs font-bold uppercase tracking-widest border border-blue-400/30">
               Platform Master Admin (/mrshahidbabu)
             </span>
-            <h2 className="text-3xl font-black text-white tracking-tight mt-2">
+            <h1 className="text-3xl font-black text-white tracking-tight mt-2">
               Hospital Life-Cycle & Credential Manager
-            </h2>
+            </h1>
             <p className="text-slate-300 text-sm mt-1">
               Create Hospital Profiles, Suspend/Block facilities, Permanently Delete, Reset Admin Passwords, and Update Profiles.
             </p>

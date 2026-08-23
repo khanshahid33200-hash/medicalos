@@ -31,11 +31,17 @@ wheels/
 *~
 .DS_Store
 
-# Environment
+# Environment & Secrets (NEVER COMMIT KEYS TO GITHUB)
 .env
+.env*
+*.env
+*.env.*
 .env.local
 .env.*.local
 .firebase/
+scratch/
+webapp/scripts/
+secrets/
 
 # Logs
 *.log
