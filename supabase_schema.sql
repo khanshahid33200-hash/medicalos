@@ -258,25 +258,5 @@ CREATE POLICY appointments_hospital_isolation ON appointments
     hospital_id = (SELECT hospital_id FROM profiles WHERE id = auth.uid())
   );
 
--- 16. SEED INITIAL DEMO DATA
-INSERT INTO hospitals (id, name, city, phone, email, doctor_seat_limit)
-VALUES 
-  ('a0000000-0000-0000-0000-000000000001', 'Metro Care General Hospital (H1)', 'Kolkata', '+91-9876543210', 'admin@metrocare.com', 5),
-  ('a0000000-0000-0000-0000-000000000002', 'City Heart & Cardiac Specialty Clinic (H2)', 'Bangalore', '+91-9876543211', 'admin@cityheart.com', 1)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO intake_links (hospital_id, token_string)
-VALUES 
-  ('a0000000-0000-0000-0000-000000000001', 'abc123xyz78924charsstring')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO departments (hospital_id, name, short_code, display_order)
-VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'Orthopaedics', 'ORT', 1),
-  ('a0000000-0000-0000-0000-000000000001', 'General OPD', 'GEN', 2),
-  ('a0000000-0000-0000-0000-000000000001', 'Paediatrics', 'PED', 3),
-  ('a0000000-0000-0000-0000-000000000001', 'Dermatology', 'DER', 4),
-  ('a0000000-0000-0000-0000-000000000001', 'ENT', 'ENT', 5)
-ON CONFLICT DO NOTHING;
-
+-- 16. SCHEMA READY FOR PRODUCTION DATA
 -- Schema setup completed successfully!
