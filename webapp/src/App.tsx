@@ -11,6 +11,7 @@ import IntakePage from './pages/IntakePage'
 import TrackPage from './pages/TrackPage'
 import RxPage from './pages/RxPage'
 import DisplayBoard from './pages/DisplayBoard'
+import PaymentsPage from './pages/PaymentsPage'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Appointments from './pages/Appointments'
@@ -77,6 +78,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Queue />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payments"
+          element={
+            <ProtectedRoute>
+              <PaymentsPage />
             </ProtectedRoute>
           }
         />

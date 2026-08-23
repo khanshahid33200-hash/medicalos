@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Clock, CheckCircle, MapPin } from 'lucide-react'
+import { Clock, CheckCircle, MapPin, DollarSign } from 'lucide-react'
 import { Card, CardContent } from '../components/Card'
+import PaymentUI from '../components/PaymentUI'
 
 export default function IntakePage() {
   const { token } = useParams()
   const hospitalName = 'City Care Hospital'
 
-  // Step state
+  // Step state (1: Date, 2: Doctor, 3: Details, 4: Payment, 5: Success Token)
   const [selectedDate, setSelectedDate] = useState('Today')
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null)
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
 
   // Patient Details
   const [formData, setFormData] = useState({
@@ -33,7 +34,7 @@ export default function IntakePage() {
     { label: 'Tue 26', date: 'Tue 26', slots: 20 },
   ]
 
-  // Doctor Roster Grouped by Department (Specification 3.1)
+  // Doctor Roster Grouped by Department with Consultation Fees (Specification v1.1)
   const doctors = [
     {
       id: 'doc-ortho',
@@ -41,6 +42,7 @@ export default function IntakePage() {
       dept: 'ORTHOPAEDICS',
       dept_code: 'ORT',
       room: 'Room 4',
+      fee: 800,
       waiting: 3,
       slots_left: 12,
       max_limit: 20,
@@ -52,6 +54,7 @@ export default function IntakePage() {
       dept: 'GENERAL OPD',
       dept_code: 'GEN',
       room: 'Room 1',
+      fee: 500,
       waiting: 11,
       slots_left: 4,
       max_limit: 40,
@@ -63,6 +66,7 @@ export default function IntakePage() {
       dept: 'PAEDIATRICS',
       dept_code: 'PED',
       room: 'Room 7',
+      fee: 600,
       waiting: 18,
       slots_left: 0,
       max_limit: 18,
@@ -75,6 +79,7 @@ export default function IntakePage() {
       dept: 'DERMATOLOGY',
       dept_code: 'DER',
       room: 'Room 9',
+      fee: 700,
       waiting: 0,
       slots_left: 0,
       status: 'on_leave',
@@ -86,6 +91,7 @@ export default function IntakePage() {
       dept: 'ENT',
       dept_code: 'ENT',
       room: 'Room 3',
+      fee: 600,
       waiting: 2,
       slots_left: 15,
       max_limit: 25,
@@ -93,10 +99,13 @@ export default function IntakePage() {
     }
   ]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleProceedToPayment = (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedDoctor || !formData.name || !formData.phone) return
+    setStep(4) // Move to PaymentUI step
+  }
 
+  const handlePaymentSuccess = (paymentId: string, transactionId: string) => {
     const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const visitToken = `${todayStr}30` // Token format: YYYYMMDD + sequence (e.g. 2026082230)
     const queueCode = `${selectedDoctor.dept_code}-07` // Queue code: ORT-07
@@ -107,11 +116,14 @@ export default function IntakePage() {
       doctor: selectedDoctor.name,
       dept: selectedDoctor.dept,
       room: selectedDoctor.room,
+      fee: selectedDoctor.fee,
       ahead: selectedDoctor.waiting,
       estimated_wait: 26,
-      date: selectedDate
+      date: selectedDate,
+      payment_id: paymentId,
+      transaction_id: transactionId
     })
-    setStep(4)
+    setStep(5) // Show confirmed token
   }
 
   return (
@@ -125,15 +137,19 @@ export default function IntakePage() {
       </header>
 
       <div className="max-w-xl mx-auto">
-        {step === 4 && confirmedToken ? (
+        {step === 5 && confirmedToken ? (
           <Card className="rounded-3xl border-2 border-emerald-500 bg-white shadow-2xl overflow-hidden text-center space-y-6 p-8">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-md">
               <CheckCircle size={40} />
             </div>
 
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Visit Token Number</p>
+              <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-extrabold text-xs rounded-full border border-emerald-200 uppercase tracking-widest">
+                ✓ Payment Received (₹{confirmedToken.fee})
+              </span>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-3">Visit Token Number</p>
               <p className="text-4xl font-black text-slate-900 font-mono mt-1">{confirmedToken.token_number}</p>
+              <p className="text-[11px] font-mono text-slate-400">Txn Ref: {confirmedToken.transaction_id}</p>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 p-6 rounded-2xl space-y-2">
@@ -166,8 +182,18 @@ export default function IntakePage() {
               Track Live Queue on Phone →
             </Link>
           </Card>
+        ) : step === 4 && selectedDoctor ? (
+          <PaymentUI
+            appointmentId={`appt-${Date.now()}`}
+            consultationFee={selectedDoctor.fee}
+            doctorName={selectedDoctor.name}
+            patientPhone={formData.phone}
+            patientName={formData.name}
+            onPaymentSuccess={handlePaymentSuccess}
+            onPaymentError={(err) => alert(`Payment error: ${err}`)}
+          />
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleProceedToPayment} className="space-y-6">
             {/* STEP 1: DATE SELECTION */}
             <Card className="rounded-3xl border border-slate-200 shadow-md">
               <CardContent className="p-6 space-y-3">
@@ -192,10 +218,10 @@ export default function IntakePage() {
               </CardContent>
             </Card>
 
-            {/* STEP 2: DOCTOR ROSTER SELECTION (Specification 3.1) */}
+            {/* STEP 2: DOCTOR ROSTER SELECTION WITH FEES */}
             <Card className="rounded-3xl border border-slate-200 shadow-md">
               <CardContent className="p-6 space-y-3">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Step 2. Choose Doctor / Department</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Step 2. Choose Doctor & View Consultation Fee</p>
                 <div className="space-y-3">
                   {doctors.map((doc) => {
                     const isSelected = selectedDoctor?.id === doc.id
@@ -221,7 +247,12 @@ export default function IntakePage() {
                       >
                         <div className="space-y-0.5">
                           <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">{doc.dept}</p>
-                          <p className="font-black text-slate-900 text-sm">{doc.name} • <span className="text-xs text-slate-500 font-normal">{doc.room}</span></p>
+                          <p className="font-black text-slate-900 text-sm">
+                            {doc.name} • <span className="text-xs text-slate-500 font-normal">{doc.room}</span>
+                          </p>
+                          <span className="inline-block px-2.5 py-0.5 bg-emerald-50 text-emerald-700 font-black text-xs rounded-md border border-emerald-200 mt-1">
+                            Fee: ₹{doc.fee}
+                          </span>
                         </div>
 
                         <div className="text-right text-xs">
@@ -247,13 +278,18 @@ export default function IntakePage() {
               </CardContent>
             </Card>
 
-            {/* STEP 3: PATIENT DETAILS */}
+            {/* STEP 3: PATIENT DETAILS & PROCEED TO PAYMENT */}
             {selectedDoctor && (
               <Card className="rounded-3xl border-2 border-blue-600 shadow-xl bg-white">
                 <CardContent className="p-6 space-y-4">
-                  <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">
-                    Step 3. Patient Details for {selectedDoctor.name} ({selectedDoctor.dept})
-                  </p>
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">
+                      Step 3. Patient Details for {selectedDoctor.name}
+                    </p>
+                    <span className="font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 text-xs">
+                      Fee: ₹{selectedDoctor.fee}
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -319,9 +355,9 @@ export default function IntakePage() {
 
                   <button
                     type="submit"
-                    className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm uppercase tracking-wider rounded-2xl shadow-xl shadow-blue-600/30 transition"
+                    className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-blue-600/30 transition flex items-center justify-center gap-2"
                   >
-                    Confirm & Get Token for {selectedDoctor.name}
+                    <DollarSign size={16} /> Proceed to Pay ₹{selectedDoctor.fee} & Issue Token
                   </button>
                 </CardContent>
               </Card>

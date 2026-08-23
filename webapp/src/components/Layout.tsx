@@ -11,7 +11,8 @@ import {
   X,
   QrCode,
   Building2,
-  User
+  User,
+  DollarSign
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -32,6 +33,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/appointments', label: 'Appointments', icon: Calendar },
     { path: '/queue', label: 'Live Queue', icon: Users },
+    { path: '/payments', label: 'Payments & Fees', icon: DollarSign },
     { path: '/qr-kiosk', label: 'QR Kiosk', icon: QrCode },
     { path: '/reports', label: 'Reports', icon: FileText },
     { path: '/history', label: 'History', icon: HistoryIcon },

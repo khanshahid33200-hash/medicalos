@@ -1,8 +1,8 @@
-# Clinic OS - Module 1 Implementation Guide
+# Med Rapidly v3.3 - Implementation Guide
 
 ## 📋 Overview
 
-This guide covers the implementation of **Module 1: Patient Check-in Automation** for Clinic OS. Module 1 is the foundation for all other modules and handles the patient intake workflow.
+Med Rapidly is a digital reception system for hospitals and clinics that replaces paper registers with a real-time digital queue. This guide covers the complete implementation from local development through production deployment.
 
 ## ✅ What's Implemented
 
