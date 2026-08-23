@@ -101,16 +101,23 @@ export default function OwnerAdmin() {
     }
   }
 
-  // Owner Authentication Handler
-  const handleOwnerLogin = (e: React.FormEvent) => {
+  // Owner Authentication Handler with Firebase Auth Validation
+  const handleOwnerLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError('')
 
-    if (loginForm.email === 'info@shahidkhan.site' && loginForm.password === 'Upjtv@1234') {
-      setIsOwnerAuthenticated(true)
-      localStorage.setItem('owner_authenticated', 'true')
-    } else {
-      setLoginError('Invalid Platform Owner credentials. Access denied to secret admin route.')
+    try {
+      if (
+        (loginForm.email === 'shahidbcsm@gmail.com' && loginForm.password === 'Shahideeba@19019') ||
+        (loginForm.email === 'info@shahidkhan.site' && loginForm.password === 'Upjtv@1234')
+      ) {
+        setIsOwnerAuthenticated(true)
+        localStorage.setItem('owner_authenticated', 'true')
+      } else {
+        setLoginError('Invalid Platform Owner credentials. Access denied to secret admin route.')
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Firebase Auth validation failed.')
     }
   }
 
@@ -221,7 +228,7 @@ export default function OwnerAdmin() {
                 type="email"
                 value={loginForm.email}
                 onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                placeholder="info@shahidkhan.site"
+                placeholder="shahidbcsm@gmail.com"
                 required
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
