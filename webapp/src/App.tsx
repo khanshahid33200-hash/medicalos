@@ -13,6 +13,7 @@ import RxPage from './pages/RxPage'
 import DisplayBoard from './pages/DisplayBoard'
 import PaymentsPage from './pages/PaymentsPage'
 import Login from './pages/Login'
+import HospitalAdminLogin from './pages/HospitalAdminLogin'
 import Dashboard from './pages/Dashboard'
 import Appointments from './pages/Appointments'
 import Checkin from './pages/Checkin'
@@ -49,14 +50,16 @@ function App() {
         <Route path="/display/:token" element={<DisplayBoard />} />
         <Route path="/checkin" element={<Checkin />} />
 
-        {/* Doctor & Hospital Sign In Portal (Hidden link /doctor) */}
+        {/* Sign In Portals */}
         <Route path="/doctor" element={<Login />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/login/hospitaladmin009" element={<HospitalAdminLogin />} />
+        <Route path="/hospitaladmin009" element={<HospitalAdminLogin />} />
 
         {/* Secret Platform Owner Control Portal */}
         <Route path="/mrshahidbabu" element={<OwnerAdmin />} />
 
-        {/* Protected Doctor Dashboard Routes */}
+        {/* Protected Doctor & Hospital Admin Dashboard Routes */}
         <Route
           path="/dashboard"
           element={
