@@ -66,6 +66,12 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    const isCleaned = localStorage.getItem('clinicos_demo_purged_v1')
+    if (!isCleaned) {
+      localStorage.removeItem('clinicos_hospital_doctors')
+      setHospitalDoctors([])
+    }
+
     const role = localStorage.getItem('user_role')
     if (role === 'hospital_admin') {
       setUserRole('hospital_admin')

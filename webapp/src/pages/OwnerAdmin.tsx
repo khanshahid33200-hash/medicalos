@@ -85,6 +85,15 @@ export default function OwnerAdmin() {
   const [newLimit, setNewLimit] = useState(5)
 
   useEffect(() => {
+    // Purge old demo storage items to ensure 100% clean state
+    const isCleaned = localStorage.getItem('clinicos_demo_purged_v1')
+    if (!isCleaned) {
+      localStorage.removeItem('clinicos_hospitals')
+      localStorage.removeItem('clinicos_hospital_doctors')
+      localStorage.setItem('clinicos_demo_purged_v1', 'true')
+      setHospitalsList([])
+    }
+
     const ownerAuth = localStorage.getItem('owner_authenticated')
     if (ownerAuth === 'true') {
       setIsOwnerAuthenticated(true)
