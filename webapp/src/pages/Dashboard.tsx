@@ -11,6 +11,7 @@ interface DoctorItem {
   id: string
   name: string
   email: string
+  password?: string
   dept: string
   specialization: string
   fee: number
@@ -114,6 +115,7 @@ export default function Dashboard() {
       id: docId,
       name: doctorForm.name,
       email: doctorForm.email,
+      password: doctorForm.password.trim(),
       dept: doctorForm.dept,
       specialization: doctorForm.specialization,
       fee: Number(doctorForm.fee) || 500,
@@ -121,7 +123,9 @@ export default function Dashboard() {
       status: 'active'
     }
 
-    setHospitalDoctors([...hospitalDoctors, newDoc])
+    const updated = [...hospitalDoctors, newDoc]
+    setHospitalDoctors(updated)
+    localStorage.setItem('clinicos_hospital_doctors', JSON.stringify(updated))
     setShowDoctorModal(false)
     setIsRegisteringDoctor(false)
     setDoctorForm({

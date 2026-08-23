@@ -28,6 +28,7 @@ interface HospitalItem {
   license: string
   phone: string
   email: string
+  password?: string
   address: string
   doctor_limit: number
   doctor_count: number
@@ -180,6 +181,7 @@ export default function OwnerAdmin() {
       license: hospitalForm.license || `HOSP-2026-LIC-${Math.floor(1000 + Math.random() * 9000)}`,
       phone: hospitalForm.phone,
       email: hospitalForm.email,
+      password: hospitalForm.password.trim(),
       address: hospitalForm.address,
       doctor_limit: Number(hospitalForm.doctor_limit) || 5,
       doctor_count: 0,
@@ -258,7 +260,14 @@ export default function OwnerAdmin() {
 
     const cleanPass = newPasswordForm.trim()
 
-    // Register / update password in user registry
+    // 1. Update password in hospitalsList
+    const updated = hospitalsList.map((h) =>
+      h.id === resettingHospital.id ? { ...h, password: cleanPass } : h
+    )
+    setHospitalsList(updated)
+    localStorage.setItem('clinicos_hospitals', JSON.stringify(updated))
+
+    // 2. Register / update password in user registry & Supabase Auth
     try {
       await registerUserInSupabase(resettingHospital.email, cleanPass, {
         role: 'hospital_admin',

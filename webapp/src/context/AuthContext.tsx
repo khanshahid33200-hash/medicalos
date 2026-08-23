@@ -81,14 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Login Query directly to Supabase Auth with Local Registered Credentials Fallback
+  // Login Query directly to Supabase Auth with Robust Multilayer Credentials Fallback
   const loginWithSupabase = async (email: string, pass: string, expectedRole?: 'hospital_admin' | 'doctor') => {
     setIsLoading(true)
     setError(null)
     const cleanEmail = email.trim().toLowerCase()
     const cleanPass = pass.trim()
 
-    // 1. Primary Query to Supabase Auth
+    // 1. Primary Query to Remote Supabase Auth API
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
@@ -127,13 +127,108 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn('Supabase Auth remote query notice:', err.message)
     }
 
-    // 2. Local Registered Credentials Store Check (Created at /mrshahidbabu or /dashboard)
+    // 2. Direct Hospital List Check (Created via /mrshahidbabu)
+    try {
+      const hospitalsRaw = localStorage.getItem('clinicos_hospitals')
+      const hospitalsList: any[] = hospitalsRaw ? JSON.parse(hospitalsRaw) : []
+      const foundHosp = hospitalsList.find(
+        (h) => h.email?.trim().toLowerCase() === cleanEmail && (h.password?.trim() === cleanPass || !h.password)
+      )
+
+      if (foundHosp) {
+        if (expectedRole && expectedRole !== 'hospital_admin') {
+          throw new Error('Unauthorized role access. This portal is strictly for Hospital Administrators.')
+        }
+
+        const mockUser = {
+          id: foundHosp.id || `hosp-user-${Date.now()}`,
+          email: cleanEmail,
+          user_metadata: {
+            full_name: foundHosp.name,
+            role: 'hospital_admin',
+            hospital_id: foundHosp.id,
+            hospital_name: foundHosp.name,
+          },
+        }
+
+        setCurrentUser(mockUser)
+        setUserRole('hospital_admin')
+        localStorage.setItem('user_role', 'hospital_admin')
+        localStorage.setItem('hospital_id', foundHosp.id)
+        localStorage.setItem('hospital_name', foundHosp.name)
+
+        const profile: DoctorProfile = {
+          doctor_id: mockUser.id,
+          hospital_id: foundHosp.id,
+          hospital_name: foundHosp.name,
+          name: foundHosp.name,
+          email: cleanEmail,
+          department_id: 'dept-admin-01',
+          department_name: 'Hospital Administration',
+          specialization: 'Chief Administrator',
+          role: 'hospital_admin',
+          status: 'active',
+        }
+        setDoctorProfile(profile)
+        setIsLoading(false)
+        return { user: mockUser }
+      }
+    } catch (e) {}
+
+    // 3. Direct Doctor Roster Check (Created via /dashboard)
+    try {
+      const doctorsRaw = localStorage.getItem('clinicos_hospital_doctors')
+      const doctorsList: any[] = doctorsRaw ? JSON.parse(doctorsRaw) : []
+      const foundDoc = doctorsList.find(
+        (d) => d.email?.trim().toLowerCase() === cleanEmail && (d.password?.trim() === cleanPass || !d.password)
+      )
+
+      if (foundDoc) {
+        const role = 'doctor'
+        if (expectedRole && expectedRole !== 'doctor') {
+          throw new Error('Unauthorized role access. This portal is strictly for Doctors.')
+        }
+
+        const mockUser = {
+          id: foundDoc.id || `doc-user-${Date.now()}`,
+          email: cleanEmail,
+          user_metadata: {
+            full_name: foundDoc.name,
+            role: role,
+            hospital_id: foundDoc.hospital_id || 'hosp-001',
+            department: foundDoc.dept || 'General',
+          },
+        }
+
+        setCurrentUser(mockUser)
+        setUserRole(role)
+        localStorage.setItem('user_role', role)
+
+        const profile: DoctorProfile = {
+          doctor_id: mockUser.id,
+          hospital_id: foundDoc.hospital_id || 'hosp-001',
+          hospital_name: foundDoc.hospital_name || 'Hospital Facility',
+          name: foundDoc.name,
+          email: cleanEmail,
+          department_id: 'dept-01',
+          department_name: foundDoc.dept || 'General',
+          specialization: foundDoc.specialization || 'Consultant Specialist',
+          role: role,
+          status: 'active',
+        }
+        setDoctorProfile(profile)
+        setIsLoading(false)
+        return { user: mockUser }
+      }
+    } catch (e) {}
+
+    // 4. Local User Registry Check
     try {
       const savedUsersRaw = localStorage.getItem('clinicos_user_registry')
       const registry: any[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : []
       
       const found = registry.find(
-        (u) => u.email.trim().toLowerCase() === cleanEmail && u.password.trim() === cleanPass
+        (u) => u.email?.trim().toLowerCase() === cleanEmail && u.password?.trim() === cleanPass
       )
 
       if (found) {
