@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Lock,
   ChevronDown,
   ArrowRight,
   CheckCircle,
@@ -16,6 +15,8 @@ import {
   Star,
   MessageSquare
 } from 'lucide-react'
+import PublicHeader from '../components/PublicHeader'
+import PublicFooter from '../components/PublicFooter'
 
 export default function LandingPage() {
   const [phoneInput, setPhoneInput] = useState('')
@@ -63,41 +64,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-sans selection:bg-blue-600 selection:text-white">
-      {/* 1. Top Header with Official White Logo */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex items-center justify-between">
-          {/* Official White Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain" />
-          </Link>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
-            <a href="#product" className="hover:text-blue-600 transition">Product</a>
-            <a href="#security" className="hover:text-blue-600 transition">Security</a>
-            <a href="#how-it-works" className="hover:text-blue-600 transition">How it works</a>
-            <Link to="/checkin" className="hover:text-blue-600 transition">QR Patient Kiosk</Link>
-          </nav>
-
-          {/* Action CTAs */}
-          <div className="flex items-center gap-4 text-sm font-bold">
-            <Link
-              to="/doctor"
-              className="text-slate-700 hover:text-blue-600 transition flex items-center gap-1.5"
-            >
-              <Lock size={15} className="text-blue-600" />
-              <span>Doctor Login</span>
-            </Link>
-
-            <a
-              href="#enroll"
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-full shadow-md shadow-blue-600/20 transition hover:shadow-lg"
-            >
-              Join Now
-            </a>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* 2. Hero Section */}
       <section id="product" className="relative pt-12 pb-20 lg:pt-16 lg:pb-24 bg-gradient-to-b from-blue-50/40 via-white to-white overflow-hidden">
@@ -643,53 +610,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 9. Footer */}
-      <footer className="bg-white text-slate-600 py-16 text-xs border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-          <div className="space-y-3 text-left">
-            <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain" />
-            <p className="text-slate-500 leading-relaxed">
-              Block-1, 4th Floor, Prestige Blue Chip Software Park Adugodi, Dairy Colony. Karnataka - 560029
-            </p>
-          </div>
-
-          <div className="text-left">
-            <h4 className="font-extrabold text-slate-900 text-sm mb-3">Company</h4>
-            <ul className="space-y-2">
-              <li><a href="#product" className="hover:text-blue-600 transition">Services</a></li>
-              <li><a href="#product" className="hover:text-blue-600 transition">Career</a></li>
-              <li><a href="#product" className="hover:text-blue-600 transition">Investors</a></li>
-              <li><Link to="/checkin" className="hover:text-blue-600 transition">Patients Kiosk</Link></li>
-            </ul>
-          </div>
-
-          <div className="text-left">
-            <h4 className="font-extrabold text-slate-900 text-sm mb-3">Resources</h4>
-            <ul className="space-y-2">
-              <li><a href="#product" className="hover:text-blue-600 transition">Blogs & Case Studies</a></li>
-              <li><a href="#security" className="hover:text-blue-600 transition">FAQs</a></li>
-              <li><Link to="/doctor" className="hover:text-blue-600 font-bold transition">Doctor Login (/doctor)</Link></li>
-            </ul>
-          </div>
-
-          <div className="text-left">
-            <h4 className="font-extrabold text-slate-900 text-sm mb-3">Legal</h4>
-            <ul className="space-y-2">
-              <li><a href="#" className="hover:text-blue-600 transition">Privacy</a></li>
-              <li><a href="#" className="hover:text-blue-600 transition">Terms</a></li>
-              <li><a href="#" className="hover:text-blue-600 transition">Refund & cancellation</a></li>
-              <li><a href="#" className="hover:text-blue-600 transition">Contact</a></li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-400">
-          <p>© All rights reserved. Clinic OS Technologies Pvt. Ltd 2026</p>
-          <Link to="/doctor" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
-            <Lock size={12} /> Doctor Sign In Portal (/doctor)
-          </Link>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   )
 }

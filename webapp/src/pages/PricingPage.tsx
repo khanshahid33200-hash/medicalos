@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Check } from 'lucide-react'
+import PublicHeader from '../components/PublicHeader'
+import PublicFooter from '../components/PublicFooter'
 import ContactModal from '../components/ContactModal'
 
 export default function PricingPage() {
@@ -58,31 +59,7 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-blue-600 selection:text-white">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain" />
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
-            <Link to="/" className="hover:text-blue-600 transition">Home</Link>
-            <Link to="/features" className="hover:text-blue-600 transition">Features</Link>
-            <Link to="/pricing" className="text-blue-600 font-bold">Pricing</Link>
-            <Link to="/contact" className="hover:text-blue-600 transition">Contact</Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link to="/doctor" className="text-xs font-bold text-slate-700 hover:text-blue-600">Login</Link>
-            <button
-              onClick={() => setSelectedPlan({ name: 'Solo Clinic', price: '₹1,999 / mo' })}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-full shadow"
-            >
-              Buy Now
-            </button>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* Hero */}
       <section className="py-16 bg-white border-b border-slate-100">
@@ -150,6 +127,8 @@ export default function PricingPage() {
           ))}
         </div>
       </section>
+
+      <PublicFooter />
 
       <ContactModal
         isOpen={!!selectedPlan}

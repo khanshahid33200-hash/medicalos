@@ -4,6 +4,8 @@ import apiClient from './api/client'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import LandingPage from './pages/LandingPage'
+import ProductPage from './pages/ProductPage'
+import AboutUsPage from './pages/AboutUsPage'
 import FeaturesPage from './pages/FeaturesPage'
 import PricingPage from './pages/PricingPage'
 import ContactPage from './pages/ContactPage'
@@ -37,14 +39,17 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Public Clinic OS SaaS Pages */}
+        {/* Public Main Website Pages (Separate Dedicated Pages) */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/product" element={<ProductPage />} />
+        <Route path="/about" element={<AboutUsPage />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/contact" element={<ContactPage />} />
 
-        {/* Med Rapidly Public Patient Workflows (No Login Required) */}
+        {/* Public Patient Self-Service Workflows (No Login Required) */}
         <Route path="/a/:token" element={<IntakePage />} />
+        <Route path="/book/:token" element={<IntakePage />} />
         <Route path="/track" element={<TrackPage />} />
         <Route path="/rx" element={<RxPage />} />
         <Route path="/display/:token" element={<DisplayBoard />} />

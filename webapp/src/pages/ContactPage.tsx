@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Mail, Phone, MapPin, CheckCircle } from 'lucide-react'
+import PublicHeader from '../components/PublicHeader'
+import PublicFooter from '../components/PublicFooter'
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -31,32 +32,29 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-blue-600 selection:text-white">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain" />
-          </Link>
+      <PublicHeader />
 
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
-            <Link to="/" className="hover:text-blue-600 transition">Home</Link>
-            <Link to="/features" className="hover:text-blue-600 transition">Features</Link>
-            <Link to="/pricing" className="hover:text-blue-600 transition">Pricing</Link>
-            <Link to="/contact" className="text-blue-600 font-bold">Contact</Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link to="/doctor" className="text-xs font-bold text-slate-700 hover:text-blue-600">Login</Link>
-          </div>
+      {/* Hero */}
+      <section className="py-16 bg-white border-b border-slate-100">
+        <div className="max-w-4xl mx-auto px-4 text-center space-y-4">
+          <span className="px-3 py-1 bg-blue-50 text-blue-700 font-extrabold text-xs rounded-full border border-blue-100 uppercase tracking-widest">
+            Contact Clinic OS Support & Sales
+          </span>
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight font-recoleta">
+            We'd love to hear from your <span className="text-blue-600">medical team</span>
+          </h1>
+          <p className="text-slate-600 text-base max-w-2xl mx-auto font-medium">
+            Get in touch for custom hospital onboarding, on-site reception kiosk setup, or ABDM compliance assistance.
+          </p>
         </div>
-      </header>
+      </section>
 
       {/* Main Content */}
       <section className="py-16 max-w-5xl mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
           {/* Contact Details */}
           <div className="md:col-span-5 space-y-6 text-left">
-            <h1 className="text-4xl font-black text-slate-900 font-recoleta">Get in touch with Clinic OS</h1>
+            <h2 className="text-3xl font-black text-slate-900 font-recoleta">Get in touch with Clinic OS</h2>
             <p className="text-xs text-slate-600 leading-relaxed font-medium">
               Have questions about digitizing your clinic reception, setting up QR check-in kiosks, or ABDM compliance? Our team is here to help.
             </p>
@@ -82,7 +80,7 @@ export default function ContactPage() {
                 <MapPin className="text-blue-600 flex-shrink-0" size={20} />
                 <div>
                   <p className="text-slate-400 font-normal">Headquarters</p>
-                  <p className="text-slate-900 font-bold">Prestige Blue Chip Software Park, Dairy Colony, Karnataka - 560029</p>
+                  <p className="text-slate-900 font-bold">Prestige Blue Chip Software Park, Dairy Colony, Bengaluru - 560029</p>
                 </div>
               </div>
             </div>
@@ -175,6 +173,8 @@ export default function ContactPage() {
           </div>
         </div>
       </section>
+
+      <PublicFooter />
     </div>
   )
 }
