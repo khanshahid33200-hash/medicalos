@@ -241,7 +241,7 @@ export default function Queue() {
           <div className="bg-blue-600 text-white rounded-2xl p-4 shadow-lg flex items-center justify-between border border-blue-500">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center font-bold">
-                📢
+                <Volume2 size={20} className="text-white" />
               </div>
               <div>
                 <p className="text-xs uppercase font-semibold text-blue-200 tracking-wider">Audio Announcement</p>
@@ -337,9 +337,9 @@ export default function Queue() {
                         </td>
                         <td className="px-6 py-4 text-xs">
                           {item.prescription?.diagnosis ? (
-                            <span className="font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
-                              🩺 {item.prescription.diagnosis}
-                            </span>
+                             <span className="font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                               {item.prescription.diagnosis}
+                             </span>
                           ) : (
                             <span className="text-gray-400 italic">No Diagnosis Yet</span>
                           )}

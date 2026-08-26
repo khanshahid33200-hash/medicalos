@@ -54,10 +54,13 @@ export default function Layout({ children }: LayoutProps) {
         } md:static md:translate-x-0 shadow-2xl border-r border-slate-800`}
       >
         <div className="flex flex-col h-full">
-          {/* Official White Background Logo Header */}
           <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-white">
-            <Link to="/" className="flex items-center gap-2">
-              <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 object-contain" />
+            <Link to="/" className="flex items-center gap-2.5">
+              <img src="/assets/logo.png" alt="MedTech Fixaters Logo" className="h-9 object-contain" />
+              <div className="flex flex-col text-left">
+                <span className="font-black text-base text-slate-900 tracking-tight font-sans leading-none">MedTech Fixaters</span>
+                <span className="text-[9px] font-bold text-emerald-700 tracking-widest uppercase mt-0.5 font-mono">Doctor Console</span>
+              </div>
             </Link>
             <button
               onClick={() => setSidebarOpen(false)}

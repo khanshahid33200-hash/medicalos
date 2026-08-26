@@ -30,7 +30,7 @@
     "postgres": "^3.4.4",
     "drizzle-orm": "^0.29.1",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.1.2",
+    "jsonwebtoken": "9.0.2",
     "uuid": "^9.0.1",
     "qrcode.react": "^1.0.1",
     "date-fns": "^2.30.0",

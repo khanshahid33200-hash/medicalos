@@ -65,5 +65,8 @@ migrations/versions/*
 !migrations/versions/.gitkeep
 node_modules/
 webapp/node_modules/
+.next/
+med-rapidly/.next/
+webapp/dist/
 
 .vercel

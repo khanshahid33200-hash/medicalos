@@ -1,25 +1,30 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Building2,
   ShieldCheck,
-  Lock,
-  Mail,
   Search,
-  Layers,
   Crown,
   LogOut,
   AlertCircle,
   Inbox,
-  Phone,
-  Sliders,
   Key,
   Trash2,
   Edit,
   RotateCcw,
   CheckCircle,
-  XCircle
+  Plus,
+  ArrowRight,
+  Users,
+  Activity,
+  Bell,
+  Calendar,
+  CreditCard,
+  ArrowUpRight,
+  Sliders,
+  Settings,
+  ChevronDown
 } from 'lucide-react'
-import Button from '../components/Button'
 import { useAuth } from '../context/AuthContext'
 
 interface HospitalItem {
@@ -58,10 +63,11 @@ export default function OwnerAdmin() {
   })
   const [loginError, setLoginError] = useState('')
 
-  const [activeTab, setActiveTab] = useState<'hospitals' | 'leads' | 'analytics'>('hospitals')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'hospitals' | 'leads' | 'analytics'>('dashboard')
+  const [chartPeriod, setChartPeriod] = useState<'monthly' | 'annually'>('annually')
   const [notice, setNotice] = useState<string | null>(null)
 
-  // Hospital State with Doctor Seat Limits (Set by Owner)
+  // Hospital State
   const [hospitalsList, setHospitalsList] = useState<HospitalItem[]>(() => {
     try {
       const saved = localStorage.getItem('clinicos_hospitals')
@@ -74,7 +80,7 @@ export default function OwnerAdmin() {
   const [leadsList, setLeadsList] = useState<LeadItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Hospital Creation Modal State
+  // Modal States
   const [showHospitalModal, setShowHospitalModal] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
   const [hospitalForm, setHospitalForm] = useState({
@@ -82,16 +88,11 @@ export default function OwnerAdmin() {
     license: '',
     phone: '',
     email: '',
-    password: '', // Hospital Admin Supabase Auth Password
+    password: '',
     address: '',
     doctor_limit: 5,
   })
 
-  // Edit Doctor Seat Limit Modal State
-  const [editingHospital, setEditingHospital] = useState<HospitalItem | null>(null)
-  const [newLimit, setNewLimit] = useState(5)
-
-  // Update Hospital Profile Modal State
   const [editingProfileHospital, setEditingProfileHospital] = useState<HospitalItem | null>(null)
   const [profileForm, setProfileForm] = useState({
     name: '',
@@ -102,7 +103,6 @@ export default function OwnerAdmin() {
     doctor_limit: 5,
   })
 
-  // Reset Password Modal State
   const [resettingHospital, setResettingHospital] = useState<HospitalItem | null>(null)
   const [newPasswordForm, setNewPasswordForm] = useState('')
 
@@ -123,7 +123,7 @@ export default function OwnerAdmin() {
     }
   }
 
-  // Owner Authentication Handler with Case-Insensitive Email Validation
+  // Owner Auth Handler
   const handleOwnerLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError('')
@@ -139,10 +139,10 @@ export default function OwnerAdmin() {
         setIsOwnerAuthenticated(true)
         localStorage.setItem('owner_authenticated', 'true')
       } else {
-        setLoginError('Invalid Platform Owner credentials. Access denied to secret admin route.')
+        setLoginError('Invalid Platform Owner credentials. Access denied.')
       }
     } catch (err: any) {
-      setLoginError(err.message || 'Firebase Auth validation failed.')
+      setLoginError(err.message || 'Validation failed.')
     }
   }
 
@@ -151,7 +151,7 @@ export default function OwnerAdmin() {
     localStorage.removeItem('owner_authenticated')
   }
 
-  // 1. Create Hospital Profile & Save Hospital Admin Credentials
+  // Hospital Actions
   const handleCreateHospital = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsRegistering(true)
@@ -165,7 +165,7 @@ export default function OwnerAdmin() {
         hospital_id: hospId,
       })
     } catch (err: any) {
-      console.warn('Supabase Auth Registration Notice:', err.message)
+      console.warn('Supabase Notice:', err.message)
     }
 
     const newHosp: HospitalItem = {
@@ -189,11 +189,10 @@ export default function OwnerAdmin() {
     setShowHospitalModal(false)
     setIsRegistering(false)
     setHospitalForm({ name: '', license: '', phone: '', email: '', password: '', address: '', doctor_limit: 5 })
-    setNotice(`Hospital profile "${newHosp.name}" created & credentials issued for ${newHosp.email}!`)
+    setNotice(`Hospital "${newHosp.name}" created & credentials issued for ${newHosp.email}!`)
     setTimeout(() => setNotice(null), 5000)
   }
 
-  // 2. Suspend / Reactivate Hospital
   const handleToggleHospitalStatus = (hospId: string) => {
     const updated = hospitalsList.map((h) =>
       h.id === hospId ? { ...h, status: (h.status === 'active' ? 'suspended' : 'active') as any } : h
@@ -206,9 +205,8 @@ export default function OwnerAdmin() {
     setTimeout(() => setNotice(null), 4000)
   }
 
-  // 3. Permanently Delete Hospital Profile
   const handleDeleteHospital = (hospId: string, hospName: string) => {
-    if (!window.confirm(`⚠️ PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete hospital "${hospName}" (${hospId}) and purge all its user credentials?\nThis action cannot be undone.`)) {
+    if (!window.confirm(`PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete hospital "${hospName}" (${hospId})?\nThis action cannot be undone.`)) {
       return
     }
 
@@ -216,11 +214,10 @@ export default function OwnerAdmin() {
     setHospitalsList(updated)
     localStorage.setItem('clinicos_hospitals', JSON.stringify(updated))
 
-    setNotice(`Hospital "${hospName}" permanently deleted from platform.`)
+    setNotice(`Hospital "${hospName}" permanently deleted.`)
     setTimeout(() => setNotice(null), 4000)
   }
 
-  // 4. Update Hospital Profile
   const handleSaveProfileUpdate = (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingProfileHospital) return
@@ -247,21 +244,18 @@ export default function OwnerAdmin() {
     setTimeout(() => setNotice(null), 4000)
   }
 
-  // 5. Reset Hospital Admin Password
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!resettingHospital || !newPasswordForm.trim()) return
 
     const cleanPass = newPasswordForm.trim()
 
-    // 1. Update password in hospitalsList
     const updated = hospitalsList.map((h) =>
       h.id === resettingHospital.id ? { ...h, password: cleanPass } : h
     )
     setHospitalsList(updated)
     localStorage.setItem('clinicos_hospitals', JSON.stringify(updated))
 
-    // 2. Register / update password in user registry & Supabase Auth
     try {
       await registerUserInSupabase(resettingHospital.email, cleanPass, {
         role: 'hospital_admin',
@@ -272,24 +266,8 @@ export default function OwnerAdmin() {
 
     setResettingHospital(null)
     setNewPasswordForm('')
-    setNotice(`Admin password reset successfully for ${resettingHospital.name} (${resettingHospital.email})!`)
+    setNotice(`Password reset for ${resettingHospital.name} (${resettingHospital.email})!`)
     setTimeout(() => setNotice(null), 5000)
-  }
-
-  // 6. Update Doctor Seat Limit
-  const handleUpdateDoctorLimit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingHospital) return
-
-    const updated = hospitalsList.map((h) =>
-      h.id === editingHospital.id ? { ...h, doctor_limit: Number(newLimit) } : h
-    )
-    setHospitalsList(updated)
-    localStorage.setItem('clinicos_hospitals', JSON.stringify(updated))
-
-    setEditingHospital(null)
-    setNotice(`Doctor seat limit updated to ${newLimit} for ${editingHospital.name}.`)
-    setTimeout(() => setNotice(null), 4000)
   }
 
   const handleClearLeads = () => {
@@ -298,231 +276,627 @@ export default function OwnerAdmin() {
     setLeadsList([])
   }
 
-  // 1. OWNER UNAUTHENTICATED VIEW
+  // 1. UNAUTHENTICATED LOCK SCREEN
   if (!isOwnerAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4 font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Crown size={36} />
+      <div className="min-h-screen bg-[#18362b] flex items-center justify-center p-4 sm:p-6 font-sans text-slate-100 selection:bg-emerald-600 selection:text-white relative overflow-hidden">
+        {/* Background Radial Glows */}
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-700/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-teal-700/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Main Split Container Card */}
+        <div className="max-w-5xl w-full bg-[#122a21] rounded-3xl shadow-2xl overflow-hidden border border-emerald-900/40 grid grid-cols-1 md:grid-cols-12 min-h-[580px]">
+          {/* LEFT PANEL: White Curved Section */}
+          <div className="md:col-span-6 bg-white text-slate-900 p-8 sm:p-12 flex flex-col justify-between items-center text-center relative md:rounded-r-[90px] shadow-lg z-10">
+            {/* Top Logo */}
+            <div className="w-full flex justify-between items-center">
+              <Link to="/" className="flex items-center gap-3">
+                <img src="/assets/logo.png" alt="MedTech Fixaters Logo" className="h-10 object-contain" />
+                <div className="flex flex-col text-left">
+                  <span className="font-black text-lg text-slate-900 tracking-tight leading-none">MedTech Fixaters</span>
+                  <span className="text-[10px] font-bold text-emerald-700 tracking-widest uppercase mt-0.5">Platform Owner Root</span>
+                </div>
+              </Link>
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-white">Platform Owner Admin Portal</h1>
-            <p className="text-xs text-slate-400">
-              Restricted secret route <code className="text-blue-400 font-mono">/mrshahidbabu</code> for Website Owner
-            </p>
+
+            {/* Center Graphic */}
+            <div className="my-auto py-8 space-y-4 max-w-xs mx-auto">
+              <div className="w-32 h-32 bg-amber-50 rounded-full border-4 border-amber-100 flex items-center justify-center mx-auto shadow-inner text-amber-600">
+                <Crown size={60} className="animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">Master Platform Owner</h2>
+                <p className="text-xs text-slate-500 font-medium">
+                  Multi-tenant master administration, credential issuance, and platform governance console.
+                </p>
+              </div>
+            </div>
+
+            {/* Left Footer */}
+            <div className="w-full text-center text-[11px] text-slate-400 font-medium border-t border-slate-100 pt-4">
+              <p>© 2026 MedTech Fixaters. Restricted Owner Interface.</p>
+            </div>
           </div>
 
-          {loginError && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3.5 flex items-center gap-3 text-red-400 text-xs font-semibold">
-              <AlertCircle size={18} className="flex-shrink-0" />
-              <span>{loginError}</span>
-            </div>
-          )}
+          {/* RIGHT PANEL: Dark Forest Form */}
+          <div className="md:col-span-6 p-8 sm:p-12 flex flex-col justify-between text-left space-y-6 bg-[#122a21]">
+            {/* Top Navigation Bar */}
+            <div className="flex items-center justify-between">
+              <span className="px-3 py-1 bg-amber-950/80 text-amber-300 border border-amber-700/50 rounded-full text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-1">
+                <Crown size={12} /> Owner Route
+              </span>
 
-          <form onSubmit={handleOwnerLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                <Mail size={14} className="inline mr-1 text-blue-400" /> Owner Email
-              </label>
-              <input
-                type="email"
-                value={loginForm.email}
-                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                placeholder="shahidbcsm@gmail.com"
-                required
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-              />
+              <Link to="/" className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1">
+                <span>Home</span> <ArrowRight size={14} />
+              </Link>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                <Lock size={14} className="inline mr-1 text-blue-400" /> Secret Key / Password
-              </label>
-              <input
-                type="password"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                placeholder="••••••••"
-                required
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-              />
+            {/* Header */}
+            <div className="space-y-1">
+              <h1 className="text-3xl font-extrabold text-white tracking-tight">Owner Login</h1>
+              <p className="text-xs text-emerald-300/80 font-mono">
+                Route: <code className="text-emerald-400 font-bold">/mrshahidbabu</code>
+              </p>
             </div>
 
-            <button
-              type="submit"
-              className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition text-sm flex items-center justify-center gap-2"
-            >
-              <ShieldCheck size={18} /> Authenticate as Owner
-            </button>
-          </form>
+            {loginError && (
+              <div className="p-3 bg-rose-950/80 border border-rose-800 text-rose-200 rounded-2xl text-xs font-bold flex items-center gap-2">
+                <AlertCircle size={16} className="flex-shrink-0 text-rose-400" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleOwnerLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">Owner Email</label>
+                <input
+                  type="email"
+                  required
+                  value={loginForm.email}
+                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                  placeholder="shahidbcsm@gmail.com"
+                  className="w-full px-5 py-3 bg-[#1a382e] border border-emerald-900/60 rounded-full text-xs text-white placeholder-slate-400 focus:ring-2 focus:ring-[#3b7c77] outline-none transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">Owner Password</label>
+                <input
+                  type="password"
+                  required
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                  placeholder="••••••••"
+                  className="w-full px-5 py-3 bg-[#1a382e] border border-emerald-900/60 rounded-full text-xs text-white placeholder-slate-400 focus:ring-2 focus:ring-[#3b7c77] outline-none transition"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-[#3b7c77] hover:bg-[#2f6661] text-white font-extrabold text-xs uppercase tracking-wider rounded-full shadow-lg shadow-teal-950/40 transition flex items-center justify-center gap-2 mt-2"
+              >
+                <Key size={16} /> Authenticate Platform Owner
+              </button>
+            </form>
+
+            {/* Bottom Footer */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2 border-t border-emerald-900/40">
+              <span className="text-[10px]">Restricted Platform Owner Portal</span>
+              <span className="text-[10px]">shahidbcsm@gmail.com</span>
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
-  // 2. OWNER AUTHENTICATED ADMIN DASHBOARD
-  const filteredHospitals = hospitalsList.filter((hosp) =>
-    hosp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    hosp.email.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filter Hospitals by search term
+  const filteredHospitals = hospitalsList.filter(
+    (h) =>
+      h.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      h.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      h.id.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const totalDoctorSeats = hospitalsList.reduce((acc, h) => acc + h.doctor_limit, 0)
+
+  // 2. AUTHENTICATED "QUIXOTIC" EXECUTIVE DASHBOARD VIEW
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 pb-12 font-sans">
-      {/* Top Navbar */}
-      <header className="bg-slate-950 border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20">
-            <Crown size={22} />
-          </div>
-          <div>
-            <span className="font-bold text-lg text-white tracking-wide block">Clinic OS Master Control Console</span>
-            <p className="text-xs text-blue-400 font-mono">Logged in as shahidbcsm@gmail.com</p>
-          </div>
+    <div className="min-h-screen bg-[#f4f6f8] text-slate-800 font-sans selection:bg-emerald-600 selection:text-white p-4 sm:p-6">
+      {/* Notice Banner */}
+      {notice && (
+        <div className="max-w-7xl mx-auto mb-4 bg-[#00875A] text-white px-4 py-3 rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-2 shadow-md">
+          <CheckCircle size={16} />
+          <span>{notice}</span>
         </div>
+      )}
 
-        <button
-          onClick={handleOwnerLogout}
-          className="px-4 py-2 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-slate-700"
-        >
-          <LogOut size={16} /> Sign Out Owner
-        </button>
-      </header>
+      {/* Main Container Wrapper */}
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* TOP FLOATING HEADER BAR */}
+        <header className="bg-white rounded-3xl p-4 sm:px-6 shadow-sm border border-slate-200/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Logo Brand */}
+          <Link to="/" className="flex items-center gap-3">
+            <img src="/assets/logo.png" alt="MedTech Fixaters Logo" className="h-9 object-contain" />
+          </Link>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 space-y-6">
-        {/* Banner */}
-        <div className="bg-gradient-to-r from-blue-700 via-indigo-800 to-slate-950 rounded-3xl p-6 sm:p-8 border border-white/10 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div>
-            <span className="px-3 py-1 bg-blue-500/20 text-blue-200 rounded-full text-xs font-bold uppercase tracking-widest border border-blue-400/30">
-              Platform Master Admin (/mrshahidbabu)
-            </span>
-            <h1 className="text-3xl font-black text-white tracking-tight mt-2">
-              Hospital Life-Cycle & Credential Manager
-            </h1>
-            <p className="text-slate-300 text-sm mt-1">
-              Create Hospital Profiles, Suspend/Block facilities, Permanently Delete, Reset Admin Passwords, and Update Profiles.
-            </p>
+          {/* Center Navigation Pill Tabs */}
+          <div className="bg-slate-100/80 p-1.5 rounded-full flex items-center gap-1 border border-slate-200/50 self-center">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-5 py-2 rounded-full text-xs font-bold transition ${
+                activeTab === 'dashboard'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setActiveTab('hospitals')}
+              className={`px-5 py-2 rounded-full text-xs font-bold transition ${
+                activeTab === 'hospitals'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Hospitals ({hospitalsList.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('leads')}
+              className={`px-5 py-2 rounded-full text-xs font-bold transition ${
+                activeTab === 'leads'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Inbound Leads ({leadsList.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`px-5 py-2 rounded-full text-xs font-bold transition ${
+                activeTab === 'analytics'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Platform Metrics
+            </button>
           </div>
 
-          <Button variant="primary" onClick={() => setShowHospitalModal(true)} className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/30 text-white font-bold flex items-center gap-2">
-            <Building2 size={18} /> + Create Hospital Profile
-          </Button>
-        </div>
+          {/* Right Controls */}
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={() => setShowHospitalModal(true)}
+              className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full transition"
+              title="Search"
+            >
+              <Search size={18} />
+            </button>
+            <button
+              onClick={() => setActiveTab('leads')}
+              className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full transition relative"
+              title="Notifications"
+            >
+              <Bell size={18} />
+              {leadsList.length > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-emerald-600 rounded-full ring-2 ring-white" />
+              )}
+            </button>
 
-        {/* Notice Alert */}
-        {notice && (
-          <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-3 rounded-2xl flex items-center justify-between text-sm font-medium">
-            <span>✓ {notice}</span>
-            <button onClick={() => setNotice(null)} className="text-emerald-400 hover:text-white">✕</button>
-          </div>
-        )}
-
-        {/* Console Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
-          {[
-            { id: 'hospitals', label: 'Hospital Profiles & Doctor Limits', icon: Building2, count: hospitalsList.length },
-            { id: 'leads', label: 'Inquiries & Sales Leads', icon: Inbox, count: leadsList.length },
-            { id: 'analytics', label: 'Platform System Stats', icon: Layers },
-          ].map((tab) => {
-            const Icon = tab.icon
-            const active = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-5 py-3 rounded-xl font-bold text-sm transition flex items-center gap-2.5 ${
-                  active
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                    : 'bg-slate-950 text-slate-400 hover:bg-slate-800 border border-slate-800'
-                }`}
-              >
-                <Icon size={18} />
-                <span>{tab.label}</span>
-                {tab.count !== undefined && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${active ? 'bg-blue-800 text-white' : 'bg-slate-800 text-slate-300'}`}>
-                    {tab.count}
-                  </span>
-                )}
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+              <div className="w-9 h-9 rounded-full bg-emerald-800 text-white font-black text-xs flex items-center justify-center ring-2 ring-emerald-600/30">
+                SK
+              </div>
+              <button onClick={handleOwnerLogout} className="text-slate-400 hover:text-rose-600 transition" title="Log Out">
+                <LogOut size={16} />
               </button>
-            )
-          })}
-        </div>
+            </div>
+          </div>
+        </header>
 
-        {/* TAB 1: HOSPITAL PROFILES & MANAGEMENT ACTIONS */}
-        {activeTab === 'hospitals' && (
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3.5 top-3 text-slate-500" size={18} />
-              <input
-                type="text"
-                placeholder="Search Hospital Profile by Name or Admin Email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:border-blue-500 text-sm text-white outline-none"
-              />
+        {/* GREETING & ACTION HEADER BAR */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+          <div>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+              Welcome Back, <span className="text-slate-500 font-normal">Platform Owner</span>
+            </h1>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Date Range Picker Pill */}
+            <div className="bg-white px-4 py-2.5 rounded-full border border-slate-200/80 shadow-sm flex items-center gap-2 text-xs font-extrabold text-slate-700">
+              <Calendar size={15} className="text-slate-500" />
+              <span>29 Jun, 2026 - 29 August, 2026</span>
+              <ChevronDown size={14} className="text-slate-400" />
             </div>
 
-            {filteredHospitals.length === 0 ? (
-              <div className="bg-slate-950 border border-slate-800 rounded-3xl p-12 text-center text-slate-500 space-y-3">
-                <Building2 size={48} className="mx-auto text-slate-700" />
-                <h3 className="text-lg font-bold text-slate-300">No Hospitals Registered Yet</h3>
-                <p className="text-xs text-slate-400 max-w-md mx-auto">
-                  Click <strong className="text-blue-400">+ Create Hospital Profile</strong> above to register a new hospital facility and issue admin login credentials.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredHospitals.map((hosp) => (
-                  <div key={hosp.id} className="bg-slate-950 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-blue-500/40 transition shadow-xl">
-                    <div className="flex items-start justify-between">
+            {/* Primary Action Button */}
+            <button
+              onClick={() => setShowHospitalModal(true)}
+              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-full shadow-md transition flex items-center gap-2"
+            >
+              <Plus size={16} /> Add New Facility
+            </button>
+          </div>
+        </div>
+
+        {/* MAIN DASHBOARD CONTENT AREA WITH SIDEBAR RAIL */}
+        <div className="flex gap-6 items-start">
+          {/* LEFT ICON SIDEBAR RAIL (QUIXOTIC MATCH) */}
+          <aside className="hidden lg:flex flex-col justify-between w-16 bg-white rounded-3xl p-3 shadow-sm border border-slate-200/60 min-h-[620px]">
+            <div className="space-y-4 text-center">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center transition mx-auto ${
+                  activeTab === 'dashboard' ? 'bg-[#00875A] text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                <Sliders size={20} />
+              </button>
+
+              <button
+                onClick={() => setActiveTab('hospitals')}
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center transition mx-auto ${
+                  activeTab === 'hospitals' ? 'bg-[#00875A] text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                <Building2 size={20} />
+              </button>
+
+              <button
+                onClick={() => setActiveTab('leads')}
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center transition mx-auto ${
+                  activeTab === 'leads' ? 'bg-[#00875A] text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                <Inbox size={20} />
+              </button>
+
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center transition mx-auto ${
+                  activeTab === 'analytics' ? 'bg-[#00875A] text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                <Activity size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-center">
+              <button onClick={() => setShowHospitalModal(true)} className="w-10 h-10 rounded-2xl text-slate-500 hover:bg-slate-100 flex items-center justify-center mx-auto">
+                <Settings size={20} />
+              </button>
+              <button onClick={handleOwnerLogout} className="w-10 h-10 rounded-2xl text-slate-500 hover:bg-slate-100 flex items-center justify-center mx-auto">
+                <LogOut size={20} />
+              </button>
+            </div>
+          </aside>
+
+          {/* RIGHT MAIN BENTO GRID */}
+          <div className="flex-1 space-y-6">
+            {activeTab === 'dashboard' && (
+              <>
+                {/* TOP BENTO ROW */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+                  {/* CARD 1: VISA / LICENSE EMERALD CREDIT CARD (4 COLS) */}
+                  <div className="md:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/60 space-y-5 text-left flex flex-col justify-between">
+                    <div className="flex justify-between items-start">
                       <div>
-                        <span className="px-2.5 py-0.5 bg-blue-500/10 text-blue-400 font-mono text-xs font-bold rounded-lg border border-blue-500/20">
-                          {hosp.id}
-                        </span>
-                        <h3 className="text-xl font-bold text-white mt-1">{hosp.name}</h3>
-                        <p className="text-xs text-slate-400 font-mono mt-0.5">License: {hosp.license}</p>
+                        <p className="text-xs font-bold text-slate-900">Hospital Licenses & Seats</p>
+                        <p className="text-[11px] text-slate-400 font-medium">Total active allocated capacity</p>
                       </div>
-                      {hosp.status === 'active' ? (
-                        <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 font-bold text-xs rounded-full border border-emerald-500/20 flex items-center gap-1">
-                          <CheckCircle size={14} /> Active Facility
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 bg-red-500/10 text-red-400 font-bold text-xs rounded-full border border-red-500/20 flex items-center gap-1">
-                          <XCircle size={14} /> Suspended / Blocked
-                        </span>
-                      )}
+                      <button className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+                        <ArrowUpRight size={16} />
+                      </button>
                     </div>
 
-                    <div className="space-y-2 text-xs text-slate-300 bg-slate-900 p-4 rounded-2xl border border-slate-800 font-medium">
-                      <p>📍 Address: {hosp.address || 'Not specified'}</p>
-                      <p>📞 Phone: {hosp.phone || 'N/A'} • ✉️ Admin Email: <strong className="text-blue-400 font-mono">{hosp.email}</strong></p>
-                      <p className="text-[11px] text-amber-300">🔑 Login Portal: Restricted to <code className="bg-slate-950 px-1.5 py-0.5 rounded text-amber-200">/login/hospitaladmin009</code></p>
-                      
-                      {/* Doctor Seat Limit */}
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                        <div>
-                          <p className="text-slate-400">Doctor Seat Limit (Owner Set):</p>
-                          <p className="text-base font-black text-emerald-400 font-mono">
-                            {hosp.doctor_count} / {hosp.doctor_limit} Doctors Added
-                          </p>
+                    {/* Deep Emerald Credit Card */}
+                    <div className="bg-gradient-to-br from-[#006e49] via-[#00875A] to-[#005c3d] text-white rounded-3xl p-6 shadow-lg shadow-emerald-800/20 space-y-4 relative overflow-hidden">
+                      <div className="flex justify-between items-center">
+                        <span className="font-black tracking-wider text-sm">MEDTECH FIXATERS</span>
+                        <CreditCard size={22} className="opacity-80" />
+                      </div>
+                      <div className="pt-2">
+                        <p className="text-[11px] font-mono opacity-80 uppercase tracking-widest">Active Doctor Seats</p>
+                        <p className="text-3xl font-black font-mono tracking-tight">{totalDoctorSeats} Seats</p>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] font-mono opacity-90 pt-2 border-t border-white/20">
+                        <span>{hospitalsList.length} Facilities</span>
+                        <span>ABDM M3 COMPLIANT</span>
+                      </div>
+                    </div>
+
+                    {/* Facility Count Summary */}
+                    <div className="flex items-center justify-between pt-1">
+                      <div>
+                        <p className="text-[11px] text-slate-400 font-bold uppercase">Registered Facilities</p>
+                        <p className="text-2xl font-black text-slate-900">{hospitalsList.length} Hospitals</p>
+                      </div>
+                      <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-extrabold text-xs rounded-full flex items-center gap-1">
+                        <ShieldCheck size={12} /> {hospitalsList.filter(h => h.status === 'active').length} Active
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* CARD 2: ENGAGEMENT RATE & BAR CHART (5 COLS) */}
+                  <div className="md:col-span-5 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/60 space-y-5 text-left flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                          <Activity size={18} />
                         </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Hospital Engagement Rate</p>
+                          <p className="text-[11px] text-slate-400 font-medium">Real-time facility status</p>
+                        </div>
+                      </div>
+
+                      {/* Monthly / Annually Pill Toggle */}
+                      <div className="bg-slate-100 p-1 rounded-full flex items-center text-[11px] font-bold">
                         <button
-                          onClick={() => {
-                            setEditingHospital(hosp)
-                            setNewLimit(hosp.doctor_limit)
-                          }}
-                          className="px-3 py-1.5 bg-blue-600/20 text-blue-300 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1 border border-blue-500/30"
+                          onClick={() => setChartPeriod('monthly')}
+                          className={`px-3 py-1 rounded-full transition ${chartPeriod === 'monthly' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'}`}
                         >
-                          <Sliders size={14} /> Adjust Limit
+                          Monthly
+                        </button>
+                        <button
+                          onClick={() => setChartPeriod('annually')}
+                          className={`px-3 py-1 rounded-full transition ${chartPeriod === 'annually' ? 'bg-[#00875A] text-white shadow-xs' : 'text-slate-500'}`}
+                        >
+                          Annually
                         </button>
                       </div>
                     </div>
 
-                    {/* OWNER MANAGEMENT ACTION CONTROLS */}
-                    <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Owner Management Actions:</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* 1. Update Profile */}
+                    {/* Simulated Bar Chart */}
+                    <div className="pt-4 space-y-2">
+                      <div className="flex justify-end pr-8">
+                        <span className="px-2.5 py-1 bg-emerald-800 text-white font-extrabold text-[10px] rounded-full shadow-sm">
+                          {hospitalsList.filter(h => h.status === 'active').length} Active Facilities
+                        </span>
+                      </div>
+                      <div className="h-36 flex items-end justify-between gap-3 px-2">
+                        <div className="w-full bg-emerald-100 hover:bg-emerald-200 rounded-2xl h-[50%] transition group relative" />
+                        <div className="w-full bg-emerald-200 hover:bg-emerald-300 rounded-2xl h-[70%] transition group relative" />
+                        <div className="w-full bg-emerald-200 hover:bg-emerald-300 rounded-2xl h-[60%] transition group relative" />
+                        <div className="w-full bg-[#00875A] hover:bg-[#007043] rounded-2xl h-[95%] transition shadow-md group relative" />
+                        <div className="w-full bg-emerald-200 hover:bg-emerald-300 rounded-2xl h-[75%] transition group relative" />
+                        <div className="w-full bg-emerald-200 hover:bg-emerald-300 rounded-2xl h-[85%] transition group relative" />
+                      </div>
+                      <div className="flex justify-between text-[11px] font-mono font-bold text-slate-400 px-2 pt-2">
+                        <span>JAN</span>
+                        <span>FEB</span>
+                        <span>MAR</span>
+                        <span>APR</span>
+                        <span>MAY</span>
+                        <span>JUN</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 3: TOTAL BALANCE / OPD CAPACITY GRAPH (3 COLS) */}
+                  <div className="md:col-span-3 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/60 space-y-5 text-left flex flex-col justify-between">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">Total OPD Capacity</p>
+                        <p className="text-[11px] text-slate-400 font-medium">Monthly seat capacity</p>
+                      </div>
+                      <button className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+                        <ArrowUpRight size={16} />
+                      </button>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] text-slate-400 font-bold uppercase">Monthly Seat Capacity</p>
+                      <p className="text-3xl font-black text-slate-900 tracking-tight font-mono">{totalDoctorSeats * 30} Visits</p>
+                    </div>
+
+                    {/* Wave Line SVG */}
+                    <div className="py-2">
+                      <svg viewBox="0 0 200 50" className="w-full h-14 text-emerald-600 stroke-current fill-none stroke-[3]">
+                        <path d="M0,35 Q30,10 60,30 T120,15 T180,35 T200,20" />
+                      </svg>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={() => setShowHospitalModal(true)}
+                        className="py-2.5 bg-[#00875A] hover:bg-[#007043] text-white font-extrabold text-[11px] rounded-2xl shadow-sm transition"
+                      >
+                        + Add Hospital
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('analytics')}
+                        className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-[11px] rounded-2xl transition"
+                      >
+                        Reports
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* BOTTOM BENTO ROW */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+                  {/* CARD 4: REGISTERED FACILITIES HISTORY TABLE (8 COLS) */}
+                  <div className="md:col-span-8 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/60 space-y-4 text-left">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-base font-extrabold text-slate-900">Registered Facilities History</h3>
+                        <p className="text-xs text-slate-400 font-medium">Recent hospital credential records</p>
+                      </div>
+                      <button onClick={() => setActiveTab('hospitals')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+                        <ArrowUpRight size={16} />
+                      </button>
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="text-slate-400 font-bold border-b border-slate-100">
+                            <th className="pb-3 font-semibold">Hospital Name</th>
+                            <th className="pb-3 font-semibold">Admin Credentials</th>
+                            <th className="pb-3 font-semibold">Status</th>
+                            <th className="pb-3 font-semibold text-center">Seats</th>
+                            <th className="pb-3 font-semibold text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {hospitalsList.slice(0, 5).map((h) => (
+                            <tr key={h.id} className="hover:bg-slate-50 transition">
+                              <td className="py-3 font-extrabold text-slate-900 flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                                  <Building2 size={16} />
+                                </div>
+                                <div>
+                                  <p>{h.name}</p>
+                                  <p className="text-[10px] font-mono text-slate-400 font-normal">{h.id}</p>
+                                </div>
+                              </td>
+                              <td className="py-3 font-mono text-slate-600">{h.email}</td>
+                              <td className="py-3">
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-800">
+                                  <span className={`w-2 h-2 rounded-full ${h.status === 'active' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                  <span>{h.status === 'active' ? 'Active' : 'Suspended'}</span>
+                                </span>
+                              </td>
+                              <td className="py-3 text-center font-mono font-bold text-slate-900">{h.doctor_limit}</td>
+                              <td className="py-3 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setEditingProfileHospital(h)
+                                      setProfileForm({
+                                        name: h.name,
+                                        license: h.license,
+                                        phone: h.phone,
+                                        email: h.email,
+                                        address: h.address,
+                                        doctor_limit: h.doctor_limit,
+                                      })
+                                    }}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
+                                    title="Edit Profile"
+                                  >
+                                    <Edit size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setResettingHospital(h)
+                                      setNewPasswordForm(h.password || '')
+                                    }}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-amber-600 rounded-lg transition"
+                                    title="Reset Password"
+                                  >
+                                    <Key size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleHospitalStatus(h.id)}
+                                    className={`p-1.5 rounded-lg transition ${
+                                      h.status === 'active'
+                                        ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                    }`}
+                                    title={h.status === 'active' ? 'Suspend' : 'Activate'}
+                                  >
+                                    <RotateCcw size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteHospital(h.id, h.name)}
+                                    className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition"
+                                    title="Delete Facility"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* CARD 5: ALLOCATED DOCTOR SEATS & PLATFORM ROOT (4 COLS) */}
+                  <div className="md:col-span-4 space-y-6">
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/60 space-y-3 text-left">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold">
+                          <Users size={16} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Allocated Doctor Seats</p>
+                          <p className="text-[11px] text-slate-400 font-medium">Total platform seat capacity</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-baseline justify-between pt-1">
+                        <p className="text-3xl font-black text-slate-900 font-mono">{totalDoctorSeats} Seats</p>
+                        <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[11px] rounded-full">
+                          {hospitalsList.length} Facilities
+                        </span>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Platform Owner Root</p>
+                          <p className="text-[11px] text-slate-400 font-mono">shahidbcsm@gmail.com</p>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center border-2 border-white shadow-sm">
+                          ROOT
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* HOSPITALS TAB */}
+            {activeTab === 'hospitals' && (
+              <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/60 space-y-6 text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900">Hospital Facilities Management</h2>
+                    <p className="text-xs text-slate-500">Manage credentials, doctor seat limits, and status</p>
+                  </div>
+                  <div className="relative max-w-sm w-full">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search facility name or email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-600 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredHospitals.map((hosp) => (
+                    <div key={hosp.id} className="bg-slate-50 p-6 rounded-3xl border border-slate-200/80 space-y-4 shadow-sm flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase tracking-widest">{hosp.id}</span>
+                            <h3 className="text-base font-black text-slate-900">{hosp.name}</h3>
+                          </div>
+                          <span className={`px-3 py-1 text-[10px] font-extrabold rounded-full uppercase ${hosp.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                            {hosp.status}
+                          </span>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-1.5 text-xs font-mono">
+                          <p><span className="text-slate-400">License:</span> <strong className="text-slate-800">{hosp.license}</strong></p>
+                          <p><span className="text-slate-400">Admin Email:</span> <strong className="text-emerald-700">{hosp.email}</strong></p>
+                          {hosp.password && <p><span className="text-slate-400">Admin Pass:</span> <strong className="text-amber-700">{hosp.password}</strong></p>}
+                          <p><span className="text-slate-400">Doctor Limit:</span> <strong className="text-slate-800">{hosp.doctor_limit} Seats</strong></p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
                         <button
                           onClick={() => {
                             setEditingProfileHospital(hosp)
@@ -535,420 +909,309 @@ export default function OwnerAdmin() {
                               doctor_limit: hosp.doctor_limit,
                             })
                           }}
-                          className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold transition border border-slate-700 flex items-center justify-center gap-1.5"
+                          className="py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition"
                         >
-                          <Edit size={14} className="text-blue-400" /> Update Profile
+                          Edit Profile
                         </button>
-
-                        {/* 2. Reset Password */}
                         <button
                           onClick={() => {
                             setResettingHospital(hosp)
-                            setNewPasswordForm('')
+                            setNewPasswordForm(hosp.password || '')
                           }}
-                          className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold transition border border-slate-700 flex items-center justify-center gap-1.5"
+                          className="py-2 bg-white hover:bg-slate-100 text-amber-700 font-bold text-xs rounded-xl border border-slate-200 transition"
                         >
-                          <RotateCcw size={14} className="text-amber-400" /> Reset Password
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        {/* 3. Block / Suspend / Reactivate */}
-                        <button
-                          onClick={() => handleToggleHospitalStatus(hosp.id)}
-                          className={`py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                            hosp.status === 'active'
-                              ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30'
-                              : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30'
-                          }`}
-                        >
-                          {hosp.status === 'active' ? '⚠️ Suspend / Block' : '✓ Reactivate'}
-                        </button>
-
-                        {/* 4. Permanently Delete */}
-                        <button
-                          onClick={() => handleDeleteHospital(hosp.id, hosp.name)}
-                          className="py-2 bg-red-500/20 text-red-300 hover:bg-red-500/30 rounded-xl text-xs font-bold transition border border-red-500/30 flex items-center justify-center gap-1.5"
-                        >
-                          <Trash2 size={14} /> Delete Hospital
+                          Reset Pass
                         </button>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* LEADS TAB */}
+            {activeTab === 'leads' && (
+              <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/60 space-y-6 text-left">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900">Website Inbound Leads</h2>
+                    <p className="text-xs text-slate-500">Contact form submissions from main website</p>
                   </div>
-                ))}
+                  {leadsList.length > 0 && (
+                    <button onClick={handleClearLeads} className="px-4 py-2 bg-rose-50 text-rose-700 font-bold text-xs rounded-xl border border-rose-200">
+                      Clear All Leads
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {leadsList.map((lead, idx) => (
+                    <div key={idx} className="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-base font-bold text-slate-900">{lead.name || 'Unnamed Lead'}</h3>
+                        <span className="text-[10px] font-mono text-slate-400">{lead.timestamp}</span>
+                      </div>
+                      <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-1 text-xs font-mono">
+                        <p><span className="text-slate-400">Phone:</span> <strong className="text-emerald-700">{lead.phone}</strong></p>
+                        {lead.email && <p><span className="text-slate-400">Email:</span> {lead.email}</p>}
+                        {lead.clinic_name && <p><span className="text-slate-400">Clinic:</span> {lead.clinic_name}</p>}
+                        {lead.message && <p className="text-slate-600 italic pt-1 border-t border-slate-100">"{lead.message}"</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ANALYTICS TAB */}
+            {activeTab === 'analytics' && (
+              <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/60 space-y-6 text-left">
+                <h2 className="text-xl font-black text-slate-900">Platform Growth & Analytics</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-2">
+                    <Building2 size={24} className="text-emerald-700" />
+                    <p className="text-3xl font-black text-slate-900">{hospitalsList.length}</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Registered Facilities</p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-2">
+                    <Users size={24} className="text-emerald-700" />
+                    <p className="text-3xl font-black text-slate-900">{totalDoctorSeats}</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Allocated Doctor Seats</p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-2">
+                    <Inbox size={24} className="text-emerald-700" />
+                    <p className="text-3xl font-black text-slate-900">{leadsList.length}</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Inbound Leads</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* TAB 2: INQUIRIES & SALES LEADS */}
-        {activeTab === 'leads' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <Inbox size={20} className="text-blue-400" /> Website Buy Now & Contact Form Submissions ({leadsList.length})
-              </h3>
-              {leadsList.length > 0 && (
-                <button
-                  onClick={handleClearLeads}
-                  className="px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg text-xs font-bold transition"
-                >
-                  Clear Leads Log
-                </button>
-              )}
+      {/* CREATE HOSPITAL MODAL */}
+      {showHospitalModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-lg w-full space-y-6 shadow-2xl border border-slate-200 text-left">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-xl font-black text-slate-900">Issue New Hospital Credentials</h3>
+              <button onClick={() => setShowHospitalModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm">✕</button>
             </div>
 
-            {leadsList.length === 0 ? (
-              <div className="bg-slate-950 border border-slate-800 rounded-3xl p-12 text-center text-slate-500 space-y-2">
-                <Inbox size={48} className="mx-auto text-slate-700" />
-                <p className="text-base font-bold text-slate-400">No Sales Inquiries Received Yet</p>
-                <p className="text-xs">When website visitors submit the Buy Now or Contact forms, their details will appear here.</p>
-              </div>
-            ) : (
-              <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-                <table className="w-full text-left text-sm text-slate-300">
-                  <thead className="bg-slate-900 border-b border-slate-800 text-xs uppercase font-bold text-slate-400">
-                    <tr>
-                      <th className="px-6 py-4">Doctor / Lead Name</th>
-                      <th className="px-6 py-4">Phone & City</th>
-                      <th className="px-6 py-4">Clinic & Speciality</th>
-                      <th className="px-6 py-4">Requested Plan</th>
-                      <th className="px-6 py-4">Timestamp</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-medium">
-                    {leadsList.map((lead, idx) => (
-                      <tr key={idx} className="hover:bg-slate-900/60 transition">
-                        <td className="px-6 py-4">
-                          <p className="font-bold text-white text-base">{lead.name || 'Anonymous Doctor'}</p>
-                          <p className="text-xs text-slate-400 font-mono">{lead.email || 'No email provided'}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="font-bold text-blue-400 flex items-center gap-1.5">
-                            <Phone size={14} /> +91-{lead.phone}
-                          </p>
-                          <p className="text-xs text-slate-400">{lead.city || 'Not specified'}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="font-semibold text-slate-200">{lead.clinic_name || 'Clinic N/A'}</p>
-                          <p className="text-xs text-slate-400">{lead.speciality || 'General'}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="px-3 py-1 bg-blue-500/20 text-blue-300 font-bold text-xs rounded-full border border-blue-500/30">
-                            {lead.plan || 'Enroll Now'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-xs text-slate-400">
-                          {lead.timestamp || 'Just now'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 3: PLATFORM SYSTEM STATS */}
-        {activeTab === 'analytics' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Registered Hospitals</p>
-              <p className="text-5xl font-black text-blue-400">{hospitalsList.length}</p>
-            </div>
-            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Sales Lead Submissions</p>
-              <p className="text-5xl font-black text-purple-400">{leadsList.length}</p>
-            </div>
-            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-center space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Supabase Auth Status</p>
-              <p className="text-2xl font-black text-emerald-400">✓ Connected (taszwtgrgvhkjvqdieqh)</p>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL 1: CREATE HOSPITAL PROFILE */}
-        {showHospitalModal && (
-          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 font-sans">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full shadow-2xl p-6 space-y-4 text-slate-100">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-lg font-bold flex items-center gap-2">
-                  <Building2 className="text-blue-400" size={20} /> Create Hospital Profile & Credentials
-                </h3>
-                <button onClick={() => setShowHospitalModal(false)} className="text-slate-400 hover:text-white">✕</button>
+            <form onSubmit={handleCreateHospital} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Facility Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={hospitalForm.name}
+                  onChange={(e) => setHospitalForm({ ...hospitalForm, name: e.target.value })}
+                  placeholder="e.g. City Care Multispecialty Hospital"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                />
               </div>
 
-              <form onSubmit={handleCreateHospital} className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">Hospital Name *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Hospital Admin Email *</label>
                   <input
-                    type="text"
-                    value={hospitalForm.name}
-                    onChange={(e) => setHospitalForm({ ...hospitalForm, name: e.target.value })}
-                    placeholder="e.g. Apollo Multi-Specialty Hospital"
+                    type="email"
                     required
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm outline-none"
+                    value={hospitalForm.email}
+                    onChange={(e) => setHospitalForm({ ...hospitalForm, email: e.target.value })}
+                    placeholder="hadmin@cityhospital.com"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Admin Email *</label>
-                    <input
-                      type="email"
-                      value={hospitalForm.email}
-                      onChange={(e) => setHospitalForm({ ...hospitalForm, email: e.target.value })}
-                      placeholder="admin@apollo.com"
-                      required
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Initial Password *</label>
-                    <input
-                      type="password"
-                      value={hospitalForm.password}
-                      onChange={(e) => setHospitalForm({ ...hospitalForm, password: e.target.value })}
-                      placeholder="••••••••"
-                      required
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm outline-none"
-                    />
-                  </div>
-                </div>
-
                 <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">Doctor Seat Limit (Owner Set) *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Admin Password *</label>
+                  <input
+                    type="text"
+                    required
+                    value={hospitalForm.password}
+                    onChange={(e) => setHospitalForm({ ...hospitalForm, password: e.target.value })}
+                    placeholder="HospAdminPass@123"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Phone Helpline</label>
+                  <input
+                    type="text"
+                    value={hospitalForm.phone}
+                    onChange={(e) => setHospitalForm({ ...hospitalForm, phone: e.target.value })}
+                    placeholder="+91 98765 43210"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Doctor Seat Limit</label>
                   <input
                     type="number"
-                    min={1}
-                    max={100}
+                    min="1"
+                    max="100"
                     value={hospitalForm.doctor_limit}
                     onChange={(e) => setHospitalForm({ ...hospitalForm, doctor_limit: Number(e.target.value) })}
-                    placeholder="e.g. 5"
-                    required
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-sm outline-none"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Phone</label>
-                    <input
-                      type="text"
-                      value={hospitalForm.phone}
-                      onChange={(e) => setHospitalForm({ ...hospitalForm, phone: e.target.value })}
-                      placeholder="+91-9876543210"
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">License No.</label>
-                    <input
-                      type="text"
-                      value={hospitalForm.license}
-                      onChange={(e) => setHospitalForm({ ...hospitalForm, license: e.target.value })}
-                      placeholder="HOSP-2026-LIC-9921"
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm font-mono outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">Address</label>
-                  <input
-                    type="text"
-                    value={hospitalForm.address}
-                    onChange={(e) => setHospitalForm({ ...hospitalForm, address: e.target.value })}
-                    placeholder="Hospital address..."
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm outline-none"
-                  />
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="secondary" onClick={() => setShowHospitalModal(false)} className="flex-1 bg-slate-800 text-slate-300">
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="primary" disabled={isRegistering} className="flex-1 bg-blue-600 text-white font-bold flex items-center justify-center gap-1.5">
-                    <Key size={14} /> Create Hospital Profile
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL 2: UPDATE HOSPITAL PROFILE */}
-        {editingProfileHospital && (
-          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 font-sans">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full shadow-2xl p-6 space-y-4 text-slate-100">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-lg font-bold flex items-center gap-2">
-                  <Edit className="text-blue-400" size={20} /> Update Hospital Profile
-                </h3>
-                <button onClick={() => setEditingProfileHospital(null)} className="text-slate-400 hover:text-white">✕</button>
               </div>
 
-              <form onSubmit={handleSaveProfileUpdate} className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">Hospital Name *</label>
-                  <input
-                    type="text"
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                    required
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Admin Email *</label>
-                    <input
-                      type="email"
-                      value={profileForm.email}
-                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                      required
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Doctor Seat Limit</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={profileForm.doctor_limit}
-                      onChange={(e) => setProfileForm({ ...profileForm, doctor_limit: Number(e.target.value) })}
-                      required
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-sm outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">Phone</label>
-                    <input
-                      type="text"
-                      value={profileForm.phone}
-                      onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-300 uppercase mb-1">License No.</label>
-                    <input
-                      type="text"
-                      value={profileForm.license}
-                      onChange={(e) => setProfileForm({ ...profileForm, license: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm font-mono outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">Address</label>
-                  <input
-                    type="text"
-                    value={profileForm.address}
-                    onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm outline-none"
-                  />
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="secondary" onClick={() => setEditingProfileHospital(null)} className="flex-1 bg-slate-800 text-slate-300">
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="primary" className="flex-1 bg-blue-600 text-white font-bold">
-                    Save Profile Changes
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL 3: RESET HOSPITAL ADMIN PASSWORD */}
-        {resettingHospital && (
-          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 font-sans">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl p-6 space-y-4 text-slate-100">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-bold flex items-center gap-2">
-                  <RotateCcw className="text-amber-400" size={18} /> Reset Admin Password
-                </h3>
-                <button onClick={() => setResettingHospital(null)} className="text-slate-400 hover:text-white">✕</button>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Address / Location</label>
+                <input
+                  type="text"
+                  value={hospitalForm.address}
+                  onChange={(e) => setHospitalForm({ ...hospitalForm, address: e.target.value })}
+                  placeholder="e.g. Park Street, Kolkata - 700016"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                />
               </div>
 
-              <form onSubmit={handleResetPassword} className="space-y-3 text-xs">
-                <p className="text-slate-300">Set a new login password for <strong>{resettingHospital.name}</strong> (<code className="text-blue-400">{resettingHospital.email}</code>):</p>
-
-                <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">New Password *</label>
-                  <input
-                    type="password"
-                    required
-                    value={newPasswordForm}
-                    onChange={(e) => setNewPasswordForm(e.target.value)}
-                    placeholder="Enter new admin password"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm font-mono outline-none"
-                  />
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="secondary" onClick={() => setResettingHospital(null)} className="flex-1 bg-slate-800 text-slate-300">
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="primary" className="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold">
-                    Update Password
-                  </Button>
-                </div>
-              </form>
-            </div>
+              <div className="pt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowHospitalModal(false)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRegistering}
+                  className="px-6 py-2.5 bg-[#00875A] hover:bg-[#007043] text-white font-extrabold text-xs rounded-xl shadow-md"
+                >
+                  {isRegistering ? 'Issuing Credentials...' : 'Create & Issue Credentials'}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* MODAL 4: EDIT DOCTOR SEAT LIMIT */}
-        {editingHospital && (
-          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 font-sans">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full shadow-2xl p-6 space-y-4 text-slate-100">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-bold flex items-center gap-2">
-                  <Sliders className="text-blue-400" size={18} /> Adjust Doctor Seat Limit
-                </h3>
-                <button onClick={() => setEditingHospital(null)} className="text-slate-400 hover:text-white">✕</button>
+      {/* EDIT PROFILE MODAL */}
+      {editingProfileHospital && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-lg w-full space-y-6 shadow-2xl border border-slate-200 text-left">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-xl font-black text-slate-900">Update Hospital Profile</h3>
+              <button onClick={() => setEditingProfileHospital(null)} className="text-slate-400 hover:text-slate-600 font-bold text-sm">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveProfileUpdate} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Facility Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                />
               </div>
 
-              <form onSubmit={handleUpdateDoctorLimit} className="space-y-3 text-xs">
-                <p className="text-slate-300">Adjust allowed doctor seat limit for <strong>{editingHospital.name}</strong>:</p>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-slate-300 uppercase mb-1">Allowed Doctor Limit *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Admin Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Doctor Seat Limit</label>
                   <input
                     type="number"
-                    min={1}
-                    max={100}
-                    value={newLimit}
-                    onChange={(e) => setNewLimit(Number(e.target.value))}
-                    required
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-lg text-center outline-none"
+                    min="1"
+                    value={profileForm.doctor_limit}
+                    onChange={(e) => setProfileForm({ ...profileForm, doctor_limit: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
                   />
                 </div>
+              </div>
 
-                <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="secondary" onClick={() => setEditingHospital(null)} className="flex-1 bg-slate-800 text-slate-300">
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="primary" className="flex-1 bg-blue-600 text-white font-bold">
-                    Save New Limit
-                  </Button>
-                </div>
-              </form>
-            </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Address</label>
+                <input
+                  type="text"
+                  value={profileForm.address}
+                  onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingProfileHospital(null)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-[#00875A] hover:bg-[#007043] text-white font-extrabold text-xs rounded-xl shadow-md"
+                >
+                  Save Profile Changes
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* RESET PASSWORD MODAL */}
+      {resettingHospital && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full space-y-6 shadow-2xl border border-slate-200 text-left">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-xl font-black text-slate-900">Reset Hospital Admin Password</h3>
+              <button onClick={() => setResettingHospital(null)} className="text-slate-400 hover:text-slate-600 font-bold text-sm">✕</button>
+            </div>
+
+            <p className="text-xs text-slate-600 font-mono">
+              Facility: <strong className="text-slate-900">{resettingHospital.name}</strong> ({resettingHospital.email})
+            </p>
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">New Admin Password *</label>
+                <input
+                  type="text"
+                  required
+                  value={newPasswordForm}
+                  onChange={(e) => setNewPasswordForm(e.target.value)}
+                  placeholder="NewAdminPass@123"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-mono focus:ring-2 focus:ring-emerald-600 outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResettingHospital(null)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-[#00875A] hover:bg-[#007043] text-white font-extrabold text-xs rounded-xl shadow-md"
+                >
+                  Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

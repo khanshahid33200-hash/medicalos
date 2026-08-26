@@ -73,15 +73,16 @@ export default function QRKiosk() {
           </div>
 
           <div className="text-white text-xs bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
-            <p className="font-extrabold text-blue-400">📱 No App Needed • Direct Browser Booking</p>
+            <p className="font-extrabold text-blue-400">No App Needed • Direct Browser Booking</p>
             <p className="text-slate-400">Works on all smartphone cameras. Live queue position updates automatically.</p>
           </div>
 
           <button
             onClick={() => setDisplayMode('kiosk')}
+            aria-label="Settings"
             className="absolute top-6 right-6 bg-slate-900 hover:bg-slate-800 text-white p-3 rounded-full transition border border-slate-800"
           >
-            ⚙️
+            Settings
           </button>
         </div>
       </div>
@@ -139,7 +140,7 @@ export default function QRKiosk() {
               <Printer size={16} /> A4 Entrance Poster
             </Button>
             <Button variant="primary" onClick={() => setDisplayMode('fullscreen')} className="shadow-lg shadow-blue-600/30">
-              📺 Fullscreen Kiosk Mode
+              Fullscreen Kiosk Mode
             </Button>
           </div>
         </div>
@@ -207,7 +208,7 @@ export default function QRKiosk() {
             {/* Printing Guide */}
             <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 space-y-3 text-xs text-amber-900">
               <h3 className="font-bold text-sm text-amber-950 flex items-center gap-2">
-                📋 Hospital Entrance QR Printing Guide
+                Hospital Entrance QR Printing Guide
               </h3>
               <ul className="list-disc list-inside space-y-1.5 font-medium text-amber-900">
                 <li><strong>Minimum size:</strong> 4cm × 4cm (for smartphone camera focus)</li>

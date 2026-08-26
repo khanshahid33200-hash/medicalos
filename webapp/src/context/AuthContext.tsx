@@ -21,7 +21,11 @@ interface AuthContextType {
   isLoading: boolean
   error: string | null
   loginWithSupabase: (email: string, pass: string, expectedRole?: 'hospital_admin' | 'doctor') => Promise<any>
-  registerUserInSupabase: (email: string, pass: string, metadata: { role: string; name: string; hospital_id?: string; dept?: string }) => Promise<any>
+  registerUserInSupabase: (
+    email: string,
+    pass: string,
+    metadata: { role: string; name: string; hospital_id?: string; dept?: string; fee?: number; limit?: number }
+  ) => Promise<any>
   logout: () => Promise<void>
 }
 
@@ -35,9 +39,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check initial Supabase Session
+    // Check initial Supabase Session or Saved Fast Session
     const initAuth = async () => {
       try {
+        const cachedUser = localStorage.getItem('clinicos_cached_user')
+        const cachedRole = localStorage.getItem('user_role') as any
+        const cachedProfile = localStorage.getItem('clinicos_cached_profile')
+
+        if (cachedUser && cachedRole && cachedProfile) {
+          setCurrentUser(JSON.parse(cachedUser))
+          setUserRole(cachedRole)
+          setDoctorProfile(JSON.parse(cachedProfile))
+          setIsLoading(false)
+          return
+        }
+
         const { data: { session } } = await supabase.auth.getSession()
         if (session && session.user) {
           setCurrentUser(session.user)
@@ -71,63 +87,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCurrentUser(session.user)
         const role = session.user.user_metadata?.role || (localStorage.getItem('user_role') as any) || 'doctor'
         setUserRole(role)
-      } else {
-        setCurrentUser(null)
-        setDoctorProfile(null)
-        setUserRole(null)
       }
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  // Login Query directly to Supabase Auth with Robust Multilayer Credentials Fallback
+  // BLAZING FAST LOGIN WITH INSTANT EVALUATION & 1S SUPABASE TIMEOUT
   const loginWithSupabase = async (email: string, pass: string, expectedRole?: 'hospital_admin' | 'doctor') => {
     setIsLoading(true)
     setError(null)
     const cleanEmail = email.trim().toLowerCase()
     const cleanPass = pass.trim()
 
-    // 1. Primary Query to Remote Supabase Auth API
-    try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password: cleanPass,
-      })
+    // 1. INSTANT CHECK: Local Storage & Supabase Registries (Instant response)
 
-      if (!authError && data?.user) {
-        const role = data.user.user_metadata?.role || expectedRole || 'doctor'
-        
-        if (expectedRole && role !== expectedRole && role !== 'super_admin') {
-          await supabase.auth.signOut()
-          throw new Error(`Unauthorized role access. This portal is strictly for ${expectedRole === 'hospital_admin' ? 'Hospital Administrators' : 'Doctors'}.`)
-        }
-
-        setCurrentUser(data.user)
-        setUserRole(role)
-        localStorage.setItem('user_role', role)
-
-        const profile: DoctorProfile = {
-          doctor_id: data.user.id,
-          hospital_id: data.user.user_metadata?.hospital_id || 'hosp-001',
-          hospital_name: data.user.user_metadata?.hospital_name || 'Hospital Facility',
-          name: data.user.user_metadata?.full_name || email.split('@')[0],
-          email: cleanEmail,
-          department_id: 'dept-cardio-01',
-          department_name: data.user.user_metadata?.department || 'General',
-          specialization: 'Consultant Specialist',
-          role: role,
-          status: 'active',
-        }
-        setDoctorProfile(profile)
-        setIsLoading(false)
-        return data
-      }
-    } catch (err: any) {
-      console.warn('Supabase Auth remote query notice:', err.message)
-    }
-
-    // 2. Direct Hospital List Check (Created via /mrshahidbabu)
+    // Check Hospital Admin local registry
     try {
       const hospitalsRaw = localStorage.getItem('clinicos_hospitals')
       const hospitalsList: any[] = hospitalsRaw ? JSON.parse(hospitalsRaw) : []
@@ -137,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (foundHosp) {
         if (expectedRole && expectedRole !== 'hospital_admin') {
+          setIsLoading(false)
           throw new Error('Unauthorized role access. This portal is strictly for Hospital Administrators.')
         }
 
@@ -151,12 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         }
 
-        setCurrentUser(mockUser)
-        setUserRole('hospital_admin')
-        localStorage.setItem('user_role', 'hospital_admin')
-        localStorage.setItem('hospital_id', foundHosp.id)
-        localStorage.setItem('hospital_name', foundHosp.name)
-
         const profile: DoctorProfile = {
           doctor_id: mockUser.id,
           hospital_id: foundHosp.id,
@@ -169,13 +139,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: 'hospital_admin',
           status: 'active',
         }
+
+        setCurrentUser(mockUser)
+        setUserRole('hospital_admin')
         setDoctorProfile(profile)
+        localStorage.setItem('user_role', 'hospital_admin')
+        localStorage.setItem('hospital_id', foundHosp.id)
+        localStorage.setItem('hospital_name', foundHosp.name)
+        localStorage.setItem('clinicos_cached_user', JSON.stringify(mockUser))
+        localStorage.setItem('clinicos_cached_profile', JSON.stringify(profile))
         setIsLoading(false)
         return { user: mockUser }
       }
     } catch (e) {}
 
-    // 3. Direct Doctor Roster Check (Created via /dashboard)
+    // Check Doctor local roster
     try {
       const doctorsRaw = localStorage.getItem('clinicos_hospital_doctors')
       const doctorsList: any[] = doctorsRaw ? JSON.parse(doctorsRaw) : []
@@ -184,8 +162,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       )
 
       if (foundDoc) {
-        const role = 'doctor'
         if (expectedRole && expectedRole !== 'doctor') {
+          setIsLoading(false)
           throw new Error('Unauthorized role access. This portal is strictly for Doctors.')
         }
 
@@ -194,15 +172,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: cleanEmail,
           user_metadata: {
             full_name: foundDoc.name,
-            role: role,
+            role: 'doctor',
             hospital_id: foundDoc.hospital_id || 'hosp-001',
             department: foundDoc.dept || 'General',
           },
         }
-
-        setCurrentUser(mockUser)
-        setUserRole(role)
-        localStorage.setItem('user_role', role)
 
         const profile: DoctorProfile = {
           doctor_id: mockUser.id,
@@ -213,28 +187,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           department_id: 'dept-01',
           department_name: foundDoc.dept || 'General',
           specialization: foundDoc.specialization || 'Consultant Specialist',
-          role: role,
+          role: 'doctor',
           status: 'active',
         }
+
+        setCurrentUser(mockUser)
+        setUserRole('doctor')
         setDoctorProfile(profile)
+        localStorage.setItem('user_role', 'doctor')
+        localStorage.setItem('hospital_id', foundDoc.hospital_id || 'hosp-001')
+        localStorage.setItem('clinicos_cached_user', JSON.stringify(mockUser))
+        localStorage.setItem('clinicos_cached_profile', JSON.stringify(profile))
         setIsLoading(false)
         return { user: mockUser }
       }
     } catch (e) {}
 
-    // 4. Local User Registry Check
+    // Check Saved User Registry
     try {
       const savedUsersRaw = localStorage.getItem('clinicos_user_registry')
       const registry: any[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : []
-      
       const found = registry.find(
         (u) => u.email?.trim().toLowerCase() === cleanEmail && u.password?.trim() === cleanPass
       )
 
       if (found) {
         const role = found.role || expectedRole || 'doctor'
-        
         if (expectedRole && role !== expectedRole && role !== 'super_admin') {
+          setIsLoading(false)
           throw new Error(`Unauthorized role access. This portal is strictly for ${expectedRole === 'hospital_admin' ? 'Hospital Administrators' : 'Doctors'}.`)
         }
 
@@ -245,21 +225,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             full_name: found.name,
             role: role,
             hospital_id: found.hospital_id || 'hosp-001',
-            hospital_name: found.name
-          }
+            hospital_name: found.name,
+          },
         }
-
-        setCurrentUser(mockUser)
-        setUserRole(role)
-        localStorage.setItem('user_role', role)
-        localStorage.setItem('hospital_id', found.hospital_id || 'hosp-001')
-        localStorage.setItem('hospital_name', found.name || 'Hospital Facility')
 
         const profile: DoctorProfile = {
           doctor_id: mockUser.id,
           hospital_id: found.hospital_id || 'hosp-001',
           hospital_name: found.name || 'Hospital Facility',
-          name: found.name || email.split('@')[0],
+          name: found.name || cleanEmail.split('@')[0],
           email: cleanEmail,
           department_id: 'dept-cardio-01',
           department_name: found.dept || 'General',
@@ -267,28 +241,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: role,
           status: 'active',
         }
+
+        setCurrentUser(mockUser)
+        setUserRole(role)
         setDoctorProfile(profile)
+        localStorage.setItem('user_role', role)
+        localStorage.setItem('hospital_id', found.hospital_id || 'hosp-001')
+        localStorage.setItem('clinicos_cached_user', JSON.stringify(mockUser))
+        localStorage.setItem('clinicos_cached_profile', JSON.stringify(profile))
         setIsLoading(false)
         return { user: mockUser }
       }
-    } catch (e) {
-      // ignore
+    } catch (e) {}
+
+    // 2. REMOTE SUPABASE AUTH WITH 1.2 SECOND FAST TIMEOUT RACE
+    try {
+      const supabaseLoginPromise = supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: cleanPass,
+      })
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase Auth network query timeout')), 1200)
+      )
+
+      const { data, error: authError }: any = await Promise.race([supabaseLoginPromise, timeoutPromise])
+
+      if (!authError && data?.user) {
+        const role = data.user.user_metadata?.role || expectedRole || 'doctor'
+        if (expectedRole && role !== expectedRole && role !== 'super_admin') {
+          await supabase.auth.signOut()
+          setIsLoading(false)
+          throw new Error(`Unauthorized role access. This portal is strictly for ${expectedRole === 'hospital_admin' ? 'Hospital Administrators' : 'Doctors'}.`)
+        }
+
+        const profile: DoctorProfile = {
+          doctor_id: data.user.id,
+          hospital_id: data.user.user_metadata?.hospital_id || 'hosp-001',
+          hospital_name: data.user.user_metadata?.hospital_name || 'Hospital Facility',
+          name: data.user.user_metadata?.full_name || cleanEmail.split('@')[0],
+          email: cleanEmail,
+          department_id: 'dept-cardio-01',
+          department_name: data.user.user_metadata?.department || 'General',
+          specialization: 'Consultant Specialist',
+          role: role,
+          status: 'active',
+        }
+
+        setCurrentUser(data.user)
+        setUserRole(role)
+        setDoctorProfile(profile)
+        localStorage.setItem('user_role', role)
+        localStorage.setItem('clinicos_cached_user', JSON.stringify(data.user))
+        localStorage.setItem('clinicos_cached_profile', JSON.stringify(profile))
+        setIsLoading(false)
+        return data
+      }
+    } catch (err: any) {
+      console.warn('Supabase Auth remote notice:', err.message)
     }
 
     setIsLoading(false)
-    throw new Error('Supabase Auth Query Result: Invalid email or password. Please verify credentials.')
+    throw new Error('Invalid email or password. Please verify your credentials or click a demo account button.')
   }
 
-  // Register User Credentials in Supabase Auth & Local Registry
+  // Register User Credentials in Supabase Auth & Supabase Database Tables
   const registerUserInSupabase = async (
     email: string,
     pass: string,
-    metadata: { role: string; name: string; hospital_id?: string; dept?: string }
+    metadata: { role: string; name: string; hospital_id?: string; dept?: string; fee?: number; limit?: number }
   ) => {
     const cleanEmail = email.trim().toLowerCase()
     const cleanPass = pass.trim()
 
-    // Save to local registry so sign-in always works seamlessly
+    // 1. Save to local registry backup
     try {
       const savedUsersRaw = localStorage.getItem('clinicos_user_registry')
       const registry: any[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : []
@@ -302,15 +328,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         dept: metadata.dept || 'General',
         timestamp: new Date().toISOString()
       }
-      registry.push(newUser)
+      const existingIdx = registry.findIndex((u) => u.email?.trim().toLowerCase() === cleanEmail)
+      if (existingIdx >= 0) {
+        registry[existingIdx] = { ...registry[existingIdx], ...newUser }
+      } else {
+        registry.push(newUser)
+      }
       localStorage.setItem('clinicos_user_registry', JSON.stringify(registry))
-    } catch (e) {
-      // ignore
+    } catch (e) {}
+
+    // 2. Save directly to Supabase Database Tables (doctors & clinicos_user_registry)
+    try {
+      await supabase.from('doctors').upsert([
+        {
+          email: cleanEmail,
+          password_hash: cleanPass,
+          name: metadata.name,
+          role: metadata.role,
+          hospital_id: metadata.hospital_id || 'hosp-001',
+          department: metadata.dept || 'General',
+          fee: metadata.fee || 500,
+          daily_limit: metadata.limit || 25,
+          created_at: new Date().toISOString(),
+        },
+      ], { onConflict: 'email' })
+    } catch (dbErr: any) {
+      console.warn('Supabase Database doctors table notice:', dbErr.message)
     }
 
-    // Call Supabase Auth signUp API
     try {
-      const { data, error: regError } = await supabase.auth.signUp({
+      await supabase.from('clinicos_user_registry').upsert([
+        {
+          email: cleanEmail,
+          password: cleanPass,
+          name: metadata.name,
+          role: metadata.role,
+          hospital_id: metadata.hospital_id || 'hosp-001',
+          department: metadata.dept || 'General',
+          created_at: new Date().toISOString(),
+        },
+      ], { onConflict: 'email' })
+    } catch (dbErr: any) {
+      console.warn('Supabase Database user registry table notice:', dbErr.message)
+    }
+
+    // 3. Call Supabase Auth signUp API
+    try {
+      await supabase.auth.signUp({
         email: cleanEmail,
         password: cleanPass,
         options: {
@@ -322,14 +386,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         },
       })
-
-      if (regError) {
-        console.warn('Supabase Auth signUp API notice:', regError.message)
-      }
-      return data
-    } catch (err: any) {
-      console.warn('Supabase Auth signUp exception:', err.message)
-      return { user: { email: cleanEmail } }
+    } catch (authErr: any) {
+      console.warn('Supabase Auth signUp notice:', authErr.message)
     }
   }
 
@@ -337,12 +395,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await supabase.auth.signOut()
     } catch (e) {}
-    localStorage.removeItem('user_role')
-    localStorage.removeItem('hospital_id')
-    localStorage.removeItem('doctor_id')
     setCurrentUser(null)
     setDoctorProfile(null)
     setUserRole(null)
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('clinicos_cached_user')
+    localStorage.removeItem('clinicos_cached_profile')
   }
 
   return (

@@ -14,6 +14,14 @@
       "port": 3000,
       "url": "http://localhost:3000",
       "cwd": "D:\\clinical os\\webapp"
+    },
+    {
+      "name": "med-rapidly",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "autoPort": true,
+      "cwd": "D:\\clinical os\\med-rapidly"
     }
   ]
 }
