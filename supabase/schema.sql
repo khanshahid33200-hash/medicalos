@@ -187,6 +187,42 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- 3b. SCHEMA DRIFT RECONCILIATION
+-- The live database has columns the CREATE TABLE blocks above never
+-- declared (the QR booking RPCs below were written/evolved against the
+-- live DB directly, ahead of this file). Idempotent, additive-only —
+-- reconciles this file with reality without touching existing data.
+ALTER TABLE public.patients
+    ADD COLUMN IF NOT EXISTS patient_number TEXT,
+    ADD COLUMN IF NOT EXISTS date_of_birth DATE,
+    ADD COLUMN IF NOT EXISTS known_diseases TEXT,
+    ADD COLUMN IF NOT EXISTS allergies TEXT,
+    ADD COLUMN IF NOT EXISTS previous_medicine TEXT,
+    ADD COLUMN IF NOT EXISTS previous_doctor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW());
+
+ALTER TABLE public.appointments
+    ADD COLUMN IF NOT EXISTS symptoms TEXT,
+    ADD COLUMN IF NOT EXISTS token_number INTEGER,
+    ADD COLUMN IF NOT EXISTS tracking_token TEXT,
+    ADD COLUMN IF NOT EXISTS department_id UUID REFERENCES public.departments(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS known_diseases TEXT,
+    ADD COLUMN IF NOT EXISTS previous_medicine TEXT,
+    ADD COLUMN IF NOT EXISTS previous_doctor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+ALTER TABLE public.qr_codes
+    ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active',
+    ADD COLUMN IF NOT EXISTS booking_url TEXT,
+    ADD COLUMN IF NOT EXISTS scans_count INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS last_scanned_at TIMESTAMPTZ;
+
+-- Doctor Dashboard migration (Rx form fields the UI already collects —
+-- diagnosis/medicines had columns; lab tests, advice, and follow-up did not).
+ALTER TABLE public.prescriptions
+    ADD COLUMN IF NOT EXISTS lab_tests TEXT,
+    ADD COLUMN IF NOT EXISTS advice TEXT,
+    ADD COLUMN IF NOT EXISTS follow_up TEXT;
+
 -- 4. PERFORMANCE INDEXES
 CREATE INDEX IF NOT EXISTS idx_profiles_doctor_code ON public.profiles(doctor_code);
 CREATE INDEX IF NOT EXISTS idx_profiles_hospital ON public.profiles(hospital_id);

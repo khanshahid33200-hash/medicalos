@@ -21,27 +21,60 @@ import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import Button from '../components/Button'
 import { useAuth } from '../context/AuthContext'
+import { QueueItem, ClinicalPrescription, MedicinePrescription } from '../utils/doctorStore'
 import {
-  getQueueForDoctor,
-  updateQueueStatusForDoctor,
-  savePrescriptionForDoctor,
-  QueueItem,
-  ClinicalPrescription,
-  MedicinePrescription
-} from '../utils/doctorStore'
+  getDoctorAppointments,
+  updateAppointmentStatus,
+  completeConsultation,
+  subscribeToDoctorAppointments,
+  type DoctorAppointment,
+  type AppointmentStatus,
+} from '../lib/doctorAppointments'
+
+// This page's JSX is built around doctorStore's QueueItem shape — kept as
+// the display type (only the data source changed, from localStorage to
+// Supabase) so the large JSX below didn't need a rewrite. `patient_id` is
+// carried alongside for writing real consultations/prescriptions rows.
+type DoctorQueueItem = QueueItem & { patient_id: string | null }
+
+function mapAppointmentToQueueItem(appt: DoctorAppointment): DoctorQueueItem | null {
+  let status: DoctorQueueItem['status']
+  if (appt.status === 'in_consultation' || appt.status === 'called') status = 'With Doctor'
+  else if (appt.status === 'completed') status = 'Completed'
+  else if (appt.status === 'waiting' || appt.status === 'pending' || appt.status === 'confirmed') status = 'Waiting'
+  else if (appt.status === 'cancelled' || appt.status === 'no_show') status = 'Skipped'
+  else return null
+
+  return {
+    id: appt.id,
+    patient_id: appt.patient?.id || null,
+    doctor_id: '',
+    token_number: String(appt.token_number ?? ''),
+    patient_name: appt.patient?.name || 'Unnamed Patient',
+    phone: appt.patient?.phone || '',
+    age: appt.patient?.age ?? undefined,
+    gender: appt.patient?.gender ?? undefined,
+    symptoms: appt.symptoms ?? undefined,
+    allergies: appt.patient?.allergies ?? undefined,
+    status,
+    check_in_time: appt.created_at ? new Date(appt.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+    date: appt.appointment_date,
+  }
+}
 
 export default function Queue() {
   const { doctorProfile } = useAuth()
   const doctorId = doctorProfile?.doctor_id || ''
+  const hospitalId = doctorProfile?.hospital_id || ''
   const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
   const departmentName = doctorProfile?.department_name || 'Cardiology'
   const hospitalName = doctorProfile?.hospital_name || 'Metro Care General Hospital'
 
-  const [queueItems, setQueueItems] = useState<QueueItem[]>([])
+  const [queueItems, setQueueItems] = useState<DoctorQueueItem[]>([])
   const [announcedToken, setAnnouncedToken] = useState<string | null>(null)
 
   // Consultation & Prescription Modal State
-  const [activeConsultationPatient, setActiveConsultationPatient] = useState<QueueItem | null>(null)
+  const [activeConsultationPatient, setActiveConsultationPatient] = useState<DoctorQueueItem | null>(null)
   const [prescriptionForm, setPrescriptionForm] = useState<ClinicalPrescription>({
     chief_complaints: '',
     diagnosis: '',
@@ -54,55 +87,32 @@ export default function Queue() {
     followup_date: 'After 7 Days'
   })
 
-  const reloadQueue = () => {
-    if (doctorId) {
-      const storeItems = getQueueForDoctor(doctorId)
-      setQueueItems(storeItems)
-    }
+  const reloadQueue = async (): Promise<DoctorQueueItem[]> => {
+    if (!doctorId) return []
+    const todayStr = new Date().toISOString().split('T')[0]
+    const appointments = await getDoctorAppointments(doctorId, { date: todayStr })
+    const mapped = appointments
+      .map(mapAppointmentToQueueItem)
+      .filter((q): q is DoctorQueueItem => q !== null)
+    setQueueItems(mapped)
+    return mapped
   }
 
-  // Load doctor-specific queue & subscribe to real-time events & polling
+  // Load doctor-specific queue & subscribe to live Supabase updates —
+  // replaces the old BroadcastChannel/2s-polling combo (which only synced
+  // localStorage across tabs, never reflecting a real booking) with a
+  // Realtime subscription scoped to this doctor's own appointments.
   useEffect(() => {
     reloadQueue()
-
-    // 1. BroadcastChannel Listener for instant multi-tab sync
-    let channel: BroadcastChannel | null = null
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      try {
-        channel = new BroadcastChannel('clinic_os_queue_channel')
-        channel.onmessage = (event) => {
-          if (event.data?.type === 'QUEUE_UPDATED') {
-            reloadQueue()
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    // 2. Custom Window Event Listener
-    const handleCustomUpdate = () => reloadQueue()
-    window.addEventListener('clinic_os_queue_updated', handleCustomUpdate)
-    window.addEventListener('storage', handleCustomUpdate)
-
-    // 3. 2-Second Real-Time Polling Interval
-    const pollInterval = setInterval(() => {
-      reloadQueue()
-    }, 2000)
-
-    return () => {
-      if (channel) channel.close()
-      window.removeEventListener('clinic_os_queue_updated', handleCustomUpdate)
-      window.removeEventListener('storage', handleCustomUpdate)
-      clearInterval(pollInterval)
-    }
+    const unsubscribe = subscribeToDoctorAppointments(doctorId, reloadQueue)
+    return unsubscribe
   }, [doctorId])
 
   const activeDoctorPatient = queueItems.find((q) => q.status === 'With Doctor')
   const waitingPatients = queueItems.filter((q) => q.status === 'Waiting')
 
   // Action 1: Call Next Patient
-  const handleCallNext = () => {
+  const handleCallNext = async () => {
     if (waitingPatients.length === 0) return
     const nextPatient = waitingPatients[0]
 
@@ -111,14 +121,17 @@ export default function Queue() {
       if (item.status === 'With Doctor') return { ...item, status: 'Completed' as const }
       return item
     })
-
     setQueueItems(updated)
-    updateQueueStatusForDoctor(doctorId, nextPatient.id, 'With Doctor')
     setAnnouncedToken(nextPatient.token_number)
+
+    if (activeDoctorPatient) {
+      await updateAppointmentStatus(activeDoctorPatient.id, 'completed')
+    }
+    await updateAppointmentStatus(nextPatient.id, 'in_consultation')
   }
 
   // Open Prescription Editor for Patient
-  const handleOpenConsultationModal = (patient: QueueItem) => {
+  const handleOpenConsultationModal = (patient: DoctorQueueItem) => {
     setActiveConsultationPatient(patient)
     setPrescriptionForm({
       chief_complaints: patient.symptoms || 'General Checkup & Consultation',
@@ -171,12 +184,38 @@ export default function Queue() {
     })
   }
 
-  // Save Prescription & Complete Consultation
-  const handleSavePrescription = () => {
-    if (!activeConsultationPatient) return
-    const updated = savePrescriptionForDoctor(doctorId, activeConsultationPatient.id, prescriptionForm)
-    setQueueItems(updated)
+  // Save Prescription & Complete Consultation — writes real
+  // consultations/prescriptions rows and marks the appointment completed,
+  // replacing the old localStorage-only savePrescriptionForDoctor.
+  const handleSavePrescription = async () => {
+    if (!activeConsultationPatient || !hospitalId || !doctorId) return
+
+    setQueueItems(prev => prev.map(q => (q.id === activeConsultationPatient.id ? { ...q, status: 'Completed' as const } : q)))
+    const closingPatient = activeConsultationPatient
     setActiveConsultationPatient(null)
+
+    const result = await completeConsultation({
+      hospitalId,
+      appointmentId: closingPatient.id,
+      doctorId,
+      patientId: closingPatient.patient_id,
+      diagnosis: prescriptionForm.diagnosis,
+      clinicalNotes: prescriptionForm.clinical_notes,
+      vitals: prescriptionForm.vitals as Record<string, string> | undefined,
+      medicines: (prescriptionForm.medicines || []).map(m => ({
+        name: m.medicine_name,
+        dosage: m.dosage,
+        duration: m.duration,
+        instruction: m.instructions || '',
+      })),
+      advice: prescriptionForm.advice,
+      followUp: prescriptionForm.followup_date,
+    })
+
+    if (!result.success) {
+      console.warn('completeConsultation failed:', result.error)
+    }
+    await reloadQueue()
   }
 
   const handlePrintPrescription = () => {
@@ -184,9 +223,9 @@ export default function Queue() {
   }
 
   // Quick Actions
-  const handleStartConsultation = (id: string) => {
-    const updated = updateQueueStatusForDoctor(doctorId, id, 'With Doctor')
-    setQueueItems(updated)
+  const handleStartConsultation = async (id: string) => {
+    await updateAppointmentStatus(id, 'in_consultation')
+    const updated = await reloadQueue()
     const item = updated.find((q) => q.id === id)
     if (item) {
       setAnnouncedToken(item.token_number)
@@ -194,14 +233,14 @@ export default function Queue() {
     }
   }
 
-  const handleSkip = (id: string) => {
-    const updated = updateQueueStatusForDoctor(doctorId, id, 'Skipped')
-    setQueueItems(updated)
+  const handleSkip = async (id: string) => {
+    await updateAppointmentStatus(id, 'no_show')
+    await reloadQueue()
   }
 
-  const handleRecall = (id: string) => {
-    const updated = updateQueueStatusForDoctor(doctorId, id, 'Waiting')
-    setQueueItems(updated)
+  const handleRecall = async (id: string) => {
+    await updateAppointmentStatus(id, 'waiting')
+    const updated = await reloadQueue()
     const item = updated.find((q) => q.id === id)
     if (item) setAnnouncedToken(item.token_number)
   }

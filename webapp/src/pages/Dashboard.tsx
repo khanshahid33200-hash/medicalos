@@ -12,11 +12,19 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useSEO } from '../hooks/useSEO'
-import { getDoctorRealStats } from '../utils/doctorStore'
-import { supabase } from '../lib/supabase'
+import {
+  getDoctorAppointments,
+  updateAppointmentStatus,
+  addWalkInAppointment,
+  completeConsultation,
+  subscribeToDoctorAppointments,
+  getDoctorStats,
+  type DoctorAppointment,
+} from '../lib/doctorAppointments'
 
 interface ClinicalQueuePatient {
   id: string
+  patient_id: string | null
   token_number: number
   patient_name: string
   phone: string
@@ -30,6 +38,41 @@ interface ClinicalQueuePatient {
   vitals: { bp: string; pulse: string; temp: string; spo2: string }
   allergies: string
   lastVisit: string
+}
+
+// Maps a real Supabase appointment row to the JSX-facing shape this page's
+// UI is built around. This dashboard only ever writes 'waiting',
+// 'in_consultation', or 'completed' itself (see handlers below); other
+// statuses a hospital-admin or another flow may set ('cancelled',
+// 'no_show') are excluded from the active queue view entirely rather than
+// mapped into a misleading bucket.
+function mapAppointmentToQueuePatient(appt: DoctorAppointment): ClinicalQueuePatient | null {
+  let status: ClinicalQueuePatient['status']
+  if (appt.status === 'in_consultation' || appt.status === 'called') status = 'Now Consulting'
+  else if (appt.status === 'completed') status = 'Completed'
+  else if (appt.status === 'waiting' || appt.status === 'pending' || appt.status === 'confirmed') status = 'Waiting'
+  else return null // cancelled / no_show — not part of the active queue
+
+  const createdAt = appt.created_at ? new Date(appt.created_at) : null
+  const waitMins = createdAt ? Math.max(0, Math.round((Date.now() - createdAt.getTime()) / 60000)) : null
+
+  return {
+    id: appt.id,
+    patient_id: appt.patient?.id || null,
+    token_number: appt.token_number ?? 0,
+    patient_name: appt.patient?.name || 'Unnamed Patient',
+    phone: appt.patient?.phone || '',
+    age: appt.patient?.age ?? 0,
+    gender: appt.patient?.gender || '',
+    chief_complaint: appt.symptoms || 'General consultation',
+    status,
+    wait_time: status === 'Completed' ? '—' : waitMins != null ? `${waitMins} min` : '—',
+    time: createdAt ? createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—',
+    doctor_id: '', // filled by caller if needed; not required for display
+    vitals: { bp: '', pulse: '', temp: '', spo2: '' },
+    allergies: appt.patient?.allergies || 'None',
+    lastVisit: '—',
+  }
 }
 
 interface DashboardProps {
@@ -48,11 +91,11 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
 
   // Doctor & Hospital Identity — sourced ONLY from the authenticated session
   // (AuthContext). A localStorage fallback here is exactly the bug class
-  // this whole isolation effort exists to remove: doctorId keys directly
-  // into doctorStore's per-doctor localStorage cache below, so a stale
-  // 'doctor_id' from a previous session on this browser would silently pull
-  // that other doctor's queue/appointments/reports into this dashboard.
+  // this whole isolation effort exists to remove: doctorId is used below to
+  // query Supabase directly, so a stale 'doctor_id' from a previous session
+  // on this browser would silently show that other doctor's live queue.
   const doctorId = doctorProfile?.doctor_id || ''
+  const hospitalId = doctorProfile?.hospital_id || ''
   const doctorCode = doctorProfile?.doctor_code || ''
   const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
   const doctorSpecialty = doctorProfile?.specialization || doctorProfile?.department_name || 'Consultant Specialist'
@@ -110,30 +153,35 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
   // Patient Card Active Tab
   const [patientCardTab, setPatientCardTab] = useState<'Details' | 'History' | 'Prescriptions' | 'Reports'>('Details')
 
-  // Live Queue State — starts empty for every doctor. This used to be a
-  // hardcoded array of 5 fake patients (names, phone numbers, vitals,
-  // diagnoses) shown as the default queue for every doctor, including
-  // brand-new ones with zero real patients — a direct violation of "new
-  // doctor dashboard starts from zero". Real entries are added via
-  // check-in/booking; see doctorStore.ts for the per-doctor persistence.
-  const initialQueue: ClinicalQueuePatient[] = []
+  // Live Queue State — loaded from Supabase (the same `appointments` table
+  // QR/walk-in bookings write into), not localStorage. This used to be a
+  // hardcoded array of 5 fake patients shown as the default queue for
+  // every doctor, then a per-doctor localStorage cache disconnected from
+  // real bookings; now it's the one real source of truth, kept live via a
+  // Realtime subscription below.
+  const [queueList, setQueueList] = useState<ClinicalQueuePatient[]>([])
+  const [queueLoading, setQueueLoading] = useState(true)
 
-  const [queueList, setQueueList] = useState<ClinicalQueuePatient[]>(() => {
-    // Guard against doctorId being transiently empty (AuthContext hasn't
-    // hydrated yet on first render) — never read/write a bucket keyed by an
-    // empty string, which would itself become a shared cross-doctor bucket.
-    if (!doctorId) return initialQueue
-    try {
-      const saved = localStorage.getItem(`clinicos_queue_patients_${doctorId}`)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        return parsed.length ? parsed : initialQueue
-      }
-      return initialQueue
-    } catch {
-      return initialQueue
+  const refreshQueue = React.useCallback(async () => {
+    if (!doctorId) return
+    const todayStr = new Date().toISOString().split('T')[0]
+    const appointments = await getDoctorAppointments(doctorId, { date: todayStr })
+    const mapped = appointments
+      .map(mapAppointmentToQueuePatient)
+      .filter((p): p is ClinicalQueuePatient => p !== null)
+    setQueueList(mapped)
+    setQueueLoading(false)
+  }, [doctorId])
+
+  useEffect(() => {
+    if (!doctorId) {
+      setQueueLoading(false)
+      return
     }
-  })
+    refreshQueue()
+    const unsubscribe = subscribeToDoctorAppointments(doctorId, refreshQueue)
+    return unsubscribe
+  }, [doctorId, refreshQueue])
 
   // Upcoming Appointments State — was hardcoded to 5 fake patients that
   // never got replaced with real data (setAppointmentsList is never called
@@ -201,7 +249,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
   })
 
   // Audio TTS Announcement Callout
-  const handleCallNextPatient = (patient?: ClinicalQueuePatient) => {
+  const handleCallNextPatient = async (patient?: ClinicalQueuePatient) => {
     const target = patient || nextPatient
     if (!target) return
 
@@ -215,7 +263,8 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
       window.speechSynthesis.speak(utterance)
     }
 
-    // Move current in_consultation to completed, target to in_consultation
+    // Optimistic local update for instant UI feedback — the Realtime
+    // subscription will reconcile with the real row shortly after.
     const updated: ClinicalQueuePatient[] = queueList.map(q => {
       if (q.id === currentPatient?.id && q.id !== target.id) {
         return { ...q, status: 'Completed' as const }
@@ -225,27 +274,45 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
       }
       return q
     })
-
     setQueueList(updated)
-    localStorage.setItem(`clinicos_queue_patients_${doctorId}`, JSON.stringify(updated))
+
+    if (currentPatient?.id && currentPatient.id !== target.id) {
+      await updateAppointmentStatus(currentPatient.id, 'completed')
+    }
+    await updateAppointmentStatus(target.id, 'in_consultation')
+
     setNotice(`📢 Calling Token CC-0${target.token_number} (${target.patient_name})`)
     setTimeout(() => setNotice(null), 4000)
   }
 
   // Complete Consultation & Send WhatsApp Rx
-  const handleFinishConsultation = () => {
-    if (!currentPatient) return
+  const handleFinishConsultation = async () => {
+    if (!currentPatient || !hospitalId || !doctorId) return
 
-    const updated: ClinicalQueuePatient[] = queueList.map(q => {
-      if (q.id === currentPatient.id) {
-        return { ...q, status: 'Completed' as const }
-      }
-      return q
+    // Optimistic local update; the real consultations/prescriptions rows
+    // and appointment status update happen via completeConsultation below.
+    setQueueList(prev => prev.map(q => (q.id === currentPatient.id ? { ...q, status: 'Completed' as const } : q)))
+    setShowRxModal(false)
+
+    const result = await completeConsultation({
+      hospitalId,
+      appointmentId: currentPatient.id,
+      doctorId,
+      patientId: currentPatient.patient_id,
+      diagnosis: rxForm.diagnosis,
+      medicines: rxForm.medicines,
+      labTests: rxForm.labTests,
+      advice: rxForm.advice,
+      followUp: rxForm.followUp,
     })
 
-    setQueueList(updated)
-    localStorage.setItem(`clinicos_queue_patients_${doctorId}`, JSON.stringify(updated))
-    setShowRxModal(false)
+    if (!result.success) {
+      console.warn('completeConsultation failed:', result.error)
+      setNotice(`⚠ Could not save the consultation: ${result.error || 'unknown error'}`)
+      setTimeout(() => setNotice(null), 5000)
+      return
+    }
+
     setNotice(`✓ Prescription generated & WhatsApp dispatched to ${currentPatient.patient_name} (${currentPatient.phone})!`)
     setTimeout(() => setNotice(null), 4500)
   }
@@ -335,42 +402,45 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
     setTimeout(() => setNotice(null), 3500)
   }
 
-  // Real stats calculation
-  const stats = getDoctorRealStats(doctorId, opdSettings.consultationFee)
+  // Real stats — derived directly from the live, Supabase-backed queueList
+  // above (revenue uses the doctor's configured fee since `fee` isn't set
+  // per-appointment by every booking path yet; see getDoctorStats in
+  // lib/doctorAppointments.ts for the fully real-fee alternative used by
+  // Reports.tsx).
   const completedToday = queueList.filter(q => q.status === 'Completed').length
   const waitingToday = queueList.filter(q => q.status === 'Waiting' || q.status === 'Next').length
   const totalToday = queueList.length
   const calculatedRevenue = completedToday * opdSettings.consultationFee
 
   // Handle adding walk-in patient
-  const handleAddWalkin = (e: React.FormEvent) => {
+  const handleAddWalkin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newWalkin.patient_name) return
+    if (!newWalkin.patient_name || !hospitalId || !doctorId) return
 
-    const nextTok = queueList.length ? Math.max(...queueList.map(q => q.token_number)) + 1 : 1
-    const newEntry: ClinicalQueuePatient = {
-      id: `walkin-${Date.now()}`,
-      token_number: nextTok,
-      patient_name: newWalkin.patient_name,
-      phone: newWalkin.phone || '+91 99999 00000',
-      age: Number(newWalkin.age) || 30,
-      gender: newWalkin.gender,
-      chief_complaint: newWalkin.chief_complaint || 'OPD Walk-in consultation',
-      status: 'Waiting',
-      wait_time: '15 min',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      doctor_id: doctorId,
-      vitals: { bp: '120/80', pulse: '76', temp: '98.6', spo2: '98%' },
-      allergies: 'None',
-      lastVisit: 'Today (Walk-in)'
+    // Reuses the same audited book_qr_appointment RPC the real QR booking
+    // flow uses — real token numbering (advisory-locked, no collisions),
+    // real patient dedup, one shared appointments table. See
+    // lib/doctorAppointments.ts.
+    const result = await addWalkInAppointment({
+      hospitalId,
+      doctorId,
+      patientName: newWalkin.patient_name,
+      patientPhone: newWalkin.phone || '',
+      patientGender: newWalkin.gender,
+      patientAge: Number(newWalkin.age) || 30,
+      symptoms: newWalkin.chief_complaint || 'OPD Walk-in consultation',
+    })
+
+    if (!result.success) {
+      setNotice(`⚠ Could not add walk-in: ${result.error || 'unknown error'}`)
+      setTimeout(() => setNotice(null), 5000)
+      return
     }
 
-    const updated = [...queueList, newEntry]
-    setQueueList(updated)
-    localStorage.setItem(`clinicos_queue_patients_${doctorId}`, JSON.stringify(updated))
+    await refreshQueue()
     setShowAddWalkinModal(false)
     setNewWalkin({ patient_name: '', phone: '', age: 30, gender: 'Male', chief_complaint: '' })
-    setNotice(`✓ Added Walk-In Patient Token CC-0${nextTok} (${newEntry.patient_name})`)
+    setNotice(`✓ Added Walk-In Patient (${newWalkin.patient_name})`)
     setTimeout(() => setNotice(null), 3500)
   }
 

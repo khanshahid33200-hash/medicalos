@@ -11,7 +11,31 @@ import {
 import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import { useAuth } from '../context/AuthContext'
-import { getQueueForDoctor, getAppointmentsForDoctor } from '../utils/doctorStore'
+import { getDoctorAppointments, type DoctorAppointment } from '../lib/doctorAppointments'
+
+// Both tabs on this page (Appointment History, Scanned Patient History,
+// Reports Archive) used to read two separate, unsynchronized localStorage
+// buckets (doctorStore's queue vs. appointments) that were themselves
+// disconnected from real bookings. Now both derive from the same live
+// Supabase query — the full (no date filter) appointment history for this
+// doctor — mapped to the field names this page's JSX already expects.
+function mapAppointmentToHistoryItem(appt: DoctorAppointment) {
+  return {
+    id: appt.id,
+    patient_name: appt.patient?.name || 'Unnamed Patient',
+    phone: appt.patient?.phone || '',
+    age: appt.patient?.age ?? undefined,
+    gender: appt.patient?.gender ?? undefined,
+    token_number: String(appt.token_number ?? ''),
+    receipt_number: appt.id.slice(0, 8).toUpperCase(),
+    department: '—',
+    appointment_date: appt.appointment_date,
+    status: appt.status,
+    symptoms: appt.symptoms || '',
+    severity: '—',
+    check_in_time: appt.created_at ? new Date(appt.created_at).toLocaleString() : '',
+  }
+}
 
 export default function History() {
   const { doctorProfile } = useAuth()
@@ -22,20 +46,17 @@ export default function History() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
-  const [queueHistory, setQueueHistory] = useState<any[]>([])
-  const [appointmentHistory, setAppointmentHistory] = useState<any[]>([])
+  const [historyList, setHistoryList] = useState<ReturnType<typeof mapAppointmentToHistoryItem>[]>([])
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null)
 
   useEffect(() => {
-    if (doctorId) {
-      const queue = getQueueForDoctor(doctorId)
-      const apts = getAppointmentsForDoctor(doctorId)
-      setQueueHistory(queue)
-      setAppointmentHistory(apts)
-    }
+    if (!doctorId) return
+    getDoctorAppointments(doctorId).then(appointments => {
+      setHistoryList(appointments.map(mapAppointmentToHistoryItem))
+    })
   }, [doctorId])
 
-  const filteredAppointments = appointmentHistory.filter((item) => {
+  const filteredAppointments = historyList.filter((item) => {
     const matchSearch =
       item.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.receipt_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -44,7 +65,7 @@ export default function History() {
     return matchSearch && matchStatus
   })
 
-  const filteredPatients = queueHistory.filter((pat) => {
+  const filteredPatients = historyList.filter((pat) => {
     return (
       pat.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pat.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -264,9 +285,9 @@ export default function History() {
         {/* TAB 3: REPORTS ARCHIVE */}
         {activeTab === 'reports' && (
           <Card>
-            <CardHeader title={`Scanned Reports Archive (${queueHistory.length})`} />
+            <CardHeader title={`Scanned Reports Archive (${historyList.length})`} />
             <CardContent className="p-0">
-              {queueHistory.length === 0 ? (
+              {historyList.length === 0 ? (
                 <div className="p-12 text-center text-gray-500">No reports archive yet for {doctorName}.</div>
               ) : (
                 <div className="overflow-x-auto">
@@ -281,7 +302,7 @@ export default function History() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 font-medium">
-                      {queueHistory.map((q) => (
+                      {historyList.map((q) => (
                         <tr key={q.id} className="hover:bg-gray-50 transition">
                           <td className="px-6 py-4 font-bold text-blue-600">{q.token_number}</td>
                           <td className="px-6 py-4 text-gray-900 font-semibold">{q.patient_name}</td>

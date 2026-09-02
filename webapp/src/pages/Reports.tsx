@@ -4,7 +4,34 @@ import Layout from '../components/Layout'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import Button from '../components/Button'
 import { useAuth } from '../context/AuthContext'
-import { getQueueForDoctor, getReportsForDoctor, QueueItem, ReportItem } from '../utils/doctorStore'
+import {
+  getDoctorAppointments,
+  getDoctorPrescriptions,
+  type DoctorAppointment,
+  type DoctorPrescription,
+} from '../lib/doctorAppointments'
+
+interface ReportRow {
+  id: string
+  token_number: string
+  patient_name: string
+  phone: string
+  symptoms: string
+  status: string
+  prescription: DoctorPrescription | null
+}
+
+function mapToReportRow(appt: DoctorAppointment, prescriptions: Map<string, DoctorPrescription>): ReportRow {
+  return {
+    id: appt.id,
+    token_number: String(appt.token_number ?? ''),
+    patient_name: appt.patient?.name || 'Unnamed Patient',
+    phone: appt.patient?.phone || '',
+    symptoms: appt.symptoms || '',
+    status: appt.status,
+    prescription: prescriptions.get(appt.id) || null,
+  }
+}
 
 export default function Reports() {
   const { doctorProfile } = useAuth()
@@ -13,19 +40,20 @@ export default function Reports() {
   const departmentName = doctorProfile?.department_name || 'Cardiology'
   const hospitalName = doctorProfile?.hospital_name || 'Metro Care General Hospital'
 
-  const [queueList, setQueueList] = useState<QueueItem[]>([])
-  const [, setReportsList] = useState<ReportItem[]>([])
-  const [selectedReport, setSelectedReport] = useState<ReportItem | QueueItem | null>(null)
+  const [queueList, setQueueList] = useState<ReportRow[]>([])
+  const [selectedReport, setSelectedReport] = useState<ReportRow | null>(null)
 
   useEffect(() => {
-    if (doctorId) {
-      setQueueList(getQueueForDoctor(doctorId))
-      setReportsList(getReportsForDoctor(doctorId))
-    }
+    if (!doctorId) return
+    Promise.all([getDoctorAppointments(doctorId), getDoctorPrescriptions(doctorId)]).then(
+      ([appointments, prescriptions]) => {
+        setQueueList(appointments.map(a => mapToReportRow(a, prescriptions)))
+      }
+    )
   }, [doctorId])
 
-  const completedCount = queueList.filter((q) => q.status === 'Completed').length
-  const waitingCount = queueList.filter((q) => q.status === 'Waiting').length
+  const completedCount = queueList.filter((q) => q.status === 'completed').length
+  const waitingCount = queueList.filter((q) => q.status === 'waiting' || q.status === 'pending').length
   const totalCheckins = queueList.length
 
   const handlePrint = () => {
@@ -201,13 +229,13 @@ export default function Reports() {
                   </div>
                 </div>
 
-                {'prescription' in selectedReport && selectedReport.prescription?.diagnosis && (
+                {selectedReport.prescription?.diagnosis && (
                   <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-xs text-emerald-900 font-bold">
                     🩺 Diagnosis: {selectedReport.prescription.diagnosis}
                   </div>
                 )}
 
-                {'prescription' in selectedReport && selectedReport.prescription?.medicines && selectedReport.prescription.medicines.length > 0 && (
+                {selectedReport.prescription?.medicines && selectedReport.prescription.medicines.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-extrabold text-gray-900 flex items-center gap-1">
                       <Pill size={14} className="text-blue-600" /> Prescribed Rx Medicines:
@@ -215,18 +243,18 @@ export default function Reports() {
                     <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 text-xs">
                       {selectedReport.prescription.medicines.map((med, i) => (
                         <div key={i} className="p-2.5 flex justify-between items-center">
-                          <span className="font-bold text-gray-900">{med.medicine_name}</span>
-                          <span className="text-gray-600">{med.dosage} • {med.frequency} ({med.duration})</span>
+                          <span className="font-bold text-gray-900">{med.name}</span>
+                          <span className="text-gray-600">{med.dosage} ({med.duration}) — {med.instruction}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {'prescription' in selectedReport && selectedReport.prescription?.clinical_notes && (
+                {selectedReport.prescription?.clinicalNotes && (
                   <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs">
                     <p className="font-bold text-gray-700">Doctor Clinical Notes:</p>
-                    <p className="text-gray-800 mt-1 whitespace-pre-wrap">{selectedReport.prescription.clinical_notes}</p>
+                    <p className="text-gray-800 mt-1 whitespace-pre-wrap">{selectedReport.prescription.clinicalNotes}</p>
                   </div>
                 )}
 
