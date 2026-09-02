@@ -90,6 +90,16 @@
   0%, 100% { opacity: 0.35; transform: scale(1); }
   50% { opacity: 0.6; transform: scale(1.06); }
 }
+@keyframes qr-scan {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.animate-qr-scan { animation: qr-scan 2.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-qr-scan { animation: none; }
+}
 
 .animate-float-blob-a { animation: float-blob-a 18s ease-in-out infinite; }
 .animate-float-blob-b { animation: float-blob-b 22s ease-in-out infinite; }

@@ -81,6 +81,54 @@ function AnimatedCounter({ value, className }: { value: number; className?: stri
   return <span className={className}>{display}</span>
 }
 
+/**
+ * "Queue Number 13 → 12 → ..." demo the brief asks for — shows what the
+ * QR flow's live queue actually looks like from the patient's side,
+ * ticking down once when it scrolls into view (not on an endless loop —
+ * this is a fixed demo of one real state transition, not ambient noise).
+ */
+function LiveQueueDemo() {
+  const [tokensAhead, setTokensAhead] = useState(4)
+  const hasRun = useRef(false)
+
+  const startCountdown = () => {
+    if (hasRun.current) return
+    hasRun.current = true
+    let count = 4
+    const interval = setInterval(() => {
+      count -= 1
+      setTokensAhead(Math.max(0, count))
+      if (count <= 0) clearInterval(interval)
+    }, 1100)
+  }
+
+  return (
+    <motion.div
+      onViewportEnter={startCountdown}
+      viewport={{ once: true, amount: 0.5 }}
+      className="w-full max-w-[220px] p-4 bg-white rounded-2xl border border-slate-200 shadow-lg text-center space-y-2">
+      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Your Live Queue</span>
+      <div className="flex items-center justify-center gap-2">
+        <QrCode size={16} className="text-[#4361EE]" />
+        <motion.span
+          key={tokensAhead}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-2xl font-black text-[#18233D] font-mono"
+        >
+          Token 13
+        </motion.span>
+      </div>
+      <p className="text-[10px] text-[#5E687B]">
+        <motion.span key={`n-${tokensAhead}`} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="font-bold text-emerald-600">
+          {tokensAhead}
+        </motion.span>{' '}
+        patients ahead of you
+      </p>
+    </motion.div>
+  )
+}
+
 interface PatientRow {
   id: string
   time: string
@@ -1128,9 +1176,15 @@ export default function LandingPage() {
       <section id="qr-booking" className="py-24 bg-gradient-to-b from-white via-indigo-50/30 to-white px-6">
         <div className="max-w-[1360px] mx-auto bg-white/70 backdrop-blur-xl rounded-3xl border border-white shadow-2xl p-8 sm:p-14">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            {/* Left: Realistic Acrylic QR Standee Mockup */}
-            <div className="lg:col-span-5 flex justify-center">
-              <div className="w-64 bg-gradient-to-b from-white to-slate-50 p-5 rounded-2xl border-2 border-slate-200 shadow-2xl text-center space-y-3 relative">
+            {/* Left: Realistic Acrylic QR Standee Mockup + live queue demo */}
+            <motion.div
+              initial={{ opacity: 0, x: -24 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 26 }}
+              className="lg:col-span-5 flex flex-col items-center gap-5"
+            >
+              <div className="w-64 bg-gradient-to-b from-white to-slate-50 p-5 rounded-2xl border-2 border-slate-200 shadow-2xl text-center space-y-3 relative overflow-hidden">
                 <div className="w-12 h-1 bg-slate-300 rounded-full mx-auto" />
                 <div className="flex items-center justify-center gap-2">
                   <img src="/assets/brand-icon.png" alt="Logo" className="w-5 h-5 object-contain" />
@@ -1142,24 +1196,34 @@ export default function LandingPage() {
                   <h4 className="text-sm font-black text-[#18233D]">Scan for Live Digital Token</h4>
                 </div>
 
-                {/* Scannable QR Graphic */}
-                <div className="w-40 h-40 mx-auto bg-white p-2.5 rounded-xl border border-slate-200 shadow-inner flex items-center justify-center">
+                {/* Scannable QR Graphic with a passing scan-line */}
+                <div className="w-40 h-40 mx-auto bg-white p-2.5 rounded-xl border border-slate-200 shadow-inner flex items-center justify-center relative overflow-hidden">
                   <img
                     src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://medrapidly.com/book/QR-METROCARE"
                     alt="Scan Hospital QR"
                     className="w-full h-full object-contain"
                   />
+                  <div className="animate-qr-scan absolute left-0 right-0 h-8 bg-gradient-to-b from-transparent via-emerald-400/40 to-transparent" />
                 </div>
 
                 <div className="text-[10px] text-[#4361EE] font-bold bg-indigo-50 py-1 px-2 rounded-lg border border-indigo-100">
                   Powered by Medtech Fixaters
                 </div>
               </div>
-            </div>
 
-            {/* Right: 5-Step Vertical Flow */}
+              {/* Live queue ticking demo — "13 → 12 → 11..." the brief asks
+                  for, showing what the QR flow actually produces */}
+              <LiveQueueDemo />
+            </motion.div>
+
+            {/* Right: 5-Step Vertical Flow, connected by a scroll-drawn line */}
             <div className="lg:col-span-7 space-y-6 text-left">
-              <div className="space-y-2">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.6 }}
+                className="space-y-2"
+              >
                 <span className="text-xs font-bold uppercase tracking-widest text-[#4361EE] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
                   QR-Based Appointment Booking
                 </span>
@@ -1169,9 +1233,17 @@ export default function LandingPage() {
                 <p className="text-sm text-[#5E687B]">
                   Every hospital receives its own unique cryptographic QR code for patient appointment booking and automated triage.
                 </p>
-              </div>
+              </motion.div>
 
-              <div className="space-y-3 pt-2">
+              <motion.div
+                initial="hidden"
+                whileInView="show"
+                viewport={{ once: true, amount: 0.2 }}
+                variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12 } } }}
+                className="relative space-y-3 pt-2"
+              >
+                {/* Connecting line, drawn top-to-bottom behind the steps */}
+                <div className="absolute left-[19px] top-3 bottom-3 w-px bg-gradient-to-b from-indigo-200 via-indigo-200 to-transparent -z-0" />
                 {[
                   { step: '01', title: 'Scan Hospital QR', desc: 'Patient scans the physical clinic standee with any smartphone camera.' },
                   { step: '02', title: 'Select Appointment Date', desc: 'Choose today for immediate OPD queue, or book an upcoming date.' },
@@ -1179,7 +1251,11 @@ export default function LandingPage() {
                   { step: '04', title: 'Select Available Doctor', desc: 'System displays only doctors active and on duty for that date.' },
                   { step: '05', title: 'Receive Live Queue Token', desc: 'Permanent token number generated with zero duplicate collisions.' },
                 ].map((st, i) => (
-                  <div key={i} className="flex items-start gap-4 p-3 rounded-xl bg-white/90 border border-slate-200/80 shadow-sm hover:border-indigo-300 transition">
+                  <motion.div
+                    key={i}
+                    variants={{ hidden: { opacity: 0, x: -16 }, show: { opacity: 1, x: 0, transition: { type: 'spring', stiffness: 260, damping: 24 } } }}
+                    className="relative flex items-start gap-4 p-3 rounded-xl bg-white/90 border border-slate-200/80 shadow-sm hover:border-indigo-300 hover:-translate-y-0.5 transition-all"
+                  >
                     <span className="w-8 h-8 rounded-full bg-indigo-50 text-[#4361EE] font-black text-xs flex items-center justify-center shrink-0 border border-indigo-100 font-mono">
                       {st.step}
                     </span>
@@ -1187,9 +1263,9 @@ export default function LandingPage() {
                       <h4 className="text-xs font-black text-[#18233D]">{st.title}</h4>
                       <p className="text-[11px] text-[#5E687B]">{st.desc}</p>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             </div>
           </div>
         </div>
