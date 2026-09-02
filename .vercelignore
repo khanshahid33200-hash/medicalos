@@ -17,3 +17,10 @@ venv/
 .venv/
 dataconnect/
 med-rapidly/
+node_modules/
+webapp/node_modules/
+webapp/dist/
+.agents/
+.gemini/
+scratch/
+
