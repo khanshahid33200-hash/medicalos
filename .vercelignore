@@ -1,0 +1,19 @@
+# This deployment is the static webapp/ frontend only (see vercel.json).
+# Vercel auto-detects Python and deploys any .py file it finds as a
+# serverless function purely from the presence of pyproject.toml at the
+# repo root -- that's the FastAPI backend meant for local dev
+# (VITE_API_URL=http://localhost:8000 in webapp/.env), not a Vercel
+# function, and it crashes when invoked serverless (no DB pool, no async
+# startup). Excluding these keeps Vercel's auto-detection from touching
+# them at all.
+clinic_os/
+pyproject.toml
+uv.lock
+poetry.lock
+requirements*.txt
+migrations/
+tests/
+venv/
+.venv/
+dataconnect/
+med-rapidly/
