@@ -19,7 +19,12 @@ import {
   completeConsultation,
   subscribeToDoctorAppointments,
   getDoctorStats,
+  getPatientProfile,
+  updatePatientProfile,
+  getPatientVisitHistory,
   type DoctorAppointment,
+  type PatientProfile,
+  type PatientVisit,
 } from '../lib/doctorAppointments'
 
 interface ClinicalQueuePatient {
@@ -197,24 +202,83 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
   const nextPatient = queueList.find(q => q.status === 'Next' || q.status === 'Waiting') || queueList[1]
   const [selectedPatientRecord, setSelectedPatientRecord] = useState<ClinicalQueuePatient | null>(null)
 
+  // Patient Record modal: editable profile + this doctor's own visit
+  // history with this patient, on one screen. Loaded from Supabase when
+  // the modal opens — patients/appointments/consultations/prescriptions
+  // RLS ("Doctor view/update own patients", doctor_id = auth.uid() on the
+  // visit tables) scopes all of it to patients this doctor has actually
+  // seen, and to this doctor's own notes only.
+  const [patientEditForm, setPatientEditForm] = useState<Partial<PatientProfile>>({})
+  const [patientHistory, setPatientHistory] = useState<PatientVisit[]>([])
+  const [patientRecordLoading, setPatientRecordLoading] = useState(false)
+  const [patientRecordSaving, setPatientRecordSaving] = useState(false)
+
+  useEffect(() => {
+    if (!showPatientDetailsModal || !selectedPatientRecord?.patient_id || !doctorId) return
+    setPatientRecordLoading(true)
+    Promise.all([
+      getPatientProfile(selectedPatientRecord.patient_id),
+      getPatientVisitHistory(selectedPatientRecord.patient_id, doctorId),
+    ]).then(([profile, history]) => {
+      setPatientEditForm(profile || {})
+      setPatientHistory(history)
+      setPatientRecordLoading(false)
+    })
+  }, [showPatientDetailsModal, selectedPatientRecord?.patient_id, doctorId])
+
+  const handleSavePatientProfile = async () => {
+    if (!selectedPatientRecord?.patient_id) return
+    setPatientRecordSaving(true)
+    const result = await updatePatientProfile(selectedPatientRecord.patient_id, {
+      name: patientEditForm.name,
+      phone: patientEditForm.phone,
+      age: patientEditForm.age,
+      gender: patientEditForm.gender,
+      allergies: patientEditForm.allergies,
+      known_diseases: patientEditForm.known_diseases,
+      address: patientEditForm.address,
+    })
+    setPatientRecordSaving(false)
+    if (!result.success) {
+      setNotice(`⚠ Could not save patient details: ${result.error || 'unknown error'}`)
+      setTimeout(() => setNotice(null), 5000)
+      return
+    }
+    setNotice('✓ Patient details updated.')
+    setTimeout(() => setNotice(null), 3000)
+    await refreshQueue()
+  }
+
   // Filters & Searches
   const [queueFilter, setQueueFilter] = useState<'all' | 'consulting' | 'waiting' | 'completed'>('all')
   const [queueSearch, setQueueSearch] = useState('')
   const [appointmentTab, setAppointmentTab] = useState<'todays' | 'upcoming' | 'completed' | 'cancelled'>('todays')
   const [patientSearch, setPatientSearch] = useState('')
 
-  // Prescription Form State
-  const [rxForm, setRxForm] = useState({
-    diagnosis: 'Acute Coronary Syndrome - Mild Angina',
-    medicines: [
-      { name: 'Tab. Atorvastatin 20mg', dosage: '0-0-1 (Night)', duration: '30 Days', instruction: 'After Dinner' },
-      { name: 'Tab. Aspirin 75mg', dosage: '1-0-0 (Morning)', duration: '30 Days', instruction: 'After Breakfast' },
-      { name: 'Tab. Metoprolol 25mg', dosage: '1-0-1 (Twice Daily)', duration: '15 Days', instruction: 'Before Meals' }
-    ],
-    labTests: 'Lipid Profile, 12-Lead ECG, Serum Creatinine',
-    advice: 'Low sodium diet, brisk walking 20 mins, avoid strenuous physical strain.',
-    followUp: '7 Days'
+  // Prescription Form State — starts BLANK, not pre-filled with a fake
+  // diagnosis and 3 canned medicines. It used to default to a fabricated
+  // "Acute Coronary Syndrome - Mild Angina" prescription that never got
+  // reset between patients (every 'Start Consultation' / 'Prescription'
+  // button just called setShowRxModal(true) with no reset at all) — since
+  // Save now writes a real consultations/prescriptions row, a rushed
+  // doctor clicking through without editing could have filed that
+  // fabricated diagnosis against a real patient's real record.
+  const blankRxForm = () => ({
+    diagnosis: '',
+    medicines: [] as { name: string; dosage: string; duration: string; instruction: string }[],
+    labTests: '',
+    advice: '',
+    followUp: '',
   })
+  const [rxForm, setRxForm] = useState(blankRxForm())
+
+  // Opens the Rx modal blank for whichever patient is currently in
+  // consultation — diagnosis, medicines, and advice must always be the
+  // doctor's own entry for this specific patient, never carried over.
+  const openRxModalForCurrentPatient = () => {
+    setRxForm(blankRxForm())
+    setShowRxModal(true)
+  }
 
   // Doctor OPD Profile & Settings Form State
   const [profileForm, setProfileForm] = useState({
@@ -390,12 +454,14 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
   ]
 
   const applyTemplate = (tmpl: typeof clinicalTemplates[0]) => {
+    const followUpDate = new Date()
+    followUpDate.setDate(followUpDate.getDate() + 7)
     setRxForm({
       diagnosis: tmpl.diagnosis,
       medicines: tmpl.medicines,
       labTests: 'Routine Blood Panel (CBC, LFT, KFT)',
       advice: tmpl.advice,
-      followUp: '7 Days'
+      followUp: followUpDate.toISOString().split('T')[0]
     })
     setShowRxModal(true)
     setNotice(`⚡ Applied template: ${tmpl.title}`)
@@ -885,7 +951,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                     <div className="grid grid-cols-4 gap-3 pt-1">
                       {[
                         { label: 'New Consultation', icon: '+', bg: 'bg-indigo-50 text-indigo-600', action: () => { setActiveNav('consultations'); navigate('/consultations', { replace: true }); } },
-                        { label: 'Prescription', icon: 'Rx', bg: 'bg-emerald-50 text-emerald-600', action: () => setShowRxModal(true) },
+                        { label: 'Prescription', icon: 'Rx', bg: 'bg-emerald-50 text-emerald-600', action: () => openRxModalForCurrentPatient() },
                         { label: 'Medical Certificate', icon: '🛡️', bg: 'bg-blue-50 text-blue-600', action: () => setShowCertModal(true) },
                         { label: 'Lab Test Advice', icon: '🧪', bg: 'bg-amber-50 text-amber-600', action: () => setShowLabModal(true) },
                         { label: 'Follow Up', icon: '📅', bg: 'bg-rose-50 text-rose-600', action: () => { setActiveNav('follow-ups'); navigate('/follow-ups', { replace: true }); } },
@@ -1078,7 +1144,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                   </div>
 
                   <button
-                    onClick={() => setShowRxModal(true)}
+                    onClick={() => openRxModalForCurrentPatient()}
                     className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition"
                   >
                     <Stethoscope size={16} />
@@ -1263,7 +1329,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                               <Volume2 size={13} /> Call
                             </button>
                             <button
-                              onClick={() => setShowRxModal(true)}
+                              onClick={() => openRxModalForCurrentPatient()}
                               title="Start Consultation & Rx"
                               className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition flex items-center gap-1"
                             >
@@ -1473,7 +1539,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowRxModal(true)}
+                    onClick={() => openRxModalForCurrentPatient()}
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow transition"
                   >
                     Open 30-Sec Rx Builder →
@@ -1551,7 +1617,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                 </div>
 
                 <button
-                  onClick={() => setShowRxModal(true)}
+                  onClick={() => openRxModalForCurrentPatient()}
                   className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow flex items-center gap-2 transition"
                 >
                   <Plus size={16} /> New Prescription
@@ -1997,6 +2063,29 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Lab Tests / Investigations</label>
+                  <input
+                    type="text"
+                    value={rxForm.labTests}
+                    onChange={e => setRxForm(p => ({ ...p, labTests: e.target.value }))}
+                    placeholder="e.g. CBC, Lipid Profile"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Follow-up Date</label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={rxForm.followUp}
+                    onChange={e => setRxForm(p => ({ ...p, followUp: e.target.value }))}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
@@ -2020,43 +2109,151 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
       {/* ─── MODAL: PATIENT DETAILS ─── */}
       {showPatientDetailsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-black text-base text-slate-900">Patient Electronic Health Record</h3>
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="font-black text-base text-slate-900">Patient Record</h3>
+                <p className="text-[11px] text-slate-400 font-medium">Profile, details, and your visit history with this patient — one screen.</p>
+              </div>
               <button onClick={() => setShowPatientDetailsModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 font-black text-base flex items-center justify-center">
-                  CC-0{selectedPatientRecord?.token_number ?? currentPatient?.token_number ?? '—'}
-                </div>
-                <div>
-                  <h4 className="font-black text-sm text-slate-900">{selectedPatientRecord?.patient_name || currentPatient?.patient_name}</h4>
-                  <p className="text-slate-500">{selectedPatientRecord?.age || currentPatient?.age} Yrs, {selectedPatientRecord?.gender || currentPatient?.gender} • {selectedPatientRecord?.phone || currentPatient?.phone}</p>
-                </div>
-              </div>
+            <div className="p-6 space-y-5 text-xs overflow-y-auto">
+              {patientRecordLoading ? (
+                <p className="text-slate-400 text-center py-8">Loading patient record…</p>
+              ) : (
+                <>
+                  {/* Editable Profile */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">Profile & Details</h4>
+                      <span className="text-[10px] font-bold text-indigo-600">
+                        CC-0{selectedPatientRecord?.token_number ?? currentPatient?.token_number ?? '—'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Full Name</label>
+                        <input
+                          type="text"
+                          value={patientEditForm.name || ''}
+                          onChange={e => setPatientEditForm(p => ({ ...p, name: e.target.value }))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Phone</label>
+                        <input
+                          type="text"
+                          value={patientEditForm.phone || ''}
+                          onChange={e => setPatientEditForm(p => ({ ...p, phone: e.target.value }))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Age</label>
+                        <input
+                          type="number"
+                          value={patientEditForm.age ?? ''}
+                          onChange={e => setPatientEditForm(p => ({ ...p, age: e.target.value ? Number(e.target.value) : null }))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Gender</label>
+                        <select
+                          value={patientEditForm.gender || ''}
+                          onChange={e => setPatientEditForm(p => ({ ...p, gender: e.target.value }))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                        >
+                          <option value="">—</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1 col-span-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Known Allergies</label>
+                        <input
+                          type="text"
+                          value={patientEditForm.allergies || ''}
+                          onChange={e => setPatientEditForm(p => ({ ...p, allergies: e.target.value }))}
+                          placeholder="e.g. Penicillin, Sulfa Drugs"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                        />
+                      </div>
+                      <div className="space-y-1 col-span-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Known Chronic Conditions</label>
+                        <input
+                          type="text"
+                          value={patientEditForm.known_diseases || ''}
+                          onChange={e => setPatientEditForm(p => ({ ...p, known_diseases: e.target.value }))}
+                          placeholder="e.g. Diabetes, Hypertension"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                        />
+                      </div>
+                      <div className="space-y-1 col-span-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Address</label>
+                        <input
+                          type="text"
+                          value={patientEditForm.address || ''}
+                          onChange={e => setPatientEditForm(p => ({ ...p, address: e.target.value }))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleSavePatientProfile}
+                      disabled={patientRecordSaving}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold rounded-xl transition"
+                    >
+                      {patientRecordSaving ? 'Saving…' : 'Save Patient Details'}
+                    </button>
+                  </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Chief Complaint</span>
-                <p className="font-bold text-slate-800">{selectedPatientRecord?.chief_complaint || currentPatient?.chief_complaint}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="p-2.5 bg-slate-50 rounded-xl">
-                  <span className="text-slate-400 font-bold block">Blood Pressure:</span>
-                  <span className="font-black text-slate-800">{selectedPatientRecord?.vitals.bp || currentPatient?.vitals.bp}</span>
-                </div>
-                <div className="p-2.5 bg-slate-50 rounded-xl">
-                  <span className="text-slate-400 font-bold block">Heart Rate:</span>
-                  <span className="font-black text-slate-800">{selectedPatientRecord?.vitals.pulse || currentPatient?.vitals.pulse}</span>
-                </div>
-              </div>
+                  {/* Previous Visit History */}
+                  <div className="space-y-2 pt-3 border-t border-slate-100">
+                    <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
+                      Previous Visits ({patientHistory.length})
+                    </h4>
+                    {patientHistory.length === 0 ? (
+                      <p className="text-slate-400 text-center py-6">No previous visits with you on record yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {patientHistory.map(visit => (
+                          <div key={visit.appointmentId} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-800">{visit.appointmentDate}</span>
+                              <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-full text-[10px] font-bold text-slate-600 capitalize">
+                                {visit.status.replace('_', ' ')}
+                              </span>
+                            </div>
+                            {visit.symptoms && (
+                              <p className="text-slate-600"><span className="font-bold text-slate-400">Symptoms:</span> {visit.symptoms}</p>
+                            )}
+                            {visit.diagnosis && (
+                              <p className="text-slate-800 font-bold">🩺 {visit.diagnosis}</p>
+                            )}
+                            {visit.medicines.length > 0 && (
+                              <p className="text-slate-600">
+                                <span className="font-bold text-slate-400">Rx:</span> {visit.medicines.map(m => m.name).join(', ')}
+                              </p>
+                            )}
+                            {visit.followUp && (
+                              <p className="text-indigo-600 font-semibold">Follow-up: {visit.followUp}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end shrink-0">
               <button
                 onClick={() => setShowPatientDetailsModal(false)}
                 className="px-4 py-2 bg-slate-100 font-bold text-xs rounded-xl"

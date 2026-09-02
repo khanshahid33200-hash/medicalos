@@ -353,3 +353,111 @@ export function subscribeToDoctorAppointments(doctorId: string, onChange: () => 
     supabase.removeChannel(channel)
   }
 }
+
+export interface PatientProfile {
+  id: string
+  name: string
+  phone: string
+  age: number | null
+  gender: string | null
+  allergies: string | null
+  known_diseases: string | null
+  address: string | null
+}
+
+/**
+ * Full profile for one patient. RLS ("Doctor view own patients") only
+ * allows this when the caller actually has an appointment with the
+ * patient — a doctor cannot browse the full hospital patient database
+ * through this, only patients they've actually seen.
+ */
+export async function getPatientProfile(patientId: string): Promise<PatientProfile | null> {
+  if (!patientId) return null
+  const { data, error } = await supabase
+    .from('patients')
+    .select('id, name, phone, age, gender, allergies, known_diseases, address')
+    .eq('id', patientId)
+    .maybeSingle()
+
+  if (error) {
+    console.warn('getPatientProfile error:', error.message)
+    return null
+  }
+  return data
+}
+
+/**
+ * Updates a patient's own profile fields. RLS ("Doctor update own
+ * patients") restricts this to patients the doctor has an appointment
+ * with, same as read access.
+ */
+export async function updatePatientProfile(
+  patientId: string,
+  updates: Partial<Pick<PatientProfile, 'name' | 'phone' | 'age' | 'gender' | 'allergies' | 'known_diseases' | 'address'>>
+): Promise<{ success: boolean; error?: string }> {
+  if (!patientId) return { success: false, error: 'Missing patient id.' }
+  const { error } = await supabase.from('patients').update(updates).eq('id', patientId)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export interface PatientVisit {
+  appointmentId: string
+  appointmentDate: string
+  status: AppointmentStatus
+  symptoms: string | null
+  diagnosis: string | null
+  clinicalNotes: string | null
+  medicines: { name: string; dosage: string; duration: string; instruction: string }[]
+  advice: string | null
+  followUp: string | null
+}
+
+/**
+ * This doctor's own visit history with one patient — every appointment
+ * this doctor has had with them, each merged with its consultation/
+ * prescription if one was written. Scoped to doctor_id = this doctor (RLS
+ * enforces the same server-side): a doctor sees their own past visits
+ * with a shared patient, not every other doctor's notes on that patient.
+ */
+export async function getPatientVisitHistory(patientId: string, doctorId: string): Promise<PatientVisit[]> {
+  if (!patientId || !doctorId) return []
+
+  const [{ data: appts, error: apptErr }, { data: rx, error: rxErr }] = await Promise.all([
+    supabase
+      .from('appointments')
+      .select('id, appointment_date, status, symptoms')
+      .eq('patient_id', patientId)
+      .eq('doctor_id', doctorId)
+      .order('appointment_date', { ascending: false }),
+    supabase
+      .from('prescriptions')
+      .select('appointment_id, medicines, advice, follow_up, consultation:consultations(diagnosis, clinical_notes)')
+      .eq('patient_id', patientId)
+      .eq('doctor_id', doctorId),
+  ])
+
+  if (apptErr) console.warn('getPatientVisitHistory appointments error:', apptErr.message)
+  if (rxErr) console.warn('getPatientVisitHistory prescriptions error:', rxErr.message)
+
+  const rxByAppointment = new Map<string, any>()
+  for (const row of rx || []) {
+    if (row.appointment_id) rxByAppointment.set(row.appointment_id, row)
+  }
+
+  return (appts || []).map(a => {
+    const prescription = rxByAppointment.get(a.id)
+    const consultation = Array.isArray(prescription?.consultation) ? prescription.consultation[0] : prescription?.consultation
+    return {
+      appointmentId: a.id,
+      appointmentDate: a.appointment_date,
+      status: a.status,
+      symptoms: a.symptoms ?? null,
+      diagnosis: consultation?.diagnosis ?? null,
+      clinicalNotes: consultation?.clinical_notes ?? null,
+      medicines: prescription?.medicines || [],
+      advice: prescription?.advice ?? null,
+      followUp: prescription?.follow_up ?? null,
+    }
+  })
+}
