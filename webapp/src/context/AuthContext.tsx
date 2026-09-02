@@ -400,8 +400,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
 
         if (fnError) {
-          console.warn('admin-ops create_doctor_auth_user notice:', fnError.message)
-          failureReasons.push(`Edge Function: ${fnError.message}`)
+          // supabase-js's FunctionsHttpError only carries a generic
+          // "Edge Function returned a non-2xx status code" in .message —
+          // the real reason is in the JSON body of the error response,
+          // reachable only via .context, and has to be read separately.
+          let detail = fnError.message
+          try {
+            const body = await fnError.context?.json?.()
+            if (body?.error) detail = body.error
+          } catch {
+            // context wasn't JSON (e.g. a raw network failure) — keep the generic message
+          }
+          console.warn('admin-ops create_doctor_auth_user notice:', detail)
+          failureReasons.push(`Edge Function: ${detail}`)
         } else if (fnData?.success && fnData?.user_id) {
           createdUserId = fnData.user_id
         } else if (fnData && !fnData.success) {
@@ -413,43 +424,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         failureReasons.push(`Edge Function unreachable: ${adminErr?.message || adminErr}`)
       }
 
-      // Step B: Fallback to standard signUp if the Edge Function was
-      // unreachable/unavailable — this path relies on RLS + the
-      // handle_new_user trigger, same as before, and never bypasses RLS.
-      if (!createdUserId) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password: cleanPass,
-          options: {
-            data: {
-              full_name: metadata.name,
-              role: metadata.role,
-              doctor_code: docCode,
-              hospital_id: validHospitalId,
-              department: metadata.dept || 'General',
-            },
-          },
-        })
-
-        if (signUpError) {
-          console.warn('Supabase Auth signUp notice:', signUpError.message)
-          failureReasons.push(`signUp: ${signUpError.message}`)
-        } else if (data?.user && data.user.identities && data.user.identities.length === 0) {
-          // Supabase returns a non-null user with an empty identities array
-          // (no error) when the email is already registered, to avoid
-          // leaking which emails exist — this is NOT a successful signup.
-          failureReasons.push('signUp: an account with this email already exists.')
-        } else if (data?.user) {
-          createdUserId = data.user.id
-        }
-      }
-
-      // NOTE: no more fake `user-${Date.now()}` fallback id — if Supabase
-      // Auth genuinely failed to create/return a user, there is no real
-      // auth.users row to attach a profile to, and inserting one under a
-      // made-up id would violate the profiles->auth.users FK (or silently
-      // create an orphaned, inaccessible record). Surface a real error
-      // instead of pretending registration succeeded.
+      // There used to be a Step B here that fell back to client-side
+      // supabase.auth.signUp() when the edge function failed. That is
+      // deliberately gone: calling signUp() from the browser SILENTLY
+      // REPLACES the caller's current session with the newly created
+      // user's session (a well-known Supabase gotcha). For an
+      // admin-initiated privileged creation flow like this one, that meant
+      // a super_admin creating a second hospital's login would suddenly,
+      // invisibly become logged in AS the account they just created —
+      // explaining a real bug where every hospital after the first failed
+      // with RLS violations. Privileged creation must go only through the
+      // service-role edge function, which never touches the caller's
+      // session; if it fails, fail loudly with the real reason instead of
+      // falling back to something that can hijack the session.
       if (!createdUserId) {
         throw new Error(
           failureReasons.length > 0
@@ -458,34 +445,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
       }
       const finalUserId = createdUserId
-
-      // Step C: only needed for the Step-B fallback path (edge function's
-      // create_doctor_auth_user already writes doctor_details, and the
-      // handle_new_user trigger already writes profiles from user_metadata
-      // on auth.users insert for BOTH paths). Uses the RLS-respecting
-      // client — the caller's own session must be allowed to write this
-      // row per the "Hospital Admin manage hospital profiles" policy.
-      try {
-        if (metadata.role === 'doctor') {
-          await supabase.from('doctor_details').upsert([
-            {
-              id: finalUserId,
-              doctor_code: docCode,
-              hospital_id: validHospitalId,
-              name: metadata.name,
-              email: cleanEmail,
-              specialization: metadata.specialization || 'Consultant Specialist',
-              room_number: metadata.room || 'Room 101',
-              daily_patient_limit: metadata.limit || 30,
-              consultation_fee: metadata.fee || 500,
-              availability_status: 'active',
-              is_active: true,
-            },
-          ])
-        }
-      } catch (dbErr) {
-        console.warn('doctor_details upsert notice:', dbErr)
-      }
+      // doctor_details (for role === 'doctor') is already written by the
+      // edge function's create_doctor_auth_user action — nothing left to
+      // do here now that the client-side fallback path is gone.
 
       // Step D: Always synchronize to Local Registry for guaranteed instant offline/resilient sign-in
       try {
