@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import apiClient from './api/client'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -113,6 +113,14 @@ function App() {
         <Route path="/doctor" element={<Login />} />
         <Route path="/doctor/login" element={<Login />} />
         <Route path="/login" element={<Login />} />
+
+        {/* Dedicated single-role login portals — each locks the role
+            toggle and rejects a correctly-authenticated account whose
+            real role doesn't match this portal (see Login.tsx lockedRole
+            and AuthContext's loginWithSupabase wrong-portal check). */}
+        <Route path="/login/doctordashboard" element={<Login lockedRole="doctor" />} />
+        <Route path="/login/hospitaladministration" element={<Login lockedRole="hospital_admin" />} />
+        <Route path="/login/platformadmin" element={<Navigate to="/mrshahidbabu" replace />} />
         <Route path="/hospitaladminmedtech" element={<HospitalAdminPage />} />
         <Route path="/login/hospitaladminmedtech" element={<HospitalAdminPage />} />
         <Route path="/login/hospitaladmin009" element={<HospitalAdminPage />} />
@@ -124,33 +132,40 @@ function App() {
         <Route path="/mrshahidbabu" element={<OwnerAdmin />} />
         <Route path="/MRSHAHIDBABU" element={<OwnerAdmin />} />
 
-        {/* Medtech Fixaters Hospital Administration Dashboard (design.md) */}
-        <Route path="/hospitaldashboard" element={<HospitalDashboardHome />} />
-        <Route path="/hospitaldashboard/dashboard" element={<HospitalDashboardHome />} />
-        <Route path="/hospitaldashboard/appointments" element={<HospitalAppointmentsPage />} />
-        <Route path="/hospitaldashboard/live-queue" element={<HospitalLiveQueuePage />} />
-        <Route path="/hospitaldashboard/patients" element={<HospitalPatientsPage />} />
-        <Route path="/hospitaldashboard/doctors" element={<HospitalDoctorsPage />} />
-        <Route path="/hospitaldashboard/departments" element={<HospitalDepartmentsPage />} />
-        <Route path="/hospitaldashboard/reports" element={<HospitalReportsPage />} />
-        <Route path="/hospitaldashboard/analytics" element={<HospitalAnalyticsPage />} />
-        <Route path="/hospitaldashboard/notifications" element={<HospitalNotificationsPage />} />
-        <Route path="/hospitaldashboard/settings" element={<HospitalSettingsPage />} />
-        <Route path="/hospitaldashboard/settings/hospital-profile" element={<HospitalSettingsPage />} />
-        <Route path="/hospitaldashboard/users-roles" element={<HospitalUsersRolesPage />} />
-        <Route path="/hospitaldashboard/qr" element={<HospitalQRManagementPage />} />
+        {/* Medtech Fixaters Hospital Administration Dashboard (design.md)
+            These pages (HospitalDashboardHome and siblings) have no login
+            gate of their own — they assume an authenticated hospital_admin
+            session and query Supabase directly. Previously NONE of these
+            routes were wrapped in ProtectedRoute at all, meaning an
+            unauthenticated visitor got an empty shell (RLS blocks anon
+            reads) but a logged-in DOCTOR could open the full hospital-admin
+            view for their own hospital, since nothing here checked role. */}
+        <Route path="/hospitaldashboard" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalDashboardHome /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/dashboard" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalDashboardHome /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/appointments" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalAppointmentsPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/live-queue" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalLiveQueuePage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/patients" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalPatientsPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/doctors" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalDoctorsPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/departments" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalDepartmentsPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/reports" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalReportsPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/analytics" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalAnalyticsPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/notifications" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalNotificationsPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/settings" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalSettingsPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/settings/hospital-profile" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalSettingsPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/users-roles" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalUsersRolesPage /></ProtectedRoute>} />
+        <Route path="/hospitaldashboard/qr" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalQRManagementPage /></ProtectedRoute>} />
 
-        {/* Seamless Legacy Hospital Admin Routes */}
-        <Route path="/hospitaladmin-dashboard" element={<HospitalDashboardHome />} />
-        <Route path="/hospitaladmin/overview" element={<HospitalDashboardHome />} />
-        <Route path="/hospitaladmin/queues" element={<HospitalLiveQueuePage />} />
-        <Route path="/hospitaladmin/doctors" element={<HospitalDoctorsPage />} />
-        <Route path="/hospitaladmin/messages" element={<HospitalNotificationsPage />} />
-        <Route path="/hospitaladmin/qr" element={<HospitalQRManagementPage />} />
+        {/* Seamless Legacy Hospital Admin Routes — same underlying pages, same gate */}
+        <Route path="/hospitaladmin-dashboard" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalDashboardHome /></ProtectedRoute>} />
+        <Route path="/hospitaladmin/overview" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalDashboardHome /></ProtectedRoute>} />
+        <Route path="/hospitaladmin/queues" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalLiveQueuePage /></ProtectedRoute>} />
+        <Route path="/hospitaladmin/doctors" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalDoctorsPage /></ProtectedRoute>} />
+        <Route path="/hospitaladmin/messages" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalNotificationsPage /></ProtectedRoute>} />
+        <Route path="/hospitaladmin/qr" element={<ProtectedRoute requiredRole="hospital_admin"><HospitalQRManagementPage /></ProtectedRoute>} />
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="dashboard" />
             </ProtectedRoute>
           }
@@ -158,7 +173,7 @@ function App() {
         <Route
           path="/queue"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="queue" />
             </ProtectedRoute>
           }
@@ -166,7 +181,7 @@ function App() {
         <Route
           path="/appointments"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="appointments" />
             </ProtectedRoute>
           }
@@ -174,7 +189,7 @@ function App() {
         <Route
           path="/patients"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="patients" />
             </ProtectedRoute>
           }
@@ -182,7 +197,7 @@ function App() {
         <Route
           path="/consultations"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="consultations" />
             </ProtectedRoute>
           }
@@ -190,7 +205,7 @@ function App() {
         <Route
           path="/prescriptions"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="prescriptions" />
             </ProtectedRoute>
           }
@@ -198,7 +213,7 @@ function App() {
         <Route
           path="/templates"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="templates" />
             </ProtectedRoute>
           }
@@ -206,7 +221,7 @@ function App() {
         <Route
           path="/follow-ups"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="follow-ups" />
             </ProtectedRoute>
           }
@@ -214,7 +229,7 @@ function App() {
         <Route
           path="/reports"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="reports" />
             </ProtectedRoute>
           }
@@ -222,7 +237,7 @@ function App() {
         <Route
           path="/profile"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="profile" />
             </ProtectedRoute>
           }
@@ -230,7 +245,7 @@ function App() {
         <Route
           path="/settings"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="settings" />
             </ProtectedRoute>
           }
@@ -238,7 +253,7 @@ function App() {
         <Route
           path="/payments"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="reports" />
             </ProtectedRoute>
           }
@@ -246,7 +261,7 @@ function App() {
         <Route
           path="/history"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="patients" />
             </ProtectedRoute>
           }
@@ -254,7 +269,7 @@ function App() {
         <Route
           path="/qr-kiosk"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="doctor">
               <Dashboard initialTab="queue" />
             </ProtectedRoute>
           }

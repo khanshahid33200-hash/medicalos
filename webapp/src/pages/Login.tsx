@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   AlertCircle, Stethoscope, Building2, Lock, Mail,
   Eye, EyeOff, ArrowRight, ShieldCheck, Zap,
@@ -8,21 +8,35 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useSEO } from '../hooks/useSEO'
 
-export default function Login() {
+interface LoginProps {
+  // When set, this is a dedicated single-role portal (e.g.
+  // /login/doctordashboard, /login/hospitaladministration) — the role
+  // toggle is hidden and every login attempt is checked against exactly
+  // this role, rejecting a correctly-authenticated-but-wrong-role account
+  // instead of silently landing it on its own real dashboard.
+  lockedRole?: 'doctor' | 'hospital_admin'
+}
+
+export default function Login({ lockedRole }: LoginProps) {
   useSEO({
     title: 'Sign In — Clinical OS by MedTech Fixaters',
     description: 'Secure Doctor and Hospital Administrator sign-in portal for MedTech Fixaters Clinical OS.',
   })
 
   const navigate = useNavigate()
+  const location = useLocation()
   const { loginWithSupabase } = useAuth()
 
-  const [selectedRole, setSelectedRole] = useState<'doctor' | 'hospital_admin'>('doctor')
+  const [selectedRole, setSelectedRole] = useState<'doctor' | 'hospital_admin'>(lockedRole || 'doctor')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
-  const [error, setError] = useState('')
+  // Wrong-portal denials are delivered via router state by ProtectedRoute
+  // (manual URL access) or thrown directly by loginWithSupabase (wrong
+  // portal at login) — both land here as the same error banner.
+  const deniedState = (location.state as { message?: string } | null)?.message
+  const [error, setError] = useState(deniedState || '')
   const [isLoading, setIsLoading] = useState(false)
   const [showForgotModal, setShowForgotModal] = useState(false)
 
@@ -136,7 +150,16 @@ export default function Login() {
           
           {/* Top Bar: Return Link & Role Switcher */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            {/* Role Switcher Pill */}
+            {/* Role Switcher Pill — hidden on a dedicated single-role portal
+                (lockedRole set); that page IS the role, so there's nothing
+                to switch, and switching here was purely cosmetic anyway
+                since loginWithSupabase now rejects a mismatched role. */}
+            {lockedRole ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 text-xs font-extrabold">
+                {lockedRole === 'doctor' ? <Stethoscope size={15} /> : <Building2 size={15} />}
+                <span>{lockedRole === 'doctor' ? 'Doctor Portal' : 'Hospital Administration Portal'}</span>
+              </div>
+            ) : (
             <div className="p-1 bg-slate-100 rounded-2xl border border-slate-200/80 inline-flex items-center text-xs font-bold">
               <button
                 type="button"
@@ -163,6 +186,7 @@ export default function Login() {
                 <span>Hospital Admin</span>
               </button>
             </div>
+            )}
 
             <Link
               to="/"

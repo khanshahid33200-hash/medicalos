@@ -279,6 +279,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const hospStatus = hospObj?.status || 'active'
       const accStatus = profileData?.account_status || (profileData?.is_active ? 'active' : 'blocked')
 
+      // Wrong-portal rejection: a definitively-known role (from the real
+      // profiles row or auth metadata, not the expectedRole fallback used
+      // only when neither of those set a role) that doesn't match the
+      // portal being logged into must be rejected outright, not silently
+      // logged into its own real dashboard. Previously the caller
+      // (Login.tsx) just redirected based on whatever role came back,
+      // which meant the role-selector toggle on the login form was
+      // cosmetic — hospital admin credentials on the Doctor Portal (or
+      // vice versa) logged in successfully and landed on the correct
+      // dashboard for their real role instead of being told to use the
+      // right portal, and any authenticated user could then navigate
+      // straight to the other portal's URL since routes didn't check role.
+      const definitiveRole = profileData?.role || user.user_metadata?.role
+      if (expectedRole && definitiveRole && definitiveRole !== expectedRole && definitiveRole !== 'super_admin') {
+        await supabase.auth.signOut()
+        setIsLoading(false)
+        const portalName = definitiveRole === 'hospital_admin' ? 'Hospital Administration' : definitiveRole === 'doctor' ? 'Doctor' : definitiveRole
+        throw new Error(`Wrong portal. This account belongs to ${portalName}. Please use the ${portalName} login.`)
+      }
+
       // Layer 1 Check: Individual Profile Status
       if (profileData && (!profileData.is_active || accStatus !== 'active')) {
         await supabase.auth.signOut()
