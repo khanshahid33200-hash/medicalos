@@ -11,7 +11,7 @@ import {
   ChevronDown, Star, Shield, Database, Cpu, Smartphone,
   Layers, CheckCircle, Network, ArrowUpRight, Award, Zap
 } from 'lucide-react'
-import { motion, useScroll, useTransform, MotionValue } from 'framer-motion'
+import { motion, AnimatePresence, useScroll, useTransform, MotionValue } from 'framer-motion'
 import { useSEO } from '../hooks/useSEO'
 import PublicHeader from '../components/PublicHeader'
 
@@ -366,12 +366,20 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="bg-white rounded-3xl border border-[#E6E9F0] shadow-2xl shadow-slate-300/60 p-4 sm:p-5 relative overflow-hidden transition-all min-h-[460px]">
-              {simToast && (
-                <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-30 bg-[#18233D] text-white px-4 py-2 rounded-full text-xs font-bold shadow-2xl border border-indigo-500/30 flex items-center gap-2 animate-bounce">
-                  <Sparkles size={14} className="text-amber-400" />
-                  <span>{simToast}</span>
-                </div>
-              )}
+              <AnimatePresence>
+                {simToast && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -12, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+                    className="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-[#18233D] text-white px-4 py-2 rounded-full text-xs font-bold shadow-2xl border border-indigo-500/30 flex items-center gap-2"
+                  >
+                    <Sparkles size={14} className="text-amber-400" />
+                    <span>{simToast}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Mockup Header Bar */}
               <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
@@ -393,12 +401,17 @@ export default function LandingPage() {
                         setSimToast(`Switched to ${dept} OPD Station`)
                         setTimeout(() => setSimToast(null), 2000)
                       }}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
-                        selectedDept === dept
-                          ? 'bg-white text-[#4361EE] shadow-sm'
-                          : 'text-[#5E687B] hover:text-[#18233D]'
+                      className={`relative px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
+                        selectedDept === dept ? 'text-[#4361EE]' : 'text-[#5E687B] hover:text-[#18233D]'
                       }`}
                     >
+                      {selectedDept === dept && (
+                        <motion.span
+                          layoutId="dept-pill"
+                          transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+                          className="absolute inset-0 bg-white rounded-lg shadow-sm -z-10"
+                        />
+                      )}
                       {dept}
                     </button>
                   ))}
@@ -432,12 +445,17 @@ export default function LandingPage() {
                         setSimToast(`Opened ${tab.key} View`)
                         setTimeout(() => setSimToast(null), 1500)
                       }}
-                      className={`w-full text-left px-2.5 py-2 rounded-xl transition flex items-center gap-2 ${
-                        activeTab === tab.key
-                          ? 'bg-indigo-50 text-[#4361EE] font-bold shadow-sm'
-                          : 'hover:bg-slate-50'
+                      className={`relative w-full text-left px-2.5 py-2 rounded-xl transition flex items-center gap-2 ${
+                        activeTab === tab.key ? 'text-[#4361EE] font-bold' : 'hover:bg-slate-50'
                       }`}
                     >
+                      {activeTab === tab.key && (
+                        <motion.span
+                          layoutId="sidebar-pill"
+                          transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+                          className="absolute inset-0 bg-indigo-50 rounded-xl shadow-sm -z-10"
+                        />
+                      )}
                       {tab.icon}
                       <span>{tab.key}</span>
                       {activeTab === tab.key && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#4361EE]" />}
