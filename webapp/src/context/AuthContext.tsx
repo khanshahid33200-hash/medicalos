@@ -366,6 +366,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const validHospitalId = isUUID(metadata.hospital_id) ? metadata.hospital_id : null
 
     let createdUserId: string | null = null
+    // Collected so the real failure reason can reach the caller instead of
+    // a generic "please try again" — both steps below used to only
+    // console.warn their errors, which meant diagnosing a failure required
+    // opening DevTools every time.
+    const failureReasons: string[] = []
 
     try {
       // Step A: Creation via the server-side admin-ops Edge Function, which
@@ -396,13 +401,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (fnError) {
           console.warn('admin-ops create_doctor_auth_user notice:', fnError.message)
+          failureReasons.push(`Edge Function: ${fnError.message}`)
         } else if (fnData?.success && fnData?.user_id) {
           createdUserId = fnData.user_id
         } else if (fnData && !fnData.success) {
           console.warn('admin-ops create_doctor_auth_user rejected:', fnData.error)
+          failureReasons.push(`Edge Function: ${fnData.error}`)
         }
-      } catch (adminErr) {
+      } catch (adminErr: any) {
         console.warn('admin-ops invoke exception:', adminErr)
+        failureReasons.push(`Edge Function unreachable: ${adminErr?.message || adminErr}`)
       }
 
       // Step B: Fallback to standard signUp if the Edge Function was
@@ -425,8 +433,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (signUpError) {
           console.warn('Supabase Auth signUp notice:', signUpError.message)
-        }
-        if (data?.user) {
+          failureReasons.push(`signUp: ${signUpError.message}`)
+        } else if (data?.user && data.user.identities && data.user.identities.length === 0) {
+          // Supabase returns a non-null user with an empty identities array
+          // (no error) when the email is already registered, to avoid
+          // leaking which emails exist — this is NOT a successful signup.
+          failureReasons.push('signUp: an account with this email already exists.')
+        } else if (data?.user) {
           createdUserId = data.user.id
         }
       }
@@ -438,7 +451,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // create an orphaned, inaccessible record). Surface a real error
       // instead of pretending registration succeeded.
       if (!createdUserId) {
-        throw new Error('Could not create the account in Supabase Auth. Please try again.')
+        throw new Error(
+          failureReasons.length > 0
+            ? `Could not create the account: ${failureReasons.join(' | ')}`
+            : 'Could not create the account in Supabase Auth. Please try again.'
+        )
       }
       const finalUserId = createdUserId
 
