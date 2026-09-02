@@ -87,6 +87,101 @@ function AnimatedCounter({ value, className }: { value: number; className?: stri
  * ticking down once when it scrolls into view (not on an endless loop —
  * this is a fixed demo of one real state transition, not ambient noise).
  */
+const PINNED_STEPS = [
+  { icon: <QrCode size={40} />, title: 'Scan the hospital QR', desc: 'Any smartphone camera, no app required — the standee is the entire interface.' },
+  { icon: <Calendar size={40} />, title: 'Pick a date', desc: "Today's OPD queue, or a future date — the same flow either way." },
+  { icon: <Building2 size={40} />, title: 'Choose a department', desc: 'Only departments this hospital actually runs are shown.' },
+  { icon: <UserCheck size={40} />, title: 'Select an available doctor', desc: 'Only doctors on duty for that date and department appear.' },
+  { icon: <RefreshCw size={40} />, title: 'Get a live queue token', desc: 'One real appointment row, atomically numbered — no collisions.' },
+]
+
+/**
+ * Apple-product-page pinned scroll sequence: the section reserves
+ * steps.length * 100vh of scroll distance; its content stays pinned
+ * (position: sticky) for that whole distance while the active step
+ * advances with scroll position, instead of each step independently
+ * fading in as it crosses the viewport (the pattern used elsewhere on
+ * this page). Proof of concept for one section before deciding whether
+ * to use it more broadly.
+ */
+function PinnedQRSequence() {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({ target: containerRef, offset: ['start start', 'end end'] })
+  const [active, setActive] = useState(0)
+
+  useEffect(() => {
+    return scrollYProgress.on('change', (v) => {
+      const idx = Math.min(PINNED_STEPS.length - 1, Math.floor(v * PINNED_STEPS.length))
+      setActive(idx)
+    })
+  }, [scrollYProgress])
+
+  return (
+    <section ref={containerRef} style={{ height: `${PINNED_STEPS.length * 100}vh` }} className="relative bg-white">
+      <div className="sticky top-0 h-screen flex items-center px-6 overflow-hidden">
+        <div className="max-w-[1360px] mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          {/* Left: big crossfading icon + title for the active step */}
+          <div className="lg:col-span-6 relative h-64">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={active}
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -24 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className="absolute inset-0 flex flex-col items-start justify-center gap-4"
+              >
+                <div className="w-20 h-20 rounded-[20px] flex items-center justify-center" style={{ backgroundColor: '#E8E8E8', color: '#0080E6' }}>
+                  {PINNED_STEPS[active].icon}
+                </div>
+                <h3 className="font-habit-display font-medium text-3xl sm:text-4xl" style={{ color: '#000000' }}>
+                  {PINNED_STEPS[active].title}
+                </h3>
+                <p className="text-[18px] max-w-md" style={{ color: '#494D4D' }}>
+                  {PINNED_STEPS[active].desc}
+                </p>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Right: scrubbing step list — active step full-ink and scaled
+              up, others fade to faint-text, Apple-style "you are here" list */}
+          <div className="lg:col-span-6 space-y-1">
+            {PINNED_STEPS.map((step, i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  opacity: i === active ? 1 : 0.35,
+                  scale: i === active ? 1 : 0.97,
+                  x: i === active ? 8 : 0,
+                }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center gap-4 py-3"
+              >
+                <span
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium shrink-0 font-mono"
+                  style={{
+                    backgroundColor: i === active ? '#0080E6' : '#E8E8E8',
+                    color: i === active ? '#F7F7F7' : '#494D4D',
+                  }}
+                >
+                  {i + 1}
+                </span>
+                <span className="text-[18px] font-normal" style={{ color: i === active ? '#000000' : '#B8B8B8' }}>
+                  {step.title}
+                </span>
+              </motion.div>
+            ))}
+            <p className="text-[14px] pt-4" style={{ color: '#B8B8B8' }}>
+              Scroll to advance ↓
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function LiveQueueDemo() {
   const [tokensAhead, setTokensAhead] = useState(4)
   const hasRun = useRef(false)
@@ -281,7 +376,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white antialiased selection:bg-[#12A70A] selection:text-white" style={{ color: '#131515', fontFamily: "'Plus Jakarta Sans', Inter, sans-serif" }}>
+    <div className="min-h-screen bg-white antialiased selection:bg-[#0080E6] selection:text-white" style={{ color: '#131515', fontFamily: "'Plus Jakarta Sans', Inter, sans-serif" }}>
       {/* ─── NAVIGATION BAR (shared, animated on scroll) ─────── */}
       <PublicHeader />
 
@@ -293,10 +388,12 @@ export default function LandingPage() {
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           {/* LEFT COLUMN: HEADLINE, DESCRIPTION & ACTIONS
-              Habitline token spec: flat colors only (no gradients), Habit
-              Green #12A70A as the sole action color, pill geometry
-              (rounded 50px) on every button, chips at rounded-full with a
-              surface-muted #E8E8E8 fill, Poppins/500 for display type. */}
+              Habitline token spec (structure/type/shape), recolored to
+              #0080E6 — sampled from the actual logo — as the sole action
+              color instead of the reference's green: flat colors only
+              (no gradients), pill geometry (rounded 50px) on every
+              button, chips at rounded-full with a surface-muted #E8E8E8
+              fill, Poppins/500 for display type. */}
           <motion.div
             variants={heroContainer}
             initial="hidden"
@@ -319,7 +416,7 @@ export default function LandingPage() {
             >
               Your hospital.
               <br />
-              Connected <span style={{ color: '#12A70A' }}>digitally.</span>
+              Connected <span style={{ color: '#0080E6' }}>digitally.</span>
             </motion.h1>
 
             <motion.p variants={heroItem} className="text-[18px] font-normal leading-[1.4] max-w-lg" style={{ color: '#494D4D' }}>
@@ -333,7 +430,7 @@ export default function LandingPage() {
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setModalOpen(true)}
                 className="px-5 py-2.5 text-[15px] font-medium rounded-[50px] transition-shadow"
-                style={{ backgroundColor: '#12A70A', color: '#F7F7F7', boxShadow: 'rgba(18, 167, 10, 0.5) 0px 10px 15px 0px' }}
+                style={{ backgroundColor: '#0080E6', color: '#F7F7F7', boxShadow: 'rgba(0, 128, 230, 0.5) 0px 10px 15px 0px' }}
               >
                 Get Started Free
               </motion.button>
@@ -370,7 +467,7 @@ export default function LandingPage() {
 
             {/* Interactive Simulator Tip Card */}
             <motion.div variants={heroItem} className="p-4 rounded-[20px] text-[14px] space-y-1" style={{ backgroundColor: '#F7F7F7', boxShadow: 'rgba(19, 21, 21, 0.05) 0px 8px 20px 0px' }}>
-              <span className="font-medium flex items-center gap-1.5" style={{ color: '#12A70A' }}>
+              <span className="font-medium flex items-center gap-1.5" style={{ color: '#0080E6' }}>
                 <Sparkles size={14} /> Live Interactive Simulator
               </span>
               <p style={{ color: '#494D4D' }}>
@@ -1263,6 +1360,14 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ─── PROOF OF CONCEPT: PINNED SCROLL SEQUENCE ──────────
+          Apple-product-page pattern: the section holds extra scroll
+          height (steps.length * 100vh); its content pins via
+          position:sticky and scrubs through steps as the user scrolls,
+          rather than each step fading in independently. One section only
+          — see how this feels before it's used elsewhere. */}
+      <PinnedQRSequence />
 
       {/* ─── NEW SECTION 4: THREE SECURE WORKSPACES ─────────── */}
       <section id="workspaces" className="py-24 bg-white px-6">

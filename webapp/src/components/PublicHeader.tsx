@@ -75,9 +75,9 @@ export default function PublicHeader() {
               onClick={() => setDemoModalOpen(true)}
               className="px-5 py-2.5 text-[15px] font-medium rounded-[50px] transition-shadow"
               style={{
-                backgroundColor: '#12A70A',
+                backgroundColor: '#0080E6',
                 color: '#F7F7F7',
-                boxShadow: 'rgba(18, 167, 10, 0.5) 0px 10px 15px 0px',
+                boxShadow: 'rgba(0, 128, 230, 0.5) 0px 10px 15px 0px',
               }}
             >
               Get Started
@@ -138,7 +138,7 @@ export default function PublicHeader() {
               <button
                 onClick={() => { setMobileMenuOpen(false); setDemoModalOpen(true) }}
                 className="w-full text-center py-2.5 text-[15px] font-medium rounded-[50px]"
-                style={{ backgroundColor: '#12A70A', color: '#F7F7F7', boxShadow: 'rgba(18, 167, 10, 0.5) 0px 10px 15px 0px' }}
+                style={{ backgroundColor: '#0080E6', color: '#F7F7F7', boxShadow: 'rgba(0, 128, 230, 0.5) 0px 10px 15px 0px' }}
               >
                 Get Started
               </button>
