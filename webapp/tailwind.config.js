@@ -11,6 +11,12 @@ export default {
         heading: ['"Plus Jakarta Sans"', 'Outfit', 'sans-serif'],
         display: ['"Outfit"', '"Plus Jakarta Sans"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        // Habitline-derived public-site design system: Poppins substitutes
+        // for the reference's proprietary "Stack Sans Headline" display
+        // face (weight 500 only), reserved for hero/section/card headings.
+        // Body copy stays on the existing Plus Jakarta Sans (substitutes
+        // "Google Sans Flex Variable"), also per the extracted spec.
+        'habit-display': ['Poppins', '"Plus Jakarta Sans"', 'sans-serif'],
       },
       colors: {
         primary: {

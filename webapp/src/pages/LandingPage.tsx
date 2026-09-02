@@ -281,7 +281,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FCFCFE] text-[#18233D] font-sans antialiased selection:bg-[#4361EE] selection:text-white">
+    <div className="min-h-screen bg-white antialiased selection:bg-[#12A70A] selection:text-white" style={{ color: '#131515', fontFamily: "'Plus Jakarta Sans', Inter, sans-serif" }}>
       {/* ─── NAVIGATION BAR (shared, animated on scroll) ─────── */}
       <PublicHeader />
 
@@ -291,97 +291,90 @@ export default function LandingPage() {
         ref={heroRef}
         className={`relative pt-14 lg:pt-16 pb-20 px-6 max-w-[1360px] mx-auto overflow-hidden ${heroVisible ? '' : 'hero-anims-paused'}`}
       >
-        {/* Atmosphere: soft gradient blobs + faint grid, low opacity so text stays crisp */}
-        <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
-          <div
-            className="absolute inset-0 opacity-[0.035]"
-            style={{
-              backgroundImage: 'linear-gradient(#18233D 1px, transparent 1px), linear-gradient(90deg, #18233D 1px, transparent 1px)',
-              backgroundSize: '48px 48px',
-              maskImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%)',
-            }}
-          />
-          <div className="animate-float-blob-a absolute top-0 right-[8%] w-[30rem] h-[30rem] bg-gradient-to-br from-indigo-400/20 to-violet-400/10 rounded-full blur-3xl" />
-          <div className="animate-float-blob-b absolute -top-10 left-[2%] w-96 h-96 bg-gradient-to-br from-sky-300/15 to-indigo-300/10 rounded-full blur-3xl" />
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-          {/* LEFT COLUMN: HEADLINE, DESCRIPTION & ACTIONS */}
+          {/* LEFT COLUMN: HEADLINE, DESCRIPTION & ACTIONS
+              Habitline token spec: flat colors only (no gradients), Habit
+              Green #12A70A as the sole action color, pill geometry
+              (rounded 50px) on every button, chips at rounded-full with a
+              surface-muted #E8E8E8 fill, Poppins/500 for display type. */}
           <motion.div
             variants={heroContainer}
             initial="hidden"
             animate="show"
             className="lg:col-span-5 space-y-6 text-left pt-2"
           >
-            <motion.div variants={heroItem} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-[11px] font-bold text-[#4361EE]">
+            <motion.div
+              variants={heroItem}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[14px] font-normal"
+              style={{ backgroundColor: '#E8E8E8', color: '#131515' }}
+            >
               <Sparkles size={12} />
               <span>Digital Hospital Operating System</span>
             </motion.div>
 
-            <motion.h1 variants={heroItem} className="font-display text-4xl sm:text-5xl lg:text-[54px] font-extrabold text-[#131A2E] tracking-tight leading-[1.08]">
+            <motion.h1
+              variants={heroItem}
+              className="font-habit-display font-medium tracking-tight leading-[1]"
+              style={{ fontSize: 'clamp(40px, 6vw, 72px)', color: '#000000' }}
+            >
               Your hospital.
               <br />
-              Connected{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4361EE] to-[#7C5CFC]">
-                digitally.
-              </span>
+              Connected <span style={{ color: '#12A70A' }}>digitally.</span>
             </motion.h1>
 
-            <motion.p variants={heroItem} className="text-base text-[#5E687B] font-normal leading-relaxed max-w-lg">
+            <motion.p variants={heroItem} className="text-[18px] font-normal leading-[1.4] max-w-lg" style={{ color: '#494D4D' }}>
               One platform for hospital administration, doctor dashboards, and QR-based patient appointments — live, isolated per hospital, built for modern OPDs.
             </motion.p>
 
             {/* CTA Buttons */}
             <motion.div variants={heroItem} className="flex flex-wrap items-center gap-3 pt-1">
-              <div className="relative">
-                <span className="animate-pulse-glow absolute inset-0 rounded-xl bg-gradient-to-br from-[#4361EE] to-[#7C5CFC] blur-md" />
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => setModalOpen(true)}
-                  className="relative group px-6 py-3.5 bg-gradient-to-br from-[#4361EE] to-[#7C5CFC] text-white font-bold text-xs rounded-xl shadow-[0_10px_24px_-6px_rgba(67,97,238,0.5)] transition-shadow hover:shadow-[0_16px_32px_-6px_rgba(67,97,238,0.6)] flex items-center gap-2"
-                >
-                  <span>Get Started Free</span>
-                  <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
-                </motion.button>
-              </div>
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setModalOpen(true)}
+                className="px-5 py-2.5 text-[15px] font-medium rounded-[50px] transition-shadow"
+                style={{ backgroundColor: '#12A70A', color: '#F7F7F7', boxShadow: 'rgba(18, 167, 10, 0.5) 0px 10px 15px 0px' }}
+              >
+                Get Started Free
+              </motion.button>
 
               <motion.button
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setModalOpen(true)}
-                className="px-6 py-3.5 bg-white/70 backdrop-blur-sm hover:bg-white border border-[#E6E9F0] text-[#18233D] font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-2"
+                className="px-5 py-2.5 text-[15px] font-medium rounded-[50px] flex items-center gap-2"
+                style={{ backgroundColor: '#E8E8E8', color: '#131515' }}
               >
-                <div className="w-5 h-5 rounded-full bg-indigo-50 text-[#4361EE] flex items-center justify-center">
-                  <Play size={10} className="fill-[#4361EE] ml-0.5" />
-                </div>
+                <Play size={12} fill="#131515" />
                 <span>Watch Demo</span>
               </motion.button>
             </motion.div>
 
-            {/* 4 Feature Pills Row */}
-            <motion.div variants={heroItem} className="pt-2 flex flex-wrap items-center gap-2.5 text-[11px] font-bold text-[#4361EE]">
-              <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
-                <QrCode size={13} /> QR Based Booking
-              </span>
-              <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
-                <RefreshCw size={13} /> Live Queue
-              </span>
-              <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
-                <Building2 size={13} /> OPD Management
-              </span>
-              <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
-                <ShieldCheck size={13} /> Secure & Reliable
-              </span>
+            {/* 4 Feature Chips Row */}
+            <motion.div variants={heroItem} className="pt-2 flex flex-wrap items-center gap-2.5">
+              {[
+                { icon: <QrCode size={13} />, label: 'QR Based Booking' },
+                { icon: <RefreshCw size={13} />, label: 'Live Queue' },
+                { icon: <Building2 size={13} />, label: 'OPD Management' },
+                { icon: <ShieldCheck size={13} />, label: 'Secure & Reliable' },
+              ].map((chip) => (
+                <span
+                  key={chip.label}
+                  className="px-3.5 py-1.5 rounded-full text-[14px] font-normal flex items-center gap-1.5"
+                  style={{ backgroundColor: '#E8E8E8', color: '#131515' }}
+                >
+                  {chip.icon} {chip.label}
+                </span>
+              ))}
             </motion.div>
 
             {/* Interactive Simulator Tip Card */}
-            <motion.div variants={heroItem} className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs space-y-1">
-              <span className="font-bold text-[#4361EE] flex items-center gap-1.5">
+            <motion.div variants={heroItem} className="p-4 rounded-[20px] text-[14px] space-y-1" style={{ backgroundColor: '#F7F7F7', boxShadow: 'rgba(19, 21, 21, 0.05) 0px 8px 20px 0px' }}>
+              <span className="font-medium flex items-center gap-1.5" style={{ color: '#12A70A' }}>
                 <Sparkles size={14} /> Live Interactive Simulator
               </span>
-              <p className="text-[11px] text-[#5E687B]">
-                Click on any sidebar button (<strong className="text-slate-800">Live Queue, Appointments, Doctors, Patients, Reports, Settings</strong>) to test real-time OPD hospital controls.
+              <p style={{ color: '#494D4D' }}>
+                Click on any sidebar button (<strong style={{ color: '#131515' }}>Live Queue, Appointments, Doctors, Patients, Reports, Settings</strong>) to test real-time OPD hospital controls.
               </p>
             </motion.div>
           </motion.div>
