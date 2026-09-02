@@ -112,6 +112,15 @@ export async function updateAppointmentStatus(appointmentId: string, status: App
  * token, so a walk-in is indistinguishable from a QR booking once created —
  * same table, same isolation guarantees.
  */
+export interface WalkInBookingResult {
+  success: boolean
+  error?: string
+  appointmentId?: string
+  tokenNumber?: number
+  trackingToken?: string
+  doctorName?: string
+}
+
 export async function addWalkInAppointment(params: {
   hospitalId: string
   doctorId: string
@@ -120,7 +129,9 @@ export async function addWalkInAppointment(params: {
   patientGender?: string
   patientAge?: number
   symptoms?: string
-}): Promise<{ success: boolean; error?: string }> {
+  knownDiseases?: string
+  previousMedicine?: string
+}): Promise<WalkInBookingResult> {
   const { data: qr, error: qrError } = await supabase
     .from('qr_codes')
     .select('token')
@@ -142,14 +153,44 @@ export async function addWalkInAppointment(params: {
     p_patient_age: params.patientAge ?? 30,
     p_patient_dob: null,
     p_symptoms: params.symptoms || null,
-    p_known_diseases: null,
-    p_previous_medicine: null,
+    p_known_diseases: params.knownDiseases || null,
+    p_previous_medicine: params.previousMedicine || null,
     p_previous_doctor_id: null,
   })
 
   if (error) return { success: false, error: error.message }
   if (data && data.success === false) return { success: false, error: data.error }
-  return { success: true }
+
+  return {
+    success: true,
+    appointmentId: data?.appointment_id,
+    tokenNumber: data?.token_number,
+    trackingToken: data?.tracking_token,
+    doctorName: data?.doctor_name,
+  }
+}
+
+/**
+ * Real doctors for a hospital — used by front-desk/reception check-in flows
+ * that need to let staff pick a doctor rather than trusting a client-
+ * supplied doctor_id. RLS ("Users view own hospital profiles") scopes this
+ * to the caller's own hospital regardless of what hospitalId is passed.
+ */
+export async function getHospitalDoctors(hospitalId: string): Promise<{ id: string; name: string; department: string | null }[]> {
+  if (!hospitalId) return []
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, department')
+    .eq('hospital_id', hospitalId)
+    .eq('role', 'doctor')
+    .eq('is_active', true)
+    .order('full_name', { ascending: true })
+
+  if (error) {
+    console.warn('getHospitalDoctors error:', error.message)
+    return []
+  }
+  return (data || []).map(d => ({ id: d.id, name: d.full_name, department: d.department }))
 }
 
 /**

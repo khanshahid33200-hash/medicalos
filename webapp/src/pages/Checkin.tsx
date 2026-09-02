@@ -1,19 +1,36 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Phone, User, AlertCircle, CheckCircle, Ticket, Clock, ShieldCheck, Smile } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '../components/Card'
 import Button from '../components/Button'
-import { useSubmitCheckin } from '../hooks/useApi'
-import { addCheckinToDoctorQueue } from '../utils/doctorStore'
+import { useAuth } from '../context/AuthContext'
+import { addWalkInAppointment, getHospitalDoctors, type WalkInBookingResult } from '../lib/doctorAppointments'
 
 export default function Checkin() {
-  const [searchParams] = useSearchParams()
+  const { doctorProfile } = useAuth()
+  // Hospital identity ONLY from the authenticated session — this used to
+  // trust raw `?doctor_id=`/`?hospital_name=` URL query params with fake
+  // defaults ('doc-001', 'Metro Care General Hospital'), meaning anyone
+  // could load /checkin unauthenticated and submit a "check-in" tied to
+  // any doctor_id string of their choosing, written only to a localStorage
+  // cache + a dead FastAPI endpoint — never a real, isolated appointment.
+  const hospitalId = doctorProfile?.hospital_id || ''
+  const hospitalName = doctorProfile?.hospital_name || 'Your Hospital'
 
-  // Extract doctor and hospital details from QR Code parameters
-  const doctorName = searchParams.get('doctor_name') || searchParams.get('doctor') || 'Dr. Authorized Doctor'
-  const doctorId = searchParams.get('doctor_id') || 'doc-001'
-  const departmentName = searchParams.get('department') || 'Cardiology'
-  const hospitalName = searchParams.get('hospital_name') || searchParams.get('hospital') || 'Metro Care General Hospital'
+  const [doctors, setDoctors] = useState<{ id: string; name: string; department: string | null }[]>([])
+  const [selectedDoctorId, setSelectedDoctorId] = useState('')
+
+  useEffect(() => {
+    if (!hospitalId) return
+    getHospitalDoctors(hospitalId).then(list => {
+      setDoctors(list)
+      setSelectedDoctorId(prev => prev || list[0]?.id || '')
+    })
+  }, [hospitalId])
+
+  const selectedDoctor = doctors.find(d => d.id === selectedDoctorId)
+  const doctorName = selectedDoctor?.name || 'Select a doctor'
+  const departmentName = selectedDoctor?.department || '—'
 
   const [step, setStep] = useState<'form' | 'success'>('form')
   const [formData, setFormData] = useState({
@@ -22,23 +39,15 @@ export default function Checkin() {
     age: '',
     gender: 'M',
     symptoms: '',
-    medical_history: '',
     allergies: '',
     current_medications: '',
     duration_symptoms: '',
     severity: 'moderate',
-    chronic_conditions: '',
-    consent_ai_triage: true,
-    doctor_id: doctorId,
-    source: 'qr_kiosk',
   })
 
-  const [response, setResponse] = useState<any>(null)
-  const { mutate: submitCheckin, isLoading, error } = useSubmitCheckin()
-
-  useEffect(() => {
-    setFormData((prev) => ({ ...prev, doctor_id: doctorId }))
-  }, [doctorId])
+  const [response, setResponse] = useState<WalkInBookingResult | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as any
@@ -55,43 +64,39 @@ export default function Checkin() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!hospitalId || !selectedDoctorId) return
 
-    const cleanedData = Object.fromEntries(
-      Object.entries(formData).filter(([_, value]) => value !== '' && value !== null)
-    )
+    setIsLoading(true)
+    setError(null)
 
-    const payload: Record<string, any> = { ...cleanedData, doctor_id: doctorId }
-    if (payload.age && typeof payload.age === 'string') {
-      payload.age = parseInt(payload.age, 10)
+    // Reuses the same audited book_qr_appointment RPC the real QR booking
+    // flow and Doctor Dashboard walk-ins use — real appointments/patients
+    // rows, real token numbering, real doctor.hospital_id validation.
+    // Replaces the old write to a localStorage-only queue plus a legacy
+    // FastAPI endpoint that silently failed in production.
+    const result = await addWalkInAppointment({
+      hospitalId,
+      doctorId: selectedDoctorId,
+      patientName: formData.name,
+      patientPhone: formData.phone,
+      patientGender: formData.gender,
+      patientAge: formData.age ? parseInt(formData.age, 10) : undefined,
+      symptoms: formData.symptoms,
+      knownDiseases: formData.current_medications || undefined,
+    })
+
+    setIsLoading(false)
+
+    if (!result.success) {
+      setError(result.error || 'Please verify your details and resubmit.')
+      return
     }
 
-    // Save directly to Doctor-Specific Queue Store
-    const newItem = addCheckinToDoctorQueue(doctorId, payload)
-
-    submitCheckin(payload, {
-      onSuccess: (data) => {
-        setResponse({
-          ...data.data,
-          queue_number: newItem.token_number,
-          receipt_number: `RCP-${Date.now().toString().substring(5)}`,
-        })
-        setStep('success')
-        window.scrollTo({ top: 0, behavior: 'smooth' })
-      },
-      onError: () => {
-        // Fallback store confirmation
-        setResponse({
-          queue_number: newItem.token_number,
-          receipt_number: `RCP-${Date.now().toString().substring(5)}`,
-          estimated_wait_minutes: 10,
-          message: `Check-in successful! Please wait in room for ${doctorName}.`
-        })
-        setStep('success')
-        window.scrollTo({ top: 0, behavior: 'smooth' })
-      }
-    })
+    setResponse(result)
+    setStep('success')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
@@ -116,7 +121,13 @@ export default function Checkin() {
 
       {/* Main Check-in Form / Success View */}
       <div className="max-w-2xl mx-auto px-4">
-        {step === 'success' && response ? (
+        {!hospitalId ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
+            <AlertCircle className="text-amber-600 mx-auto mb-2" size={28} />
+            <p className="text-amber-800 text-sm font-semibold">Please log in as hospital staff to use the reception kiosk.</p>
+            <Link to="/login" className="text-blue-600 text-xs font-bold mt-2 inline-block">Go to Login →</Link>
+          </div>
+        ) : step === 'success' && response ? (
           <div className="space-y-6">
             <Card className="border-2 border-emerald-500 bg-emerald-50/50 shadow-xl overflow-hidden rounded-3xl">
               <div className="bg-emerald-600 text-white text-center py-6 px-4">
@@ -130,13 +141,15 @@ export default function Checkin() {
                 <div className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-md space-y-3">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Your Live Queue Token</p>
                   <div className="inline-flex items-center gap-2 px-6 py-2 bg-blue-50 text-blue-700 font-black text-4xl rounded-2xl border border-blue-200 shadow-inner">
-                    <Ticket size={32} /> {response.queue_number}
+                    <Ticket size={32} /> {response.tokenNumber}
                   </div>
-                  <p className="text-xs font-mono text-slate-500">Receipt Ref: {response.receipt_number}</p>
+                  {response.trackingToken && (
+                    <p className="text-xs font-mono text-slate-500">Tracking Ref: {response.trackingToken}</p>
+                  )}
 
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-2 text-slate-700 font-semibold text-sm">
                     <Clock className="text-blue-600" size={18} />
-                    <span>Estimated Wait Time: {response.estimated_wait_minutes || 10} mins</span>
+                    <span>You are now in {doctorName}'s live queue</span>
                   </div>
                 </div>
 
@@ -163,11 +176,38 @@ export default function Checkin() {
             {error && (
               <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex gap-3 items-center">
                 <AlertCircle className="text-rose-600 flex-shrink-0" size={20} />
-                <p className="text-rose-700 text-xs font-medium">Please verify your details and resubmit.</p>
+                <p className="text-rose-700 text-xs font-medium">{error}</p>
               </div>
             )}
 
+            {doctors.length === 0 ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3 items-center">
+                <AlertCircle className="text-amber-600 flex-shrink-0" size={20} />
+                <p className="text-amber-800 text-xs font-medium">No active doctors found for your hospital yet.</p>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* 0. Doctor Selection */}
+              <Card className="rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-900 text-white py-4">
+                  <h2 className="text-base font-extrabold flex items-center gap-2">
+                    <ShieldCheck size={18} /> 0. Select Doctor
+                  </h2>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <select
+                    value={selectedDoctorId}
+                    onChange={(e) => setSelectedDoctorId(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-600 outline-none"
+                  >
+                    {doctors.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}{d.department ? ` — ${d.department}` : ''}</option>
+                    ))}
+                  </select>
+                </CardContent>
+              </Card>
+
               {/* 1. Patient Info */}
               <Card className="rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                 <CardHeader className="bg-blue-600 text-white py-4">
@@ -325,12 +365,13 @@ export default function Checkin() {
                 type="submit"
                 variant="primary"
                 size="lg"
-                disabled={isLoading}
+                disabled={isLoading || !selectedDoctorId}
                 className="w-full py-4 text-sm font-extrabold shadow-xl shadow-blue-600/30 rounded-2xl bg-blue-600 hover:bg-blue-700"
               >
                 {isLoading ? 'Generating Queue Token...' : `Confirm Check-in for ${doctorName}`}
               </Button>
             </form>
+            )}
           </div>
         )}
       </div>

@@ -99,7 +99,14 @@ function App() {
         <Route path="/track" element={<TrackPage />} />
         <Route path="/rx" element={<RxPage />} />
         <Route path="/display/:token" element={<DisplayBoard />} />
-        <Route path="/checkin" element={<Checkin />} />
+        <Route
+          path="/checkin"
+          element={
+            <ProtectedRoute>
+              <Checkin />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Sign In Portals & Access Control */}
         <Route path="/account-blocked" element={<AccountBlockedPage />} />
