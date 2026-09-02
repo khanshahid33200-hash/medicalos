@@ -144,15 +144,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/appointments"
-          element={
-            <ProtectedRoute>
-              <Appointments />
+              <Dashboard initialTab="dashboard" />
             </ProtectedRoute>
           }
         />
@@ -160,23 +152,55 @@ function App() {
           path="/queue"
           element={
             <ProtectedRoute>
-              <Queue />
+              <Dashboard initialTab="queue" />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/payments"
+          path="/appointments"
           element={
             <ProtectedRoute>
-              <PaymentsPage />
+              <Dashboard initialTab="appointments" />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/qr-kiosk"
+          path="/patients"
           element={
             <ProtectedRoute>
-              <QRKiosk />
+              <Dashboard initialTab="patients" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/consultations"
+          element={
+            <ProtectedRoute>
+              <Dashboard initialTab="consultations" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/prescriptions"
+          element={
+            <ProtectedRoute>
+              <Dashboard initialTab="prescriptions" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/templates"
+          element={
+            <ProtectedRoute>
+              <Dashboard initialTab="templates" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/follow-ups"
+          element={
+            <ProtectedRoute>
+              <Dashboard initialTab="follow-ups" />
             </ProtectedRoute>
           }
         />
@@ -184,15 +208,7 @@ function App() {
           path="/reports"
           element={
             <ProtectedRoute>
-              <Reports />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/history"
-          element={
-            <ProtectedRoute>
-              <History />
+              <Dashboard initialTab="reports" />
             </ProtectedRoute>
           }
         />
@@ -200,7 +216,39 @@ function App() {
           path="/profile"
           element={
             <ProtectedRoute>
-              <DoctorProfile />
+              <Dashboard initialTab="profile" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Dashboard initialTab="settings" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payments"
+          element={
+            <ProtectedRoute>
+              <Dashboard initialTab="reports" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <ProtectedRoute>
+              <Dashboard initialTab="patients" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/qr-kiosk"
+          element={
+            <ProtectedRoute>
+              <Dashboard initialTab="queue" />
             </ProtectedRoute>
           }
         />
