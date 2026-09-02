@@ -467,10 +467,52 @@ CREATE POLICY "Super Admin full access to patients" ON public.patients
     FOR ALL TO authenticated
     USING (public.is_super_admin());
 
-DROP POLICY IF EXISTS "Hospital Users manage own hospital patients" ON public.patients;
-CREATE POLICY "Hospital Users manage own hospital patients" ON public.patients
+-- Was "Hospital Users manage own hospital patients" — a single FOR ALL
+-- policy scoped only by hospital_id, meaning ANY authenticated user in the
+-- hospital (a plain doctor included) could read or write every patient in
+-- the hospital, not just their own patients. Split into a hospital_admin
+-- policy (operationally needs full hospital visibility) and a doctor
+-- policy restricted to patients they actually have an appointment with —
+-- Doctor Dashboard isolation requires this: D1 must not be able to browse
+-- D2's patients via a direct `supabase.from('patients')` query, even
+-- though the current UI doesn't happen to issue one today.
+DROP POLICY IF EXISTS "Hospital Admin manage hospital patients" ON public.patients;
+CREATE POLICY "Hospital Admin manage hospital patients" ON public.patients
     FOR ALL TO authenticated
-    USING (hospital_id = public.current_hospital_id())
+    USING (public.is_hospital_admin() AND hospital_id = public.current_hospital_id())
+    WITH CHECK (public.is_hospital_admin() AND hospital_id = public.current_hospital_id());
+
+DROP POLICY IF EXISTS "Doctor view own patients" ON public.patients;
+CREATE POLICY "Doctor view own patients" ON public.patients
+    FOR SELECT TO authenticated
+    USING (
+        public.is_doctor()
+        AND hospital_id = public.current_hospital_id()
+        AND EXISTS (
+            SELECT 1 FROM public.appointments a
+            WHERE a.patient_id = patients.id AND a.doctor_id = auth.uid()
+        )
+    );
+
+-- Doctors also need to create/update patient records at check-in/booking
+-- time, before an appointment row necessarily exists yet — scoped to their
+-- own hospital only, same as every other hospital-scoped write.
+DROP POLICY IF EXISTS "Doctor manage hospital patients at checkin" ON public.patients;
+CREATE POLICY "Doctor manage hospital patients at checkin" ON public.patients
+    FOR INSERT TO authenticated
+    WITH CHECK (public.is_doctor() AND hospital_id = public.current_hospital_id());
+
+DROP POLICY IF EXISTS "Doctor update own patients" ON public.patients;
+CREATE POLICY "Doctor update own patients" ON public.patients
+    FOR UPDATE TO authenticated
+    USING (
+        public.is_doctor()
+        AND hospital_id = public.current_hospital_id()
+        AND EXISTS (
+            SELECT 1 FROM public.appointments a
+            WHERE a.patient_id = patients.id AND a.doctor_id = auth.uid()
+        )
+    )
     WITH CHECK (hospital_id = public.current_hospital_id());
 
 -- Patient self-registration during QR booking (before any appointment/profile

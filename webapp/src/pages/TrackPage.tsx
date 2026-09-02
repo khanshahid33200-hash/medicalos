@@ -84,7 +84,14 @@ export default function TrackPage() {
         {
           event: '*',
           schema: 'public',
-          table: 'appointments'
+          table: 'appointments',
+          // Scoped to this one appointment row — without this filter, RLS's
+          // "Public view queue for display" anon policy (appointment_date =
+          // CURRENT_DATE, no hospital_id restriction) meant every hospital's
+          // today's appointment changes were pushed to every tracking
+          // patient's browser over the wire, not just the one they're
+          // following, even though the callback itself ignored the payload.
+          filter: `id=eq.${queueData.appointment_id}`
         },
         () => {
           // Re-fetch queue status immediately on any change in appointments

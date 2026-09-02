@@ -46,15 +46,20 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
   const location = useLocation()
   const { doctorProfile, logout } = useAuth()
 
-  // Doctor & Hospital Identity
-  const doctorId = doctorProfile?.doctor_id || localStorage.getItem('doctor_id') || ''
-  const doctorCode = doctorProfile?.doctor_code || localStorage.getItem('doctor_code') || 'H1-D-0001'
+  // Doctor & Hospital Identity — sourced ONLY from the authenticated session
+  // (AuthContext). A localStorage fallback here is exactly the bug class
+  // this whole isolation effort exists to remove: doctorId keys directly
+  // into doctorStore's per-doctor localStorage cache below, so a stale
+  // 'doctor_id' from a previous session on this browser would silently pull
+  // that other doctor's queue/appointments/reports into this dashboard.
+  const doctorId = doctorProfile?.doctor_id || ''
+  const doctorCode = doctorProfile?.doctor_code || ''
   const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
   const doctorSpecialty = doctorProfile?.specialization || doctorProfile?.department_name || 'Consultant Specialist'
   const doctorDegree = 'MBBS, MD'
   const [doctorStatus, setDoctorStatus] = useState<'Available' | 'In Session' | 'On Break' | 'Off Duty'>('Available')
 
-  const selectedHospital = doctorProfile?.hospital_name || localStorage.getItem('hospital_name') || 'Hospital Facility'
+  const selectedHospital = doctorProfile?.hospital_name || 'Hospital Facility'
   const hospitalLocation = 'Clinical OPD Wing'
 
   // Live Hospital Clock
@@ -105,93 +110,21 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
   // Patient Card Active Tab
   const [patientCardTab, setPatientCardTab] = useState<'Details' | 'History' | 'Prescriptions' | 'Reports'>('Details')
 
-  // Live Queue State
-  const initialQueue: ClinicalQueuePatient[] = [
-    {
-      id: 'q-1',
-      token_number: 12,
-      patient_name: 'Ravi Kumar',
-      phone: '+91 98201 44521',
-      age: 32,
-      gender: 'Male',
-      chief_complaint: 'Chest pain and fatigue since 2 days',
-      status: 'Now Consulting',
-      wait_time: '—',
-      time: '10:15 AM',
-      doctor_id: doctorId,
-      vitals: { bp: '120/80', pulse: '78', temp: '98.4', spo2: '98%' },
-      allergies: 'None',
-      lastVisit: 'May 20, 2025'
-    },
-    {
-      id: 'q-2',
-      token_number: 13,
-      patient_name: 'Neha Singh',
-      phone: '+91 98230 11928',
-      age: 28,
-      gender: 'Female',
-      chief_complaint: 'Acidity, headache and mild nausea',
-      status: 'Next',
-      wait_time: '5 min',
-      time: '10:30 AM',
-      doctor_id: doctorId,
-      vitals: { bp: '110/70', pulse: '74', temp: '98.6', spo2: '99%' },
-      allergies: 'Penicillin',
-      lastVisit: 'Apr 12, 2025'
-    },
-    {
-      id: 'q-3',
-      token_number: 14,
-      patient_name: 'Mohd. Ali',
-      phone: '+91 98450 77319',
-      age: 45,
-      gender: 'Male',
-      chief_complaint: 'Hypertension follow-up and breathlessness',
-      status: 'Waiting',
-      wait_time: '18 min',
-      time: '10:45 AM',
-      doctor_id: doctorId,
-      vitals: { bp: '140/90', pulse: '84', temp: '98.2', spo2: '97%' },
-      allergies: 'None',
-      lastVisit: 'May 10, 2025'
-    },
-    {
-      id: 'q-4',
-      token_number: 15,
-      patient_name: 'Sunita Devi',
-      phone: '+91 94150 99281',
-      age: 34,
-      gender: 'Female',
-      chief_complaint: 'Palpitations during exertion',
-      status: 'Waiting',
-      wait_time: '28 min',
-      time: '11:00 AM',
-      doctor_id: doctorId,
-      vitals: { bp: '124/82', pulse: '88', temp: '98.5', spo2: '98%' },
-      allergies: 'Sulfa Drugs',
-      lastVisit: 'First Visit'
-    },
-    {
-      id: 'q-5',
-      token_number: 16,
-      patient_name: 'Vikas Patel',
-      phone: '+91 94140 33812',
-      age: 50,
-      gender: 'Male',
-      chief_complaint: 'Post-stent routine 6-month checkup',
-      status: 'Waiting',
-      wait_time: '35 min',
-      time: '11:15 AM',
-      doctor_id: doctorId,
-      vitals: { bp: '130/85', pulse: '76', temp: '98.4', spo2: '99%' },
-      allergies: 'None',
-      lastVisit: 'Nov 18, 2024'
-    }
-  ]
+  // Live Queue State — starts empty for every doctor. This used to be a
+  // hardcoded array of 5 fake patients (names, phone numbers, vitals,
+  // diagnoses) shown as the default queue for every doctor, including
+  // brand-new ones with zero real patients — a direct violation of "new
+  // doctor dashboard starts from zero". Real entries are added via
+  // check-in/booking; see doctorStore.ts for the per-doctor persistence.
+  const initialQueue: ClinicalQueuePatient[] = []
 
   const [queueList, setQueueList] = useState<ClinicalQueuePatient[]>(() => {
+    // Guard against doctorId being transiently empty (AuthContext hasn't
+    // hydrated yet on first render) — never read/write a bucket keyed by an
+    // empty string, which would itself become a shared cross-doctor bucket.
+    if (!doctorId) return initialQueue
     try {
-      const saved = localStorage.getItem(`clinicos_queue_patients_${doctorId || 'default'}`)
+      const saved = localStorage.getItem(`clinicos_queue_patients_${doctorId}`)
       if (saved) {
         const parsed = JSON.parse(saved)
         return parsed.length ? parsed : initialQueue
@@ -202,14 +135,14 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
     }
   })
 
-  // Upcoming Appointments State
-  const [appointmentsList, setAppointmentsList] = useState([
-    { id: 'apt-1', time: '11:30 AM', name: 'Arjun Mehta', phone: '+91 98111 22334', type: 'Follow up', status: 'Confirmed', dept: 'Cardiology' },
-    { id: 'apt-2', time: '12:00 PM', name: 'Pooja Gupta', phone: '+91 98222 33445', type: 'New Patient', status: 'Confirmed', dept: 'Cardiology' },
-    { id: 'apt-3', time: '12:30 PM', name: 'Sanjay Verma', phone: '+91 98333 44556', type: 'Follow up', status: 'Confirmed', dept: 'Cardiology' },
-    { id: 'apt-4', time: '01:00 PM', name: 'Anita Desai', phone: '+91 98444 55667', type: 'Consultation', status: 'Confirmed', dept: 'Cardiology' },
-    { id: 'apt-5', time: '01:30 PM', name: 'Rajesh Nair', phone: '+91 98555 66778', type: 'ECG Review', status: 'Confirmed', dept: 'Cardiology' },
-  ])
+  // Upcoming Appointments State — was hardcoded to 5 fake patients that
+  // never got replaced with real data (setAppointmentsList is never called
+  // anywhere in this file), so every doctor saw the same fake appointment
+  // list permanently. Starts empty; see note below re: this list not
+  // actually being wired to the live appointments table yet.
+  const [appointmentsList, setAppointmentsList] = useState<
+    { id: string; time: string; name: string; phone: string; type: string; status: string; dept: string }[]
+  >([])
 
   // Current Patient in Consultation
   const currentPatient = queueList.find(q => q.status === 'Now Consulting') || queueList[0]
@@ -294,7 +227,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
     })
 
     setQueueList(updated)
-    localStorage.setItem(`clinicos_queue_patients_${doctorId || 'default'}`, JSON.stringify(updated))
+    localStorage.setItem(`clinicos_queue_patients_${doctorId}`, JSON.stringify(updated))
     setNotice(`📢 Calling Token CC-0${target.token_number} (${target.patient_name})`)
     setTimeout(() => setNotice(null), 4000)
   }
@@ -311,7 +244,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
     })
 
     setQueueList(updated)
-    localStorage.setItem(`clinicos_queue_patients_${doctorId || 'default'}`, JSON.stringify(updated))
+    localStorage.setItem(`clinicos_queue_patients_${doctorId}`, JSON.stringify(updated))
     setShowRxModal(false)
     setNotice(`✓ Prescription generated & WhatsApp dispatched to ${currentPatient.patient_name} (${currentPatient.phone})!`)
     setTimeout(() => setNotice(null), 4500)
@@ -434,7 +367,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
 
     const updated = [...queueList, newEntry]
     setQueueList(updated)
-    localStorage.setItem(`clinicos_queue_patients_${doctorId || 'default'}`, JSON.stringify(updated))
+    localStorage.setItem(`clinicos_queue_patients_${doctorId}`, JSON.stringify(updated))
     setShowAddWalkinModal(false)
     setNewWalkin({ patient_name: '', phone: '', age: 30, gender: 'Male', chief_complaint: '' })
     setNotice(`✓ Added Walk-In Patient Token CC-0${nextTok} (${newEntry.patient_name})`)
@@ -955,30 +888,48 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                   </div>
 
                   <div className="p-5 pt-0 space-y-4">
-                    <div>
-                      <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Now Consulting</span>
-                      <span className="text-3xl font-black text-slate-900 tracking-tight block">CC-0{currentPatient?.token_number || 12}</span>
-                      <h4 className="font-extrabold text-base text-slate-800 mt-1">{currentPatient?.patient_name || 'Ravi Kumar'}</h4>
-                      <p className="text-xs text-slate-500 font-semibold">{currentPatient?.age || 32} Yrs, {currentPatient?.gender || 'Male'} • {currentPatient?.chief_complaint || 'Chest pain, fatigue'}</p>
-                    </div>
+                    {currentPatient ? (
+                      <div>
+                        <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">Now Consulting</span>
+                        <span className="text-3xl font-black text-slate-900 tracking-tight block">CC-0{currentPatient.token_number}</span>
+                        <h4 className="font-extrabold text-base text-slate-800 mt-1">{currentPatient.patient_name}</h4>
+                        <p className="text-xs text-slate-500 font-semibold">{currentPatient.age} Yrs, {currentPatient.gender} • {currentPatient.chief_complaint}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Now Consulting</span>
+                        <p className="text-xs text-slate-400 font-semibold mt-1">No patient currently in consultation.</p>
+                      </div>
+                    )}
 
                     <button
                       onClick={() => setShowPatientDetailsModal(true)}
-                      className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition"
+                      disabled={!currentPatient}
+                      className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition"
                     >
                       View Patient Details
                     </button>
 
                     <div className="pt-3 border-t border-slate-100">
-                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">Next Patient</span>
-                      <span className="text-lg font-black text-slate-800 block">CC-0{nextPatient?.token_number || 13}</span>
-                      <p className="text-xs font-extrabold text-slate-700">{nextPatient?.patient_name || 'Neha Singh'}</p>
-                      <p className="text-[11px] text-slate-400 font-medium">{nextPatient?.age || 28} Yrs, {nextPatient?.gender || 'Female'} • {nextPatient?.chief_complaint || 'Acidity, headache'}</p>
+                      {nextPatient ? (
+                        <>
+                          <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">Next Patient</span>
+                          <span className="text-lg font-black text-slate-800 block">CC-0{nextPatient.token_number}</span>
+                          <p className="text-xs font-extrabold text-slate-700">{nextPatient.patient_name}</p>
+                          <p className="text-[11px] text-slate-400 font-medium">{nextPatient.age} Yrs, {nextPatient.gender} • {nextPatient.chief_complaint}</p>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Next Patient</span>
+                          <p className="text-xs text-slate-400 font-medium">No one waiting.</p>
+                        </>
+                      )}
                     </div>
 
                     <button
                       onClick={() => handleCallNextPatient()}
-                      className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition transform hover:-translate-y-0.5"
+                      disabled={!nextPatient}
+                      className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition transform hover:-translate-y-0.5"
                     >
                       <Volume2 size={16} />
                       <span>Call Next Patient</span>
@@ -987,6 +938,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                 </div>
 
                 {/* Current Patient Detailed Card */}
+                {currentPatient ? (
                 <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">Current Patient</h4>
@@ -998,13 +950,13 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                   <div className="flex items-center gap-3">
                     <img
                       src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80"
-                      alt={currentPatient?.patient_name}
+                      alt={currentPatient.patient_name}
                       className="w-12 h-12 rounded-2xl object-cover ring-2 ring-indigo-500/20"
                     />
                     <div>
-                      <h4 className="font-black text-sm text-slate-900 leading-tight">{currentPatient?.patient_name || 'Ravi Kumar'}</h4>
-                      <p className="text-xs text-slate-500">{currentPatient?.age || 32} Yrs, {currentPatient?.gender || 'Male'}</p>
-                      <span className="text-[10px] font-black text-indigo-600"># CC-0{currentPatient?.token_number || 12}</span>
+                      <h4 className="font-black text-sm text-slate-900 leading-tight">{currentPatient.patient_name}</h4>
+                      <p className="text-xs text-slate-500">{currentPatient.age} Yrs, {currentPatient.gender}</p>
+                      <span className="text-[10px] font-black text-indigo-600"># CC-0{currentPatient.token_number}</span>
                     </div>
                   </div>
 
@@ -1026,15 +978,15 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
 
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Chief Complaint</span>
-                    <p className="text-xs font-bold text-slate-800">{currentPatient?.chief_complaint || 'Chest pain and fatigue since 2 days'}</p>
+                    <p className="text-xs font-bold text-slate-800">{currentPatient.chief_complaint}</p>
                   </div>
 
                   <div className="grid grid-cols-4 gap-2 text-center">
                     {[
-                      { label: 'BP', val: '120/80', unit: 'mmHg' },
-                      { label: 'Pulse', val: '78', unit: 'bpm' },
-                      { label: 'Temp', val: '98.4', unit: '°F' },
-                      { label: 'SpO2', val: '98%', unit: '' },
+                      { label: 'BP', val: currentPatient.vitals?.bp || '—', unit: 'mmHg' },
+                      { label: 'Pulse', val: currentPatient.vitals?.pulse || '—', unit: 'bpm' },
+                      { label: 'Temp', val: currentPatient.vitals?.temp || '—', unit: '°F' },
+                      { label: 'SpO2', val: currentPatient.vitals?.spo2 || '—', unit: '' },
                     ].map((v, i) => (
                       <div key={i} className="p-2 bg-slate-50 border border-slate-100 rounded-xl">
                         <span className="text-[9px] font-bold text-slate-400 block">{v.label}</span>
@@ -1047,11 +999,11 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                   <div className="grid grid-cols-2 gap-3 text-xs pt-1 border-t border-slate-100">
                     <div>
                       <span className="text-[10px] font-bold text-slate-400 block">Allergies</span>
-                      <span className="font-extrabold text-slate-800">{currentPatient?.allergies || 'None'}</span>
+                      <span className="font-extrabold text-slate-800">{currentPatient.allergies || 'None'}</span>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-slate-400 block">Last Visit</span>
-                      <span className="font-extrabold text-slate-800">{currentPatient?.lastVisit || 'May 20, 2025'}</span>
+                      <span className="font-extrabold text-slate-800">{currentPatient.lastVisit || '—'}</span>
                     </div>
                   </div>
 
@@ -1063,6 +1015,12 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
                     <span>Start Consultation</span>
                   </button>
                 </div>
+                ) : (
+                <div className="bg-white p-8 rounded-3xl border border-dashed border-slate-200 text-center">
+                  <h4 className="font-black text-xs text-slate-400 uppercase tracking-wider mb-1">Current Patient</h4>
+                  <p className="text-xs text-slate-400">No patient currently in consultation.</p>
+                </div>
+                )}
               </div>
             </section>
 
@@ -1434,11 +1392,11 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
               <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white font-black text-lg flex items-center justify-center">
-                    CC-0{currentPatient?.token_number || 12}
+                    CC-0{currentPatient?.token_number ?? '—'}
                   </div>
                   <div>
-                    <h3 className="font-black text-base text-slate-900 leading-tight">{currentPatient?.patient_name || 'Ravi Kumar'}</h3>
-                    <p className="text-xs text-slate-600 font-medium">{currentPatient?.age || 32} Yrs • {currentPatient?.gender || 'Male'} • Phone: {currentPatient?.phone}</p>
+                    <h3 className="font-black text-base text-slate-900 leading-tight">{currentPatient?.patient_name || 'No patient selected'}</h3>
+                    <p className="text-xs text-slate-600 font-medium">{currentPatient?.age ?? '—'} Yrs • {currentPatient?.gender || '—'} • Phone: {currentPatient?.phone || '—'}</p>
                     <span className="text-[10px] font-bold text-rose-600 block mt-0.5">Allergies: {currentPatient?.allergies || 'None'}</span>
                   </div>
                 </div>
@@ -2003,7 +1961,7 @@ export default function Dashboard({ initialTab = 'dashboard' }: DashboardProps) 
             <div className="space-y-3 text-xs">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 font-black text-base flex items-center justify-center">
-                  CC-0{selectedPatientRecord?.token_number || currentPatient?.token_number || 12}
+                  CC-0{selectedPatientRecord?.token_number ?? currentPatient?.token_number ?? '—'}
                 </div>
                 <div>
                   <h4 className="font-black text-sm text-slate-900">{selectedPatientRecord?.patient_name || currentPatient?.patient_name}</h4>
