@@ -2,17 +2,10 @@
   "version": 2,
   "buildCommand": "cd webapp && npm install && npm run build",
   "outputDirectory": "webapp/dist",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "clinic_os/main.py"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
