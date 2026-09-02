@@ -3,30 +3,44 @@ import { supabase } from '../lib/supabase'
 
 export interface DoctorProfile {
   doctor_id: string
-  hospital_id: string
+  doctor_code: string // Unique Doctor ID e.g. H1-D-0001
+  hospital_id: string | null // null only for super_admin, which is hospital-less
   hospital_name: string
+  hospital_status: 'active' | 'suspended' | 'blocked' | 'banned' | 'deleted'
   name: string
   email: string
   department_id: string
   department_name: string
   specialization: string
-  role: 'doctor' | 'hospital_admin' | 'super_admin'
+  role: 'doctor' | 'hospital_admin' | 'super_admin' | 'staff'
+  account_status: 'active' | 'suspended' | 'blocked' | 'banned' | 'deleted'
   status: 'active' | 'inactive' | 'on_leave'
 }
 
 interface AuthContextType {
   currentUser: any | null
   doctorProfile: DoctorProfile | null
-  userRole: 'hospital_admin' | 'doctor' | 'super_admin' | null
+  userRole: 'hospital_admin' | 'doctor' | 'super_admin' | 'staff' | null
   isLoading: boolean
   error: string | null
-  loginWithSupabase: (email: string, pass: string, expectedRole?: 'hospital_admin' | 'doctor') => Promise<any>
+  loginWithSupabase: (identifier: string, pass: string, expectedRole?: 'hospital_admin' | 'doctor') => Promise<any>
   registerUserInSupabase: (
     email: string,
     pass: string,
-    metadata: { role: string; name: string; hospital_id?: string; dept?: string; fee?: number; limit?: number }
+    metadata: {
+      role: string
+      name: string
+      doctor_code?: string
+      hospital_id?: string
+      dept?: string
+      fee?: number
+      limit?: number
+      room?: string
+      specialization?: string
+    }
   ) => Promise<any>
   logout: () => Promise<void>
+  validateActiveSession: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -34,47 +48,113 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<any | null>(null)
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null)
-  const [userRole, setUserRole] = useState<'hospital_admin' | 'doctor' | 'super_admin' | null>(null)
+  const [userRole, setUserRole] = useState<'hospital_admin' | 'doctor' | 'super_admin' | 'staff' | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
+  // 1. Initial Session Load & Two-Layer Status Verification
+  const validateUserProfile = async (user: any) => {
+    try {
+      const { data: profileData, error: profileErr } = await supabase
+        .from('profiles')
+        .select('*, hospitals(*)')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (profileErr) {
+        console.warn('Profile fetch error:', profileErr.message)
+      }
+
+      if (profileData) {
+        const role = profileData.role || 'doctor'
+        const hospObj = profileData.hospitals
+        const hospStatus = hospObj?.status || 'active'
+        const accStatus = profileData.account_status || (profileData.is_active ? 'active' : 'blocked')
+
+        // Check Layer 1: Individual Profile Active Status
+        if (!profileData.is_active || accStatus !== 'active') {
+          console.warn('Account is inactive or blocked:', accStatus)
+          await supabase.auth.signOut()
+          setCurrentUser(null)
+          setUserRole(null)
+          setDoctorProfile(null)
+          return false
+        }
+
+        // Check Layer 2: Hospital Organization Active Status (non-super_admin)
+        if (role !== 'super_admin' && hospStatus !== 'active') {
+          console.warn('Hospital is inactive or blocked:', hospStatus)
+          await supabase.auth.signOut()
+          setCurrentUser(null)
+          setUserRole(null)
+          setDoctorProfile(null)
+          return false
+        }
+
+        const hospName = hospObj?.name || user.user_metadata?.hospital_name || 'Hospital Facility'
+        const hospId = profileData.hospital_id || user.user_metadata?.hospital_id || null
+
+        // Never default to a shared tenant bucket — a hospital-less non-admin
+        // session must be rejected, not silently pooled with other hospitals.
+        if (role !== 'super_admin' && !hospId) {
+          console.warn('Profile has no hospital_id linked; rejecting session.')
+          await supabase.auth.signOut()
+          setCurrentUser(null)
+          setUserRole(null)
+          setDoctorProfile(null)
+          return false
+        }
+
+        const docCode = profileData.doctor_code || user.user_metadata?.doctor_code || `DOC-${user.id.slice(-4).toUpperCase()}`
+
+        const profile: DoctorProfile = {
+          doctor_id: user.id,
+          doctor_code: docCode,
+          hospital_id: hospId,
+          hospital_name: hospName,
+          hospital_status: hospStatus,
+          name: profileData.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Doctor',
+          email: user.email || '',
+          department_id: profileData.department || 'General',
+          department_name: profileData.department || 'General Medicine',
+          specialization: profileData.specialization || 'Consultant Specialist',
+          role: role,
+          account_status: accStatus,
+          status: 'active',
+        }
+
+        setCurrentUser(user)
+        setUserRole(profile.role)
+        setDoctorProfile(profile)
+        localStorage.setItem('user_role', profile.role)
+        localStorage.setItem('hospital_id', hospId || '')
+        localStorage.setItem('hospital_name', hospName)
+        localStorage.setItem('doctor_id', user.id)
+        localStorage.setItem('doctor_code', docCode)
+        return true
+      }
+      return false
+    } catch (e) {
+      console.warn('Error during validateUserProfile:', e)
+      return false
+    }
+  }
+
+  // Periodic Authorization Heartbeat to terminate sessions if blocked
+  const validateActiveSession = async (): Promise<boolean> => {
+    if (!currentUser) return false
+    return await validateUserProfile(currentUser)
+  }
+
   useEffect(() => {
-    // Check initial Supabase Session or Saved Fast Session
     const initAuth = async () => {
       try {
-        const cachedUser = localStorage.getItem('clinicos_cached_user')
-        const cachedRole = localStorage.getItem('user_role') as any
-        const cachedProfile = localStorage.getItem('clinicos_cached_profile')
-
-        if (cachedUser && cachedRole && cachedProfile) {
-          setCurrentUser(JSON.parse(cachedUser))
-          setUserRole(cachedRole)
-          setDoctorProfile(JSON.parse(cachedProfile))
-          setIsLoading(false)
-          return
-        }
-
         const { data: { session } } = await supabase.auth.getSession()
         if (session && session.user) {
-          setCurrentUser(session.user)
-          const role = session.user.user_metadata?.role || (localStorage.getItem('user_role') as any) || 'doctor'
-          setUserRole(role)
-          
-          setDoctorProfile({
-            doctor_id: session.user.id,
-            hospital_id: session.user.user_metadata?.hospital_id || 'hosp-001',
-            hospital_name: session.user.user_metadata?.hospital_name || 'Hospital Facility',
-            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-            email: session.user.email || '',
-            department_id: 'dept-cardio-01',
-            department_name: session.user.user_metadata?.department || 'General',
-            specialization: 'Consultant Specialist',
-            role: role,
-            status: 'active',
-          })
+          await validateUserProfile(session.user)
         }
       } catch (e) {
-        console.warn('Supabase Auth init:', e)
+        console.warn('Supabase Auth init notice:', e)
       } finally {
         setIsLoading(false)
       }
@@ -82,316 +162,354 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        setCurrentUser(session.user)
-        const role = session.user.user_metadata?.role || (localStorage.getItem('user_role') as any) || 'doctor'
-        setUserRole(role)
+        await validateUserProfile(session.user)
+      } else {
+        setCurrentUser(null)
+        setUserRole(null)
+        setDoctorProfile(null)
       }
     })
 
-    return () => subscription.unsubscribe()
+    // 60-second periodic heartbeat checking hospital/account status
+    const interval = setInterval(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const isValid = await validateUserProfile(session.user)
+        if (!isValid && window.location.pathname !== '/account-blocked' && window.location.pathname !== '/login') {
+          window.location.href = '/account-blocked'
+        }
+      }
+    }, 60000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearInterval(interval)
+    }
   }, [])
 
-  // BLAZING FAST LOGIN WITH INSTANT EVALUATION & 1S SUPABASE TIMEOUT
-  const loginWithSupabase = async (email: string, pass: string, expectedRole?: 'hospital_admin' | 'doctor') => {
+  // 2. SUPABASE PASSWORD AUTHENTICATION WITH TWO-LAYER SECURITY CHECKS
+  const loginWithSupabase = async (identifier: string, pass: string, expectedRole?: 'hospital_admin' | 'doctor') => {
     setIsLoading(true)
     setError(null)
-    const cleanEmail = email.trim().toLowerCase()
+    const cleanId = identifier.trim()
     const cleanPass = pass.trim()
 
-    // 1. INSTANT CHECK: Local Storage & Supabase Registries (Instant response)
+    let resolvedEmail = cleanId.toLowerCase()
 
-    // Check Hospital Admin local registry
     try {
-      const hospitalsRaw = localStorage.getItem('clinicos_hospitals')
-      const hospitalsList: any[] = hospitalsRaw ? JSON.parse(hospitalsRaw) : []
-      const foundHosp = hospitalsList.find(
-        (h) => h.email?.trim().toLowerCase() === cleanEmail && (h.password?.trim() === cleanPass || !h.password)
-      )
+      // If identifier is a Doctor ID (e.g. H1-D-0001, H1-CARDIO-01) without @ symbol:
+      if (!cleanId.includes('@')) {
+        const { data: matchedProfile } = await supabase
+          .from('profiles')
+          .select('email, doctor_code, is_active, account_status')
+          .ilike('doctor_code', cleanId)
+          .maybeSingle()
 
-      if (foundHosp) {
-        if (expectedRole && expectedRole !== 'hospital_admin') {
-          setIsLoading(false)
-          throw new Error('Unauthorized role access. This portal is strictly for Hospital Administrators.')
+        if (matchedProfile && matchedProfile.email) {
+          if (!matchedProfile.is_active || matchedProfile.account_status !== 'active') {
+            throw new Error('Access Denied: This Doctor ID account is restricted or deactivated.')
+          }
+          resolvedEmail = matchedProfile.email.toLowerCase()
+        } else {
+          // Local registry fallback check
+          const localRegistryRaw = localStorage.getItem('clinicos_user_registry')
+          const localRegistry: any[] = localRegistryRaw ? JSON.parse(localRegistryRaw) : []
+          const found = localRegistry.find(
+            (u) =>
+              (u.doctor_code && u.doctor_code.toUpperCase() === cleanId.toUpperCase()) ||
+              (u.id && u.id.toUpperCase() === cleanId.toUpperCase())
+          )
+
+          if (found && found.email) {
+            resolvedEmail = found.email.toLowerCase()
+          } else {
+            throw new Error(`Doctor ID "${cleanId}" not found. Please verify your assigned Doctor ID.`)
+          }
         }
-
-        const mockUser = {
-          id: foundHosp.id || `hosp-user-${Date.now()}`,
-          email: cleanEmail,
-          user_metadata: {
-            full_name: foundHosp.name,
-            role: 'hospital_admin',
-            hospital_id: foundHosp.id,
-            hospital_name: foundHosp.name,
-          },
-        }
-
-        const profile: DoctorProfile = {
-          doctor_id: mockUser.id,
-          hospital_id: foundHosp.id,
-          hospital_name: foundHosp.name,
-          name: foundHosp.name,
-          email: cleanEmail,
-          department_id: 'dept-admin-01',
-          department_name: 'Hospital Administration',
-          specialization: 'Chief Administrator',
-          role: 'hospital_admin',
-          status: 'active',
-        }
-
-        setCurrentUser(mockUser)
-        setUserRole('hospital_admin')
-        setDoctorProfile(profile)
-        localStorage.setItem('user_role', 'hospital_admin')
-        localStorage.setItem('hospital_id', foundHosp.id)
-        localStorage.setItem('hospital_name', foundHosp.name)
-        localStorage.setItem('clinicos_cached_user', JSON.stringify(mockUser))
-        localStorage.setItem('clinicos_cached_profile', JSON.stringify(profile))
-        setIsLoading(false)
-        return { user: mockUser }
       }
-    } catch (e) {}
 
-    // Check Doctor local roster
-    try {
-      const doctorsRaw = localStorage.getItem('clinicos_hospital_doctors')
-      const doctorsList: any[] = doctorsRaw ? JSON.parse(doctorsRaw) : []
-      const foundDoc = doctorsList.find(
-        (d) => d.email?.trim().toLowerCase() === cleanEmail && (d.password?.trim() === cleanPass || !d.password)
-      )
+      let user: any = null
 
-      if (foundDoc) {
-        if (expectedRole && expectedRole !== 'doctor') {
-          setIsLoading(false)
-          throw new Error('Unauthorized role access. This portal is strictly for Doctors.')
-        }
-
-        const mockUser = {
-          id: foundDoc.id || `doc-user-${Date.now()}`,
-          email: cleanEmail,
-          user_metadata: {
-            full_name: foundDoc.name,
-            role: 'doctor',
-            hospital_id: foundDoc.hospital_id || 'hosp-001',
-            department: foundDoc.dept || 'General',
-          },
-        }
-
-        const profile: DoctorProfile = {
-          doctor_id: mockUser.id,
-          hospital_id: foundDoc.hospital_id || 'hosp-001',
-          hospital_name: foundDoc.hospital_name || 'Hospital Facility',
-          name: foundDoc.name,
-          email: cleanEmail,
-          department_id: 'dept-01',
-          department_name: foundDoc.dept || 'General',
-          specialization: foundDoc.specialization || 'Consultant Specialist',
-          role: 'doctor',
-          status: 'active',
-        }
-
-        setCurrentUser(mockUser)
-        setUserRole('doctor')
-        setDoctorProfile(profile)
-        localStorage.setItem('user_role', 'doctor')
-        localStorage.setItem('hospital_id', foundDoc.hospital_id || 'hosp-001')
-        localStorage.setItem('clinicos_cached_user', JSON.stringify(mockUser))
-        localStorage.setItem('clinicos_cached_profile', JSON.stringify(profile))
-        setIsLoading(false)
-        return { user: mockUser }
-      }
-    } catch (e) {}
-
-    // Check Saved User Registry
-    try {
-      const savedUsersRaw = localStorage.getItem('clinicos_user_registry')
-      const registry: any[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : []
-      const found = registry.find(
-        (u) => u.email?.trim().toLowerCase() === cleanEmail && u.password?.trim() === cleanPass
-      )
-
-      if (found) {
-        const role = found.role || expectedRole || 'doctor'
-        if (expectedRole && role !== expectedRole && role !== 'super_admin') {
-          setIsLoading(false)
-          throw new Error(`Unauthorized role access. This portal is strictly for ${expectedRole === 'hospital_admin' ? 'Hospital Administrators' : 'Doctors'}.`)
-        }
-
-        const mockUser = {
-          id: found.id || `user-${Date.now()}`,
-          email: cleanEmail,
-          user_metadata: {
-            full_name: found.name,
-            role: role,
-            hospital_id: found.hospital_id || 'hosp-001',
-            hospital_name: found.name,
-          },
-        }
-
-        const profile: DoctorProfile = {
-          doctor_id: mockUser.id,
-          hospital_id: found.hospital_id || 'hosp-001',
-          hospital_name: found.name || 'Hospital Facility',
-          name: found.name || cleanEmail.split('@')[0],
-          email: cleanEmail,
-          department_id: 'dept-cardio-01',
-          department_name: found.dept || 'General',
-          specialization: 'Consultant Specialist',
-          role: role,
-          status: 'active',
-        }
-
-        setCurrentUser(mockUser)
-        setUserRole(role)
-        setDoctorProfile(profile)
-        localStorage.setItem('user_role', role)
-        localStorage.setItem('hospital_id', found.hospital_id || 'hosp-001')
-        localStorage.setItem('clinicos_cached_user', JSON.stringify(mockUser))
-        localStorage.setItem('clinicos_cached_profile', JSON.stringify(profile))
-        setIsLoading(false)
-        return { user: mockUser }
-      }
-    } catch (e) {}
-
-    // 2. REMOTE SUPABASE AUTH WITH 1.2 SECOND FAST TIMEOUT RACE
-    try {
-      const supabaseLoginPromise = supabase.auth.signInWithPassword({
-        email: cleanEmail,
+      // Step 1: Authenticate with Supabase Auth
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: resolvedEmail,
         password: cleanPass,
       })
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Supabase Auth network query timeout')), 1200)
-      )
+      if (data?.user) {
+        user = data.user
+      } else {
+        // Resilient Fallback: Check local verified user registry
+        const regRaw = localStorage.getItem('clinicos_user_registry')
+        const registry: any[] = regRaw ? JSON.parse(regRaw) : []
+        const regUser = registry.find(
+          u =>
+            (u.email?.toLowerCase() === resolvedEmail.toLowerCase() ||
+             (u.doctor_code && u.doctor_code.toUpperCase() === cleanId.toUpperCase())) &&
+            u.password === cleanPass
+        )
 
-      const { data, error: authError }: any = await Promise.race([supabaseLoginPromise, timeoutPromise])
-
-      if (!authError && data?.user) {
-        const role = data.user.user_metadata?.role || expectedRole || 'doctor'
-        if (expectedRole && role !== expectedRole && role !== 'super_admin') {
-          await supabase.auth.signOut()
-          setIsLoading(false)
-          throw new Error(`Unauthorized role access. This portal is strictly for ${expectedRole === 'hospital_admin' ? 'Hospital Administrators' : 'Doctors'}.`)
+        if (regUser) {
+          user = {
+            id: regUser.id,
+            email: regUser.email,
+            user_metadata: {
+              role: regUser.role,
+              full_name: regUser.name,
+              hospital_id: regUser.hospital_id,
+              doctor_code: regUser.doctor_code,
+            },
+          }
+        } else {
+          throw new Error(authError?.message || 'Invalid Doctor ID / Email or Password.')
         }
-
-        const profile: DoctorProfile = {
-          doctor_id: data.user.id,
-          hospital_id: data.user.user_metadata?.hospital_id || 'hosp-001',
-          hospital_name: data.user.user_metadata?.hospital_name || 'Hospital Facility',
-          name: data.user.user_metadata?.full_name || cleanEmail.split('@')[0],
-          email: cleanEmail,
-          department_id: 'dept-cardio-01',
-          department_name: data.user.user_metadata?.department || 'General',
-          specialization: 'Consultant Specialist',
-          role: role,
-          status: 'active',
-        }
-
-        setCurrentUser(data.user)
-        setUserRole(role)
-        setDoctorProfile(profile)
-        localStorage.setItem('user_role', role)
-        localStorage.setItem('clinicos_cached_user', JSON.stringify(data.user))
-        localStorage.setItem('clinicos_cached_profile', JSON.stringify(profile))
-        setIsLoading(false)
-        return data
       }
-    } catch (err: any) {
-      console.warn('Supabase Auth remote notice:', err.message)
-    }
 
-    setIsLoading(false)
-    throw new Error('Invalid email or password. Please verify your credentials or click a demo account button.')
+      // Step 2: Fetch Profile and Hospital Node for Two-Layer Security
+      let { data: profileData } = await supabase
+        .from('profiles')
+        .select('*, hospitals(*)')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      const role = profileData?.role || user.user_metadata?.role || expectedRole || 'doctor'
+      const hospObj = profileData?.hospitals
+      const hospStatus = hospObj?.status || 'active'
+      const accStatus = profileData?.account_status || (profileData?.is_active ? 'active' : 'blocked')
+
+      // Layer 1 Check: Individual Profile Status
+      if (profileData && (!profileData.is_active || accStatus !== 'active')) {
+        await supabase.auth.signOut()
+        setIsLoading(false)
+        throw new Error('Access Denied: Your account is currently restricted. Please contact your facility administrator.')
+      }
+
+      // Layer 2 Check: Hospital Node Status (non-super_admin)
+      if (role !== 'super_admin' && hospStatus !== 'active') {
+        await supabase.auth.signOut()
+        setIsLoading(false)
+        throw new Error('Access Denied: Your hospital facility account is currently unavailable. Please contact the platform administrator.')
+      }
+
+      const hospId = profileData?.hospital_id || user.user_metadata?.hospital_id || null
+
+      // super_admin is legitimately hospital-less; every other role must
+      // resolve to a real hospital — never silently default to a shared
+      // tenant bucket (that was the 'hosp-001' bug: any broken session
+      // collapsed onto one shared hospital and could see its data).
+      if (role !== 'super_admin' && !hospId) {
+        await supabase.auth.signOut()
+        setIsLoading(false)
+        throw new Error('Account setup incomplete: no hospital is linked to this account. Please contact your platform administrator.')
+      }
+
+      const hospName = hospObj?.name || user.user_metadata?.hospital_name || 'Hospital Facility'
+      const docCode = profileData?.doctor_code || user.user_metadata?.doctor_code || cleanId.toUpperCase()
+
+      const profile: DoctorProfile = {
+        doctor_id: user.id,
+        doctor_code: docCode,
+        hospital_id: hospId,
+        hospital_name: hospName,
+        hospital_status: hospStatus,
+        name: profileData?.full_name || user.user_metadata?.full_name || resolvedEmail.split('@')[0],
+        email: resolvedEmail,
+        department_id: profileData?.department || 'General',
+        department_name: profileData?.department || 'General Medicine',
+        specialization: profileData?.specialization || 'Consultant Specialist',
+        role: role as any,
+        account_status: accStatus,
+        status: 'active',
+      }
+
+      setCurrentUser(user)
+      setUserRole(role as any)
+      setDoctorProfile(profile)
+      localStorage.setItem('user_role', role)
+      localStorage.setItem('hospital_id', hospId)
+      localStorage.setItem('hospital_name', hospName)
+      localStorage.setItem('doctor_id', user.id)
+      localStorage.setItem('doctor_code', docCode)
+      setIsLoading(false)
+      return { user, profile, role }
+    } catch (err: any) {
+      setIsLoading(false)
+      setError(err.message || 'Login failed')
+      throw err
+    }
   }
 
-  // Register User Credentials in Supabase Auth & Supabase Database Tables
+  // 3. REGISTER USER IN SUPABASE AUTH & PROFILES TABLE
   const registerUserInSupabase = async (
     email: string,
     pass: string,
-    metadata: { role: string; name: string; hospital_id?: string; dept?: string; fee?: number; limit?: number }
+    metadata: {
+      role: string
+      name: string
+      doctor_code?: string
+      hospital_id?: string
+      dept?: string
+      fee?: number
+      limit?: number
+      room?: string
+      specialization?: string
+    }
   ) => {
     const cleanEmail = email.trim().toLowerCase()
     const cleanPass = pass.trim()
+    const docCode = metadata.doctor_code || `H1-D-${Date.now().toString().slice(-4)}`
 
-    // 1. Save to local registry backup
+    // Validate UUID format so PostgreSQL trigger (hospital_id)::uuid never fails
+    const isUUID = (str?: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str || '')
+    const validHospitalId = isUUID(metadata.hospital_id) ? metadata.hospital_id : null
+
+    let createdUserId: string | null = null
+
     try {
-      const savedUsersRaw = localStorage.getItem('clinicos_user_registry')
-      const registry: any[] = savedUsersRaw ? JSON.parse(savedUsersRaw) : []
-      const newUser = {
-        id: `usr-${Date.now()}`,
-        email: cleanEmail,
-        password: cleanPass,
-        name: metadata.name,
-        role: metadata.role,
-        hospital_id: metadata.hospital_id || 'hosp-001',
-        dept: metadata.dept || 'General',
-        timestamp: new Date().toISOString()
+      // Step A: Creation via the server-side admin-ops Edge Function, which
+      // holds the service_role key ONLY server-side and independently
+      // re-checks that the caller (current session) is a hospital_admin for
+      // this exact hospital_id (or super_admin) before creating anything —
+      // see supabase/functions/admin-ops/index.ts. Never call the service
+      // role directly from the browser.
+      try {
+        const { data: fnData, error: fnError } = await supabase.functions.invoke('admin-ops', {
+          body: {
+            action: 'create_doctor_auth_user',
+            payload: {
+              email: cleanEmail,
+              password: cleanPass,
+              full_name: metadata.name,
+              role: metadata.role,
+              doctor_code: docCode,
+              hospital_id: validHospitalId,
+              department: metadata.dept || 'General',
+              specialization: metadata.specialization,
+              room: metadata.room,
+              limit: metadata.limit,
+              fee: metadata.fee,
+            },
+          },
+        })
+
+        if (fnError) {
+          console.warn('admin-ops create_doctor_auth_user notice:', fnError.message)
+        } else if (fnData?.success && fnData?.user_id) {
+          createdUserId = fnData.user_id
+        } else if (fnData && !fnData.success) {
+          console.warn('admin-ops create_doctor_auth_user rejected:', fnData.error)
+        }
+      } catch (adminErr) {
+        console.warn('admin-ops invoke exception:', adminErr)
       }
-      const existingIdx = registry.findIndex((u) => u.email?.trim().toLowerCase() === cleanEmail)
-      if (existingIdx >= 0) {
-        registry[existingIdx] = { ...registry[existingIdx], ...newUser }
-      } else {
-        registry.push(newUser)
-      }
-      localStorage.setItem('clinicos_user_registry', JSON.stringify(registry))
-    } catch (e) {}
 
-    // 2. Save directly to Supabase Database Tables (doctors & clinicos_user_registry)
-    try {
-      await supabase.from('doctors').upsert([
-        {
-          email: cleanEmail,
-          password_hash: cleanPass,
-          name: metadata.name,
-          role: metadata.role,
-          hospital_id: metadata.hospital_id || 'hosp-001',
-          department: metadata.dept || 'General',
-          fee: metadata.fee || 500,
-          daily_limit: metadata.limit || 25,
-          created_at: new Date().toISOString(),
-        },
-      ], { onConflict: 'email' })
-    } catch (dbErr: any) {
-      console.warn('Supabase Database doctors table notice:', dbErr.message)
-    }
-
-    try {
-      await supabase.from('clinicos_user_registry').upsert([
-        {
+      // Step B: Fallback to standard signUp if the Edge Function was
+      // unreachable/unavailable — this path relies on RLS + the
+      // handle_new_user trigger, same as before, and never bypasses RLS.
+      if (!createdUserId) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
           email: cleanEmail,
           password: cleanPass,
-          name: metadata.name,
-          role: metadata.role,
-          hospital_id: metadata.hospital_id || 'hosp-001',
-          department: metadata.dept || 'General',
-          created_at: new Date().toISOString(),
-        },
-      ], { onConflict: 'email' })
-    } catch (dbErr: any) {
-      console.warn('Supabase Database user registry table notice:', dbErr.message)
-    }
-
-    // 3. Call Supabase Auth signUp API
-    try {
-      await supabase.auth.signUp({
-        email: cleanEmail,
-        password: cleanPass,
-        options: {
-          data: {
-            full_name: metadata.name,
-            role: metadata.role,
-            hospital_id: metadata.hospital_id || 'hosp-001',
-            department: metadata.dept || 'General',
+          options: {
+            data: {
+              full_name: metadata.name,
+              role: metadata.role,
+              doctor_code: docCode,
+              hospital_id: validHospitalId,
+              department: metadata.dept || 'General',
+            },
           },
-        },
-      })
-    } catch (authErr: any) {
-      console.warn('Supabase Auth signUp notice:', authErr.message)
+        })
+
+        if (signUpError) {
+          console.warn('Supabase Auth signUp notice:', signUpError.message)
+        }
+        if (data?.user) {
+          createdUserId = data.user.id
+        }
+      }
+
+      // NOTE: no more fake `user-${Date.now()}` fallback id — if Supabase
+      // Auth genuinely failed to create/return a user, there is no real
+      // auth.users row to attach a profile to, and inserting one under a
+      // made-up id would violate the profiles->auth.users FK (or silently
+      // create an orphaned, inaccessible record). Surface a real error
+      // instead of pretending registration succeeded.
+      if (!createdUserId) {
+        throw new Error('Could not create the account in Supabase Auth. Please try again.')
+      }
+      const finalUserId = createdUserId
+
+      // Step C: only needed for the Step-B fallback path (edge function's
+      // create_doctor_auth_user already writes doctor_details, and the
+      // handle_new_user trigger already writes profiles from user_metadata
+      // on auth.users insert for BOTH paths). Uses the RLS-respecting
+      // client — the caller's own session must be allowed to write this
+      // row per the "Hospital Admin manage hospital profiles" policy.
+      try {
+        if (metadata.role === 'doctor') {
+          await supabase.from('doctor_details').upsert([
+            {
+              id: finalUserId,
+              doctor_code: docCode,
+              hospital_id: validHospitalId,
+              name: metadata.name,
+              email: cleanEmail,
+              specialization: metadata.specialization || 'Consultant Specialist',
+              room_number: metadata.room || 'Room 101',
+              daily_patient_limit: metadata.limit || 30,
+              consultation_fee: metadata.fee || 500,
+              availability_status: 'active',
+              is_active: true,
+            },
+          ])
+        }
+      } catch (dbErr) {
+        console.warn('doctor_details upsert notice:', dbErr)
+      }
+
+      // Step D: Always synchronize to Local Registry for guaranteed instant offline/resilient sign-in
+      try {
+        const regRaw = localStorage.getItem('clinicos_user_registry')
+        const registry: any[] = regRaw ? JSON.parse(regRaw) : []
+        const existingIdx = registry.findIndex(u => u.email === cleanEmail || u.doctor_code === docCode)
+        const userEntry = {
+          id: finalUserId,
+          email: cleanEmail,
+          password: cleanPass,
+          role: metadata.role,
+          name: metadata.name,
+          doctor_code: docCode,
+          hospital_id: validHospitalId,
+          department: metadata.dept || 'General',
+          is_active: true,
+          created_at: new Date().toISOString()
+        }
+        if (existingIdx >= 0) {
+          registry[existingIdx] = userEntry
+        } else {
+          registry.unshift(userEntry)
+        }
+        localStorage.setItem('clinicos_user_registry', JSON.stringify(registry))
+      } catch (regErr) {
+        console.warn('Local registry sync notice:', regErr)
+      }
+
+      return { user: { id: finalUserId, email: cleanEmail } }
+    } catch (err: any) {
+      console.warn('Supabase registerUser error:', err.message)
+      throw err
     }
   }
 
   const logout = async () => {
+    // Capture the outgoing session's identity BEFORE clearing it, so the
+    // tenant-scoped caches below can actually be found and removed.
+    const outgoingDoctorId = doctorProfile?.doctor_id || localStorage.getItem('doctor_id')
+    const outgoingHospitalId = doctorProfile?.hospital_id || localStorage.getItem('hospital_id')
+
     try {
       await supabase.auth.signOut()
     } catch (e) {}
@@ -399,8 +517,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDoctorProfile(null)
     setUserRole(null)
     localStorage.removeItem('user_role')
-    localStorage.removeItem('clinicos_cached_user')
-    localStorage.removeItem('clinicos_cached_profile')
+    localStorage.removeItem('hospital_id')
+    localStorage.removeItem('hospital_name')
+    localStorage.removeItem('doctor_id')
+    localStorage.removeItem('doctor_code')
+
+    // Previously only the four keys above were cleared — every per-doctor
+    // and per-hospital cache below survived logout, so the next person to
+    // log into this browser (a different hospital/doctor) could still see
+    // stale queue/appointment/doctor-list data from the outgoing session.
+    if (outgoingDoctorId) {
+      localStorage.removeItem(`clinic_os_queue_${outgoingDoctorId}`)
+      localStorage.removeItem(`clinic_os_appointments_${outgoingDoctorId}`)
+      localStorage.removeItem(`clinic_os_reports_${outgoingDoctorId}`)
+      localStorage.removeItem(`clinic_os_doctor_profile_${outgoingDoctorId}`)
+    }
+    if (outgoingHospitalId) {
+      localStorage.removeItem(`clinicos_hospital_doctors_${outgoingHospitalId}`)
+    }
+    // Not yet hospital-scoped in storage — clear entirely rather than risk
+    // showing it to the next session on this device.
+    localStorage.removeItem('clinicos_appointments')
   }
 
   return (
@@ -414,6 +551,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithSupabase,
         registerUserInSupabase,
         logout,
+        validateActiveSession,
       }}
     >
       {children}

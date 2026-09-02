@@ -19,7 +19,7 @@ import { useAuth } from '../context/AuthContext'
 
 export default function DoctorProfile() {
   const { doctorProfile } = useAuth()
-  const doctorId = doctorProfile?.doctor_id || 'doc-001'
+  const doctorId = doctorProfile?.doctor_id || ''
 
   const [activeTab, setActiveTab] = useState<'basic' | 'professional' | 'hospital' | 'consultation' | 'schedule' | 'documents' | 'patient' | 'account'>('basic')
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -99,7 +99,7 @@ export default function DoctorProfile() {
 
     // Clinic OS Internal
     doctor_id: doctorId,
-    hospital_id: 'hosp-001',
+    hospital_id: doctorProfile?.hospital_id || '',
     role: 'Senior Doctor & HOD',
     firebase_uid: 'fb-uid-auth-98742',
     account_status: 'Active',

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Send, CheckCheck } from 'lucide-react'
 import HospitalAdminHeader from '../../components/HospitalAdminHeader'
+import { useAuth } from '../../context/AuthContext'
 import { useSEO } from '../../hooks/useSEO'
 
 interface DoctorItem {
@@ -24,9 +25,16 @@ export default function HospitalAdminMessagesPage() {
     description: 'Send direct real-time instructions to practising doctors.',
   })
 
+  const { doctorProfile } = useAuth()
+  const currentHospId = doctorProfile?.hospital_id || ''
+
+  // Hospital-scoped key ONLY — see HospitalAdminQueuesPage.tsx for the same
+  // fix; the unscoped global key here showed a stale/other-hospital doctor
+  // list on shared browsers.
   const [hospitalDoctors] = useState<DoctorItem[]>(() => {
+    if (!currentHospId) return []
     try {
-      const saved = localStorage.getItem('clinicos_hospital_doctors')
+      const saved = localStorage.getItem(`clinicos_hospital_doctors_${currentHospId}`)
       if (saved) return JSON.parse(saved)
     } catch (e) {}
     return []

@@ -15,7 +15,7 @@ import { getQueueForDoctor, getAppointmentsForDoctor } from '../utils/doctorStor
 
 export default function History() {
   const { doctorProfile } = useAuth()
-  const doctorId = doctorProfile?.doctor_id || 'doc-001'
+  const doctorId = doctorProfile?.doctor_id || ''
   const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
 
   const [activeTab, setActiveTab] = useState<'appointments' | 'patients' | 'reports'>('appointments')

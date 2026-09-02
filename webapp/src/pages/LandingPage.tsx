@@ -1,806 +1,1613 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  CheckCircle,
-  Headphones,
-  Zap,
-  User,
-  Star,
-  ShieldCheck,
-  ArrowRight,
-  Play,
-  QrCode,
-  FileText,
-  BarChart2,
-  Building2,
-  TrendingUp,
-  HelpCircle,
-  ChevronDown,
-  Volume2,
-  Smartphone,
-  Lock,
-  Clock
+  QrCode, RefreshCw, UserCheck, Users, BarChart3,
+  Building2, Calendar, Smile, ShieldCheck, FileText,
+  Clock, Stethoscope, ArrowRight, Play, CheckCircle2,
+  MapPin, HeartPulse, ChevronRight, X, Phone, Mail,
+  Volume2, Check, Sparkles, Send, Activity, Settings,
+  Search, Filter, Plus, Printer, UserPlus, Download,
+  TrendingUp, AlertCircle, Eye, SlidersHorizontal, Lock,
+  ChevronDown, Star, Shield, Database, Cpu, Smartphone,
+  Layers, CheckCircle, Network, ArrowUpRight, Award, Zap
 } from 'lucide-react'
-import PublicHeader from '../components/PublicHeader'
-import PublicFooter from '../components/PublicFooter'
-import ContactModal from '../components/ContactModal'
 import { useSEO } from '../hooks/useSEO'
+
+interface PatientRow {
+  id: string
+  time: string
+  name: string
+  token: string
+  gender: string
+  age: number
+  status: 'Now' | 'Next' | 'Waiting' | 'Completed'
+  color: string
+  vitals: string
+  complaint: string
+  phone: string
+}
 
 export default function LandingPage() {
   useSEO({
-    title: 'MedTech Fixaters - Smart OPD & EMR System for Indian Clinics',
-    description: 'Transform paper OPDs into digital smart clinics. 30-second AI EMR prescriptions, QR reception check-in, live audio token callouts, and WhatsApp digital Rx.',
+    title: 'Med Rapidly — Smart OPD Management for Modern Hospitals | MedTech Fixaters',
+    description: 'Med Rapidly by MedTech Fixaters helps hospitals manage appointments, live queues, doctors and patients efficiently with QR based smart system.',
   })
 
+  // ─── ONBOARDING MODAL STATE ────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false)
-  const [activeFaq, setActiveFaq] = useState<number | null>(0)
-  const [activeWorkflowTab, setActiveWorkflowTab] = useState<'checkin' | 'audio' | 'emr' | 'whatsapp'>('checkin')
+  const [leadForm, setLeadForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    hospital_name: '',
+    city: '',
+    plan: 'Hospital Pro',
+  })
+  const [leadSubmitted, setLeadSubmitted] = useState(false)
+
+  // ─── HERO REAL DASHBOARD SIMULATOR STATE ───────────────────
+  const [activeTab, setActiveTab] = useState<'Dashboard' | 'Appointments' | 'Live Queue' | 'Doctors' | 'Patients' | 'Reports' | 'Settings'>('Dashboard')
+  const [selectedDept, setSelectedDept] = useState<'Cardiology' | 'Orthopaedics' | 'Pediatrics'>('Cardiology')
   
-  // Interactive ROI Calculator State
-  const [dailyPatients, setDailyPatients] = useState<number>(45)
-  const [customFee, setCustomFee] = useState<number>(500)
+  // Dynamic Real-time Counters
+  const [stats, setStats] = useState({
+    appointments: 256,
+    patients: 132,
+    completed: 98,
+    noShows: 14
+  })
 
-  // Dynamic Calculations based on user custom fee & patients
-  const hoursSavedPerMonth = Math.round((dailyPatients * 4 * 30) / 60)
-  const monthlyRevenue = dailyPatients * customFee * 30
-  const revenueLossPrevented = Math.round(monthlyRevenue * 0.15)
+  const [currentServingIndex, setCurrentServingIndex] = useState(0)
+  const [simToast, setSimToast] = useState<string | null>(null)
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>('p1')
 
-  const faqs = [
-    {
-      q: 'How does the contactless QR reception kiosk work?',
-      a: 'Patients scan an entrance QR poster using their mobile phone camera, select their doctor, and instantly receive a live queue token number. They can track estimated wait times on their phone without standing in line or writing on paper registers.'
-    },
-    {
-      q: 'Can multiple doctors use MedTech Fixaters in a polyclinic or hospital?',
-      a: 'Yes! MedTech Fixaters supports multi-doctor and multi-hospital seat management. Each doctor gets an independent, isolated queue and private EMR workspace while the hospital admin has full oversight.'
-    },
-    {
-      q: 'Is MedTech Fixaters compliant with ABDM and medical data security standards?',
-      a: 'Absolutely. MedTech Fixaters is built in compliance with ABDM Milestone-3, HIPAA, and ISO 27001 data encryption standards with 256-bit AES database encryption.'
-    },
-    {
-      q: 'Do patients need to download any mobile app?',
-      a: 'No app download is required. The patient intake portal runs directly inside any mobile web browser on Chrome, Safari, or Samsung Internet.'
-    },
-    {
-      q: 'How long does it take to onboard our hospital or clinic?',
-      a: 'Initial account activation takes under 5 minutes. You can print your entrance QR poster immediately and invite doctors to set up their consultation schedules.'
+  // Patient database by department
+  const [deptQueues, setDeptQueues] = useState<Record<string, PatientRow[]>>({
+    Cardiology: [
+      { id: 'p1', time: '09:00 AM', name: 'Ravi Kumar', token: 'C-012', gender: 'Male', age: 48, status: 'Now', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', vitals: 'BP 125/82 • Pulse 74 bpm', complaint: 'Chest tightness & fatigue', phone: '+91 98765 11001' },
+      { id: 'p2', time: '09:30 AM', name: 'Neha Singh', token: 'C-013', gender: 'Female', age: 34, status: 'Next', color: 'bg-blue-100 text-blue-800 border-blue-300', vitals: 'BP 118/76 • Pulse 68 bpm', complaint: 'Routine ECG follow-up', phone: '+91 98765 11002' },
+      { id: 'p3', time: '10:00 AM', name: 'Mohd. Ali', token: 'C-014', gender: 'Male', age: 52, status: 'Waiting', color: 'bg-amber-100 text-amber-800 border-amber-300', vitals: 'BP 130/85 • Pulse 80 bpm', complaint: 'Post-angioplasty check', phone: '+91 98765 11003' },
+      { id: 'p4', time: '10:30 AM', name: 'Sunita Devi', token: 'C-015', gender: 'Female', age: 61, status: 'Waiting', color: 'bg-amber-100 text-amber-800 border-amber-300', vitals: 'BP 122/80 • Pulse 72 bpm', complaint: 'Palpitations review', phone: '+91 98765 11004' },
+      { id: 'p4b', time: '11:00 AM', name: 'Kishore Patel', token: 'C-016', gender: 'Male', age: 45, status: 'Waiting', color: 'bg-amber-100 text-amber-800 border-amber-300', vitals: 'BP 128/84 • Pulse 76 bpm', complaint: 'Shortness of breath', phone: '+91 98765 11005' },
+    ],
+    Orthopaedics: [
+      { id: 'p5', time: '09:15 AM', name: 'Vikram Mehta', token: 'ORT-007', gender: 'Male', age: 41, status: 'Now', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', vitals: 'SpO2 99% • Normal gait', complaint: 'Right knee acute pain', phone: '+91 98765 22001' },
+      { id: 'p6', time: '09:45 AM', name: 'Ananya Sharma', token: 'ORT-008', gender: 'Female', age: 29, status: 'Next', color: 'bg-blue-100 text-blue-800 border-blue-300', vitals: 'SpO2 98% • Normal', complaint: 'Lumbar spine MRI review', phone: '+91 98765 22002' },
+      { id: 'p7', time: '10:15 AM', name: 'Harish Patel', token: 'ORT-009', gender: 'Male', age: 55, status: 'Waiting', color: 'bg-amber-100 text-amber-800 border-amber-300', vitals: 'SpO2 99% • Normal', complaint: 'Fracture cast removal', phone: '+91 98765 22003' },
+    ],
+    Pediatrics: [
+      { id: 'p8', time: '09:00 AM', name: 'Baby Aarav', token: 'PED-015', gender: 'Male', age: 2, status: 'Now', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', vitals: 'Temp 98.6°F • Wt 11.2kg', complaint: 'Vaccination dose 3 MMR', phone: '+91 98765 33001' },
+      { id: 'p9', time: '09:30 AM', name: 'Zoya Khan', token: 'PED-016', gender: 'Female', age: 4, status: 'Next', color: 'bg-blue-100 text-blue-800 border-blue-300', vitals: 'Temp 99.1°F • Wt 14.5kg', complaint: 'Seasonal cough & fever', phone: '+91 98765 33002' },
+      { id: 'p10', time: '10:00 AM', name: 'Rohan Joshi', token: 'PED-017', gender: 'Male', age: 6, status: 'Waiting', color: 'bg-amber-100 text-amber-800 border-amber-300', vitals: 'Temp 98.4°F • Wt 18.0kg', complaint: 'General growth checkup', phone: '+91 98765 33003' },
+    ]
+  })
+
+  // Doctor roster data
+  const [doctorsList, setDoctorsList] = useState([
+    { id: 'd1', name: 'Dr. Amit Sharma', dept: 'Cardiology', room: 'Room 101', fee: '₹700', active: true, served: 24, limit: 45 },
+    { id: 'd2', name: 'Dr. Ashok Verma', dept: 'Orthopaedics', room: 'Room 104', fee: '₹650', active: true, served: 18, limit: 40 },
+    { id: 'd3', name: 'Dr. Priya Sen', dept: 'Pediatrics', room: 'Room 108', fee: '₹600', active: true, served: 31, limit: 50 },
+    { id: 'd4', name: 'Dr. Rajesh Nair', dept: 'Neurology', room: 'Room 201', fee: '₹900', active: false, served: 0, limit: 30 },
+  ])
+
+  // FAQ Accordion State
+  const [openFaq, setOpenFaq] = useState<number | null>(0)
+
+  // Doctor Availability Section Filter State
+  const [availDept, setAvailDept] = useState<string>('Cardiology')
+  const [availDate, setAvailDate] = useState<string>('Today')
+
+  const currentPatients = deptQueues[selectedDept] || []
+  const activeServing = currentPatients[currentServingIndex] || currentPatients[0]
+  const nextServing = currentPatients[currentServingIndex + 1]
+  const waitingCount = Math.max(0, currentPatients.length - (currentServingIndex + 1))
+
+  // Call Next Patient
+  const handleCallNextPatient = () => {
+    if (currentServingIndex < currentPatients.length - 1) {
+      const nextIdx = currentServingIndex + 1
+      setCurrentServingIndex(nextIdx)
+      
+      const updatedList = currentPatients.map((p, idx) => {
+        if (idx === nextIdx) return { ...p, status: 'Now' as const, color: 'bg-emerald-100 text-emerald-800 border-emerald-300' }
+        if (idx === nextIdx + 1) return { ...p, status: 'Next' as const, color: 'bg-blue-100 text-blue-800 border-blue-300' }
+        if (idx < nextIdx) return { ...p, status: 'Completed' as const, color: 'bg-slate-100 text-slate-500 border-slate-200' }
+        return p
+      })
+
+      setDeptQueues({ ...deptQueues, [selectedDept]: updatedList })
+      setSelectedPatientId(updatedList[nextIdx].id)
+      
+      setSimToast(`📢 Calling Token ${updatedList[nextIdx].token} (${updatedList[nextIdx].name}) to Room 101!`)
+      setTimeout(() => setSimToast(null), 3200)
+    } else {
+      setSimToast('All queue patients for this session have been completed!')
+      setTimeout(() => setSimToast(null), 2500)
     }
-  ]
+  }
 
-  const specialties = [
-    { title: 'General Medicine & OPD', count: '1,200+ Clinics', desc: 'Rapid intake of daily walk-ins, fever cases, and chronic disease consultations.' },
-    { title: 'Cardiology & Heart Care', count: '450+ Hospitals', desc: 'Vitals tracking (BP, Pulse, SpO2) integrated with long-term cardiac EMR records.' },
-    { title: 'Pediatrics & Child Care', count: '680+ Clinics', desc: 'Growth chart timelines, vaccination schedules, and parent WhatsApp reminders.' },
-    { title: 'Orthopedics & Sports Med', count: '520+ OPDs', desc: 'X-Ray diagnostic ordering, physical therapy follow-ups, and surgery scheduling.' },
-    { title: 'Dermatology & Cosmetology', count: '890+ Clinics', desc: 'Visual skin assessment notes, procedural consent tracking, and prescription printouts.' },
-    { title: 'Gynecology & Obstetrics', count: '760+ Hospitals', desc: 'ANC trimester tracking, ultrasound diagnosis reporting, and prenatal care notes.' }
-  ]
+  // Complete Consultation & Send WhatsApp Rx
+  const handleCompleteRx = () => {
+    setStats(prev => ({ ...prev, completed: prev.completed + 1 }))
+    setSimToast(`✅ WhatsApp Rx & Invoice dispatched to ${activeServing?.name || 'Patient'}!`)
+    setTimeout(() => setSimToast(null), 3200)
+  }
+
+  const handleToggleDoctorDuty = (docId: string) => {
+    setDoctorsList(prev => prev.map(d => d.id === docId ? { ...d, active: !d.active } : d))
+    setSimToast('Doctor duty status updated live across all OPD kiosks!')
+    setTimeout(() => setSimToast(null), 2500)
+  }
+
+  const handleLeadSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setLeadSubmitted(true)
+    setTimeout(() => {
+      setModalOpen(false)
+      setLeadSubmitted(false)
+      setLeadForm({ name: '', phone: '', email: '', hospital_name: '', city: '', plan: 'Hospital Pro' })
+    }, 2500)
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-emerald-600 selection:text-white">
-      <PublicHeader />
+    <div className="min-h-screen bg-[#FCFCFE] text-[#18233D] font-sans antialiased selection:bg-[#4361EE] selection:text-white">
+      {/* ─── NAVIGATION BAR ─────────────────────────────────── */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E6E9F0]">
+        <div className="max-w-[1360px] mx-auto px-6 h-[72px] flex items-center justify-between">
+          {/* Brand Logo with Cropped Logo Mark */}
+          <Link to="/" className="flex items-center gap-3 group">
+            <img
+              src="/assets/brand-icon.png"
+              alt="MedTech Fixaters Logo"
+              className="w-9 h-9 object-contain group-hover:scale-105 transition-transform"
+            />
+            <div>
+              <span className="text-lg font-extrabold text-[#18233D] block leading-tight tracking-tight">
+                Med Rapidly
+              </span>
+              <span className="text-[10px] text-[#5E687B] font-medium block">
+                by MedTech Fixaters • Smart Hospital
+              </span>
+            </div>
+          </Link>
 
-      {/* 1. HERO SECTION (FINVORA DESIGN MATCH) */}
-      <section className="relative pt-12 pb-20 lg:pt-16 lg:pb-24 bg-gradient-to-b from-emerald-50/30 via-white to-slate-50 border-b border-slate-100 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            {/* Left Column */}
-            <div className="lg:col-span-6 space-y-6 text-left">
-              {/* Top Pill Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-50 text-emerald-800 rounded-full border border-emerald-200 text-xs font-bold tracking-wide">
-                <ShieldCheck size={14} className="text-emerald-700" />
-                <span>BANK-GRADE SECURITY • ABDM M3 COMPLIANT</span>
-              </div>
+          {/* Navigation Links */}
+          <nav className="hidden md:flex items-center gap-7 text-[13px] font-semibold text-[#5E687B]">
+            <Link to="/" className="text-[#4361EE] font-bold border-b-2 border-[#4361EE] pb-0.5">Home</Link>
+            <Link to="/features" className="hover:text-[#18233D] transition">Features</Link>
+            <Link to="/how-it-works" className="hover:text-[#18233D] transition">How It Works</Link>
+            <Link to="/pricing" className="hover:text-[#18233D] transition">Pricing</Link>
+            <Link to="/about" className="hover:text-[#18233D] transition">About Us</Link>
+            <Link to="/architecture" className="hover:text-[#18233D] transition">Platform</Link>
+            <Link to="/contact" className="hover:text-[#18233D] transition">Contact</Link>
+          </nav>
 
-              {/* Main Headline */}
-              <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight leading-[1.15]">
-                The complete <span className="text-emerald-700">OPD management</span> platform for modern clinics.
-              </h1>
+          {/* Auth & CTA Buttons */}
+          <div className="flex items-center gap-3">
+            <Link
+              to="/login"
+              className="px-4 py-2 text-xs font-bold text-[#18233D] hover:text-[#4361EE] bg-white hover:bg-slate-50 rounded-xl border border-[#E6E9F0] transition"
+            >
+              Login
+            </Link>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="px-5 py-2.5 bg-gradient-to-r from-[#4361EE] to-[#5D4CC8] hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition transform hover:-translate-y-0.5"
+            >
+              Get Started
+            </button>
+          </div>
+        </div>
+      </header>
 
-              {/* Subtitle */}
-              <p className="text-slate-600 text-base sm:text-lg max-w-xl font-medium leading-relaxed">
-                Eliminate long patient waiting lines, generate digital EMR prescriptions in under 30 seconds, and run a 100% paperless clinic reception.
+      {/* ─── HERO SECTION ───────────────────────────────────── */}
+      <section id="home" className="relative pt-10 lg:pt-14 pb-20 px-6 max-w-[1360px] mx-auto">
+        <div className="absolute top-10 right-1/4 w-96 h-96 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+          {/* LEFT COLUMN: HEADLINE, DESCRIPTION & ACTIONS */}
+          <div className="lg:col-span-5 space-y-6 text-left pt-2">
+            <h1 className="text-4xl sm:text-5xl lg:text-[52px] font-black text-[#18233D] tracking-tight leading-[1.12]">
+              Smart OPD Management <br />
+              for{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4361EE] to-[#5D4CC8]">
+                Modern Hospitals
+              </span>
+            </h1>
+
+            <p className="text-base text-[#5E687B] font-normal leading-relaxed max-w-lg">
+              Med Rapidly helps hospitals manage appointments, queues, doctors and patients efficiently with QR based smart system.
+            </p>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <button
+                onClick={() => setModalOpen(true)}
+                className="px-6 py-3.5 bg-gradient-to-r from-[#4361EE] to-[#5D4CC8] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-500/25 transition transform hover:-translate-y-0.5 flex items-center gap-2"
+              >
+                <span>Get Started Free</span>
+                <ArrowRight size={14} />
+              </button>
+
+              <button
+                onClick={() => setModalOpen(true)}
+                className="px-6 py-3.5 bg-white hover:bg-slate-50 border border-[#E6E9F0] text-[#18233D] font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-2"
+              >
+                <div className="w-5 h-5 rounded-full bg-indigo-50 text-[#4361EE] flex items-center justify-center">
+                  <Play size={10} className="fill-[#4361EE] ml-0.5" />
+                </div>
+                <span>Watch Demo</span>
+              </button>
+            </div>
+
+            {/* 4 Feature Pills Row */}
+            <div className="pt-2 flex flex-wrap items-center gap-2.5 text-[11px] font-bold text-[#4361EE]">
+              <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
+                <QrCode size={13} /> QR Based Booking
+              </span>
+              <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
+                <RefreshCw size={13} /> Live Queue
+              </span>
+              <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
+                <Building2 size={13} /> OPD Management
+              </span>
+              <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
+                <ShieldCheck size={13} /> Secure & Reliable
+              </span>
+            </div>
+
+            {/* Interactive Simulator Tip Card */}
+            <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs space-y-1">
+              <span className="font-bold text-[#4361EE] flex items-center gap-1.5">
+                <Sparkles size={14} /> Live Interactive Simulator
+              </span>
+              <p className="text-[11px] text-[#5E687B]">
+                Click on any sidebar button (<strong className="text-slate-800">Live Queue, Appointments, Doctors, Patients, Reports, Settings</strong>) to test real-time OPD hospital controls.
               </p>
-
-              {/* User Avatars & Counter */}
-              <div className="flex items-center gap-4 pt-1">
-                <div className="flex -space-x-2 overflow-hidden">
-                  <div className="inline-block h-9 w-9 rounded-full ring-2 ring-white bg-slate-800 text-white font-bold text-xs flex items-center justify-center">DR</div>
-                  <div className="inline-block h-9 w-9 rounded-full ring-2 ring-white bg-emerald-800 text-white font-bold text-xs flex items-center justify-center">MK</div>
-                  <div className="inline-block h-9 w-9 rounded-full ring-2 ring-white bg-indigo-800 text-white font-bold text-xs flex items-center justify-center">SK</div>
-                  <div className="inline-block h-9 w-9 rounded-full ring-2 ring-white bg-teal-800 text-white font-bold text-xs flex items-center justify-center">RK</div>
-                  <div className="inline-block h-9 w-9 rounded-full ring-2 ring-white bg-emerald-600 text-white font-bold text-xs flex items-center justify-center">+</div>
-                </div>
-                <div>
-                  <p className="text-sm font-black text-slate-900">4,500+ Registered Doctors</p>
-                  <p className="text-xs font-bold text-slate-500">Over 1.2M OPD Patients Served</p>
-                </div>
-              </div>
-
-              {/* CTAs */}
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <button
-                  onClick={() => setModalOpen(true)}
-                  className="px-7 py-3.5 bg-emerald-950 hover:bg-emerald-900 text-white font-extrabold text-xs tracking-wider rounded-full shadow-lg shadow-emerald-950/20 transition flex items-center gap-2 group"
-                >
-                  <span>Get Started Now</span>
-                  <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
-                </button>
-
-                <Link
-                  to="/checkin"
-                  className="px-6 py-3.5 bg-white text-slate-800 hover:text-emerald-800 font-extrabold text-xs tracking-wider rounded-full border border-slate-200 hover:border-slate-300 shadow-sm transition flex items-center gap-2"
-                >
-                  <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
-                    <Play size={12} className="text-slate-800 fill-slate-800 ml-0.5" />
-                  </div>
-                  <span>Test Kiosk Demo</span>
-                </Link>
-              </div>
-            </div>
-
-            {/* Right Column: Finvora Style App Preview Card Mockup */}
-            <div className="lg:col-span-6 relative flex justify-center">
-              <div className="relative w-full max-w-md">
-                <div className="absolute -top-6 -right-6 w-72 h-72 bg-emerald-200/40 rounded-full blur-3xl -z-10" />
-
-                {/* Main Floating Smartphone / Kiosk Card */}
-                <div className="bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-5 text-left">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-rose-500" />
-                      <div className="w-3 h-3 rounded-full bg-amber-500" />
-                      <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                    </div>
-                    <span className="text-[11px] font-mono font-bold text-slate-400">OPD QUEUE #12 ACTIVE</span>
-                  </div>
-
-                  <div className="bg-emerald-950 text-white p-6 rounded-2xl space-y-3">
-                    <div className="flex justify-between items-center text-xs text-emerald-300 font-mono">
-                      <span>Total OPD Consultations</span>
-                      <span className="text-emerald-400 font-bold">+18.5% Today</span>
-                    </div>
-                    <p className="text-3xl font-black tracking-tight">₹ 14,800 / Daily Revenue</p>
-                    <div className="flex gap-2 pt-1">
-                      <span className="px-3 py-1 bg-emerald-800/80 text-white text-[11px] font-bold rounded-lg">
-                        14 Waiting
-                      </span>
-                      <span className="px-3 py-1 bg-emerald-600/60 text-white text-[11px] font-bold rounded-lg">
-                        2 With Doctor
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Active Patient Roster Item */}
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-emerald-100 text-emerald-800 rounded-xl flex items-center justify-center font-bold">
-                        <User size={20} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">Ramesh Kumar (Token #12)</p>
-                        <p className="text-[11px] text-slate-500 font-medium">Dr. Rahul Sharma • Cardiology</p>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-lg">
-                      Called
-                    </span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* 2. SECTION: "Your trusted partner in healthcare." + 4 PILL CARDS (FINVORA DESIGN MATCH) */}
-      <section className="py-20 max-w-7xl mx-auto px-4 sm:px-8 space-y-12">
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-          <div className="space-y-2 max-w-xl text-left">
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900">
-              Your <span className="text-emerald-700">trusted partner</span> in healthcare.
-            </h2>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-md text-left">
-            We combine innovative technology with medical industry best practices to deliver a secure and seamless OPD experience for everyone.
-          </p>
-        </div>
-
-        {/* 4 Feature Pill Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition space-y-4 text-left">
-            <div className="w-12 h-12 bg-emerald-800 text-white rounded-2xl flex items-center justify-center font-bold shadow-md shadow-emerald-800/20">
-              <Lock size={24} className="text-emerald-200" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Bank-grade Security</h3>
-            <p className="text-xs text-slate-500 font-medium leading-relaxed">
-              Your clinical records and patient data are protected with advanced 256-bit AES encryption.
-            </p>
-          </div>
-
-          <div className="bg-white p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition space-y-4 text-left">
-            <div className="w-12 h-12 bg-emerald-800 text-white rounded-2xl flex items-center justify-center font-bold shadow-md shadow-emerald-800/20">
-              <CheckCircle size={24} className="text-emerald-200" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Transparent & Reliable</h3>
-            <p className="text-xs text-slate-500 font-medium leading-relaxed">
-              100% transparent OPD operations and real-time patient queue updates across devices.
-            </p>
-          </div>
-
-          <div className="bg-white p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition space-y-4 text-left">
-            <div className="w-12 h-12 bg-emerald-800 text-white rounded-2xl flex items-center justify-center font-bold shadow-md shadow-emerald-800/20">
-              <Headphones size={24} className="text-emerald-200" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">24/7 Priority Support</h3>
-            <p className="text-xs text-slate-500 font-medium leading-relaxed">
-              Dedicated support from healthcare IT specialists whenever your reception needs assistance.
-            </p>
-          </div>
-
-          <div className="bg-white p-7 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition space-y-4 text-left">
-            <div className="w-12 h-12 bg-emerald-800 text-white rounded-2xl flex items-center justify-center font-bold shadow-md shadow-emerald-800/20">
-              <Zap size={24} className="text-emerald-200" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900">Fast & Paperless</h3>
-            <p className="text-xs text-slate-500 font-medium leading-relaxed">
-              Write digital EMR prescriptions in under 30 seconds with zero paper token waste.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. INTERACTIVE STEP-BY-STEP WORKFLOW VISUALIZER (NEW DETAILED SECTION) */}
-      <section className="py-20 bg-white border-y border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-12">
-          <div className="text-center space-y-3">
-            <span className="px-4 py-1.5 bg-emerald-50 text-emerald-800 rounded-full border border-emerald-200 text-xs font-bold tracking-wide">
-              HOW MEDTECH FIXATERS WORKS
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900">End-to-End Digital OPD Journey</h2>
-            <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-xl mx-auto">
-              From entrance QR scan to instant WhatsApp prescription delivery in 4 effortless steps.
-            </p>
-          </div>
-
-          {/* Workflow Tabs */}
-          <div className="flex flex-wrap justify-center gap-3">
-            <button
-              onClick={() => setActiveWorkflowTab('checkin')}
-              className={`px-5 py-3 rounded-full text-xs font-bold transition flex items-center gap-2 ${
-                activeWorkflowTab === 'checkin' ? 'bg-emerald-950 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <QrCode size={16} /> Step 1: Contactless QR Check-in
-            </button>
-            <button
-              onClick={() => setActiveWorkflowTab('audio')}
-              className={`px-5 py-3 rounded-full text-xs font-bold transition flex items-center gap-2 ${
-                activeWorkflowTab === 'audio' ? 'bg-emerald-950 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <Volume2 size={16} /> Step 2: Live Waiting Room Callouts
-            </button>
-            <button
-              onClick={() => setActiveWorkflowTab('emr')}
-              className={`px-5 py-3 rounded-full text-xs font-bold transition flex items-center gap-2 ${
-                activeWorkflowTab === 'emr' ? 'bg-emerald-950 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <FileText size={16} /> Step 3: Rapid EMR Consultation
-            </button>
-            <button
-              onClick={() => setActiveWorkflowTab('whatsapp')}
-              className={`px-5 py-3 rounded-full text-xs font-bold transition flex items-center gap-2 ${
-                activeWorkflowTab === 'whatsapp' ? 'bg-emerald-950 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <Smartphone size={16} /> Step 4: WhatsApp Rx Delivery
-            </button>
-          </div>
-
-          {/* Workflow Content Container */}
-          <div className="bg-slate-950 text-white p-8 sm:p-12 rounded-3xl shadow-2xl border border-slate-800">
-            {activeWorkflowTab === 'checkin' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                <div className="space-y-4 text-left">
-                  <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest">STEP 01 / PATIENT RECEPTION</span>
-                  <h3 className="text-3xl font-black text-white">No Waiting Lines • Direct Mobile Intake</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Patients open their smartphone camera and scan your hospital entrance QR code. The system identifies your hospital automatically from a secure QR token, lists your active doctors, and issues a live digital token number.
-                  </p>
-                  <ul className="space-y-2 text-xs text-slate-200 font-medium pt-2">
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Patient fills name, phone number, and primary symptoms</li>
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> System assigns independent token numbers per doctor</li>
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Patient tracks estimated wait time live on their browser</li>
-                  </ul>
+          {/* RIGHT COLUMN: REAL DASHBOARD SIMULATOR */}
+          <div className="lg:col-span-7 relative">
+            <div className="bg-white rounded-3xl border border-[#E6E9F0] shadow-2xl shadow-slate-300/60 p-4 sm:p-5 relative overflow-hidden transition-all min-h-[460px]">
+              {simToast && (
+                <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-30 bg-[#18233D] text-white px-4 py-2 rounded-full text-xs font-bold shadow-2xl border border-indigo-500/30 flex items-center gap-2 animate-bounce">
+                  <Sparkles size={14} className="text-amber-400" />
+                  <span>{simToast}</span>
                 </div>
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center space-y-3">
-                  <div className="w-12 h-12 bg-emerald-800 text-white rounded-xl flex items-center justify-center mx-auto font-bold">
-                    <QrCode size={24} />
-                  </div>
-                  <p className="text-sm font-bold text-white uppercase tracking-wider">Hospital Entrance QR Poster</p>
-                  <p className="text-xs text-slate-400 font-mono">https://clinicos.site/book/tok_hosp-001</p>
-                  <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/30">
-                    Live Active Station
-                  </span>
-                </div>
-              </div>
-            )}
+              )}
 
-            {activeWorkflowTab === 'audio' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                <div className="space-y-4 text-left">
-                  <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest">STEP 02 / QUEUE ANNOUNCER</span>
-                  <h3 className="text-3xl font-black text-white">Smart Audio Callouts for Waiting Rooms</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    When the doctor clicks "Call Next Patient" inside their consultation console, waiting room TV screens automatically play loud automated voice announcements in clear audio.
-                  </p>
-                  <ul className="space-y-2 text-xs text-slate-200 font-medium pt-2">
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> "Token #15 - Please proceed to Room 102 for Dr. Sharma"</li>
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Eliminates chaotic reception announcements and shouting</li>
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Visual TV display board keeps patients informed</li>
-                  </ul>
-                </div>
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center space-y-3">
-                  <div className="w-12 h-12 bg-emerald-800 text-white rounded-xl flex items-center justify-center mx-auto font-bold animate-bounce">
-                    <Volume2 size={24} />
-                  </div>
-                  <p className="text-lg font-black text-white uppercase tracking-wider">NOW CALLING TOKEN #15</p>
-                  <p className="text-xs text-emerald-400 font-semibold">Dr. Rahul Sharma • Room 102</p>
-                </div>
-              </div>
-            )}
-
-            {activeWorkflowTab === 'emr' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                <div className="space-y-4 text-left">
-                  <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest">STEP 03 / DOCTOR CONSULTATION</span>
-                  <h3 className="text-3xl font-black text-white">Rx Prescriptions Written in &lt; 30 Seconds</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Doctors review patient symptoms captured during QR check-in, record clinical notes, vitals (BP, Pulse, Weight), select prescribed medicines with 1-0-1 dosage, and generate clean printouts.
-                  </p>
-                  <ul className="space-y-2 text-xs text-slate-200 font-medium pt-2">
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Professional printable prescription header card</li>
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Complete historical visits timeline</li>
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Multi-tenant isolation guarantees private patient data</li>
-                  </ul>
-                </div>
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-left space-y-3 font-mono text-xs text-slate-300">
-                  <div className="flex justify-between border-b border-slate-800 pb-2">
-                    <span className="text-emerald-400 font-bold">DR. RAHUL SHARMA (CARDIOLOGY)</span>
-                    <span className="text-emerald-400">Rx Card #1024</span>
-                  </div>
-                  <p>Patient: Ramesh Kumar (Age 45)</p>
-                  <p>Vitals: BP 120/80 • Pulse 74 • Weight 72kg</p>
-                  <p className="text-emerald-400 font-bold">Diagnosis: Essential Hypertension</p>
-                  <p>Rx: Telmisartan 40mg (1-0-0) After Meal</p>
-                </div>
-              </div>
-            )}
-
-            {activeWorkflowTab === 'whatsapp' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                <div className="space-y-4 text-left">
-                  <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest">STEP 04 / PATIENT ENGAGEMENT</span>
-                  <h3 className="text-3xl font-black text-white">Automated WhatsApp Receipts & E-Prescriptions</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Keep patients engaged after their visit. Send digital consultation fee receipts, live queue status links, and PDF prescriptions straight to their WhatsApp.
-                  </p>
-                  <ul className="space-y-2 text-xs text-slate-200 font-medium pt-2">
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Instant PDF prescription download link</li>
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> Digital payment receipts & OPD fee bills</li>
-                    <li className="flex items-center gap-2"><CheckCircle size={16} className="text-emerald-400" /> High 98% patient open rate</li>
-                  </ul>
-                </div>
-                <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-left space-y-3 font-sans text-xs">
-                  <div className="bg-emerald-950/80 border border-emerald-500/30 p-4 rounded-xl text-emerald-200 space-y-1">
-                    <p className="font-bold flex items-center gap-2"><Smartphone size={16} className="text-emerald-400" /> WhatsApp Message Sent to +91 98765 43210</p>
-                    <p className="text-[11px] text-slate-300">"Dear Ramesh, your OPD Token #15 at Metro Care Hospital is confirmed. Click to track live queue: https://clinicos.site/track"</p>
+              {/* Mockup Header Bar */}
+              <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <img src="/assets/brand-icon.png" alt="Logo" className="w-6 h-6 object-contain" />
+                  <div>
+                    <span className="font-bold text-xs text-[#18233D] block leading-tight">City Care Multi-Specialty Hospital</span>
+                    <span className="text-[9px] text-[#5E687B]">Live OPD Telemetry Node</span>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
 
-      {/* 4. COMPARISON TABLE: TRADITIONAL VS MEDTECH FIXATERS (NEW DETAILED SECTION) */}
-      <section className="py-20 max-w-7xl mx-auto px-4 sm:px-8 space-y-12">
-        <div className="text-center space-y-3">
-          <span className="px-4 py-1.5 bg-emerald-50 text-emerald-800 rounded-full border border-emerald-200 text-xs font-bold tracking-wide">
-            PLATFORM COMPARISON
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900">Why Top Clinics Upgrade to MedTech Fixaters</h2>
-          <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-xl mx-auto">
-            See how MedTech Fixaters transforms daily OPD operations compared to traditional paper registers.
-          </p>
-        </div>
-
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden text-left">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="bg-slate-900 text-white">
-                  <th className="p-4 sm:p-5 font-bold uppercase tracking-wider">Feature / Capability</th>
-                  <th className="p-4 sm:p-5 font-bold uppercase tracking-wider text-rose-300 bg-slate-950">Traditional Paper Reception</th>
-                  <th className="p-4 sm:p-5 font-bold uppercase tracking-wider text-emerald-300 bg-emerald-950">MedTech Fixaters Smart OPD</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-                <tr>
-                  <td className="p-4 font-bold text-slate-900">Patient Check-in Method</td>
-                  <td className="p-4 text-slate-500 bg-slate-50/50">Manual pen & paper registration book</td>
-                  <td className="p-4 text-emerald-800 bg-emerald-50/30 font-bold">Contactless Smartphone QR Scan</td>
-                </tr>
-                <tr>
-                  <td className="p-4 font-bold text-slate-900">Average Patient Wait Time</td>
-                  <td className="p-4 text-slate-500 bg-slate-50/50">60 - 90 Minutes standing in line</td>
-                  <td className="p-4 text-emerald-800 bg-emerald-50/30 font-bold">&lt; 15 Minutes with live mobile updates</td>
-                </tr>
-                <tr>
-                  <td className="p-4 font-bold text-slate-900">Waiting Room Calling System</td>
-                  <td className="p-4 text-slate-500 bg-slate-50/50">Reception shouting out patient names</td>
-                  <td className="p-4 text-emerald-800 bg-emerald-50/30 font-bold">Automated Voice Callouts & TV Board</td>
-                </tr>
-                <tr>
-                  <td className="p-4 font-bold text-slate-900">Prescription Generation</td>
-                  <td className="p-4 text-slate-500 bg-slate-50/50">Handwritten paper pads (unclear writing)</td>
-                  <td className="p-4 text-emerald-800 bg-emerald-50/30 font-bold">Digital EMR Rx generated in &lt; 30 seconds</td>
-                </tr>
-                <tr>
-                  <td className="p-4 font-bold text-slate-900">Patient Records History</td>
-                  <td className="p-4 text-slate-500 bg-slate-50/50">Physical paper folders prone to loss</td>
-                  <td className="p-4 text-emerald-800 bg-emerald-50/30 font-bold">256-bit Encrypted Cloud EMR Timeline</td>
-                </tr>
-                <tr>
-                  <td className="p-4 font-bold text-slate-900">Compliance & Security</td>
-                  <td className="p-4 text-slate-500 bg-slate-50/50">Zero data encryption or compliance</td>
-                  <td className="p-4 text-emerald-800 bg-emerald-50/30 font-bold">ABDM M3 & ISO 27001 Certified</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. INTERACTIVE ROI CALCULATOR WIDGET (NEW DETAILED SECTION) */}
-      <section className="py-20 bg-white border-y border-slate-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-8 space-y-12">
-          <div className="text-center space-y-3">
-            <span className="px-4 py-1.5 bg-emerald-50 text-emerald-800 rounded-full border border-emerald-200 text-xs font-bold tracking-wide">
-              CLINIC TIME & REVENUE CALCULATOR
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900">Calculate Your Monthly OPD Savings</h2>
-            <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-xl mx-auto">
-              See how much time your clinic staff saves every month by switching to MedTech Fixaters.
-            </p>
-          </div>
-
-          <div className="bg-slate-900 text-white rounded-3xl p-8 sm:p-12 shadow-2xl border border-slate-800 space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-left">
-              {/* Input 1: Daily Patients */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-300">
-                  <label className="uppercase tracking-wider">1. Daily Average OPD Patients:</label>
-                  <span className="text-base font-black text-emerald-400 font-mono">{dailyPatients} Patients / Day</span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="300"
-                  step="5"
-                  value={dailyPatients}
-                  onChange={(e) => setDailyPatients(parseInt(e.target.value) || 10)}
-                  className="w-full h-3 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
-                <div className="flex justify-between text-[11px] font-mono text-slate-500">
-                  <span>10 Patients</span>
-                  <span>150 Patients</span>
-                  <span>300+ Patients</span>
-                </div>
-              </div>
-
-              {/* Input 2: Custom Consultation Fee */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-300">
-                  <label className="uppercase tracking-wider">2. Consultation Fee per Patient (₹):</label>
-                  <span className="text-base font-black text-emerald-400 font-mono">₹ {customFee.toLocaleString('en-IN')} / Visit</span>
-                </div>
-                <input
-                  type="number"
-                  min="50"
-                  max="10000"
-                  step="50"
-                  value={customFee}
-                  onChange={(e) => setCustomFee(Math.max(50, parseInt(e.target.value) || 50))}
-                  className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-extrabold text-white font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] text-slate-400 font-bold">Quick Presets:</span>
-                  {[300, 500, 800, 1200, 1500].map((fee) => (
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  {(['Cardiology', 'Orthopaedics', 'Pediatrics'] as const).map(dept => (
                     <button
-                      key={fee}
-                      onClick={() => setCustomFee(fee)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition font-mono ${
-                        customFee === fee
-                          ? 'bg-emerald-600 text-white shadow-md'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      key={dept}
+                      onClick={() => {
+                        setSelectedDept(dept)
+                        setCurrentServingIndex(0)
+                        setSimToast(`Switched to ${dept} OPD Station`)
+                        setTimeout(() => setSimToast(null), 2000)
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
+                        selectedDept === dept
+                          ? 'bg-white text-[#4361EE] shadow-sm'
+                          : 'text-[#5E687B] hover:text-[#18233D]'
                       }`}
                     >
-                      ₹{fee}
+                      {dept}
                     </button>
                   ))}
                 </div>
-              </div>
-            </div>
 
-            {/* 3 Calculated Metric Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-slate-800">
-              <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-2 text-left">
-                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                  <TrendingUp size={18} /> <span>Monthly OPD Revenue</span>
+                <div className="hidden sm:flex items-center gap-2 text-[11px] text-[#5E687B]">
+                  <span className="flex items-center gap-1 font-semibold text-[10px]"><Calendar size={11} /> May 31, 2026</span>
+                  <div className="w-6 h-6 rounded-full bg-indigo-100 text-[#4361EE] flex items-center justify-center font-bold text-[10px]">
+                    👨‍⚕️
+                  </div>
                 </div>
-                <p className="text-3xl font-black text-white font-mono">₹ {monthlyRevenue.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-slate-400 font-medium">Based on {dailyPatients} patients/day at ₹{customFee}/visit.</p>
               </div>
 
-              <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-2 text-left">
-                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                  <ShieldCheck size={18} /> <span>Prevented Revenue Leakage</span>
-                </div>
-                <p className="text-3xl font-black text-emerald-400 font-mono">₹ {revenueLossPrevented.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-slate-400 font-medium">15% saved from unrecorded fees & walk-aways.</p>
-              </div>
+              {/* Mockup Body Grid */}
+              <div className="grid grid-cols-12 gap-3 pt-3">
+                {/* Left Interactive Sidebar */}
+                <div className="col-span-12 sm:col-span-3 space-y-1 text-[11px] font-semibold text-[#5E687B] border-r border-slate-100 pr-2">
+                  {[
+                    { key: 'Dashboard', icon: <Building2 size={13} /> },
+                    { key: 'Appointments', icon: <Calendar size={13} /> },
+                    { key: 'Live Queue', icon: <RefreshCw size={13} /> },
+                    { key: 'Doctors', icon: <UserCheck size={13} /> },
+                    { key: 'Patients', icon: <Users size={13} /> },
+                    { key: 'Reports', icon: <BarChart3 size={13} /> },
+                    { key: 'Settings', icon: <Settings size={13} /> },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => {
+                        setActiveTab(tab.key as any)
+                        setSimToast(`Opened ${tab.key} View`)
+                        setTimeout(() => setSimToast(null), 1500)
+                      }}
+                      className={`w-full text-left px-2.5 py-2 rounded-xl transition flex items-center gap-2 ${
+                        activeTab === tab.key
+                          ? 'bg-indigo-50 text-[#4361EE] font-bold shadow-sm'
+                          : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      {tab.icon}
+                      <span>{tab.key}</span>
+                      {activeTab === tab.key && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#4361EE]" />}
+                    </button>
+                  ))}
 
-              <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-2 text-left">
-                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                  <Clock size={18} /> <span>Staff Hours Saved</span>
+                  <div className="pt-3 px-1 hidden sm:block">
+                    <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-100 text-left space-y-1">
+                      <span className="text-[9px] font-bold text-emerald-800 uppercase block">OPD Kiosk Node</span>
+                      <span className="text-[10px] text-emerald-950 font-bold flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                        Room 101 Active
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-3xl font-black text-white font-mono">{hoursSavedPerMonth} Hours / Mo</p>
-                <p className="text-xs text-slate-400 font-medium">Replaces paper register work and reception entry.</p>
+
+                {/* Right Main Dashboard Area: DYNAMIC VIEWS */}
+                <div className="col-span-12 sm:col-span-9 space-y-3">
+                  {/* VIEW 1: DASHBOARD */}
+                  {activeTab === 'Dashboard' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[10px] font-bold text-[#5E687B] uppercase tracking-wider">
+                          Today's Telemetry & OPD Control
+                        </div>
+                        <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          ● Live Realtime Sync
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { val: stats.appointments, label: 'Appointments', color: 'text-[#4361EE]' },
+                          { val: stats.patients, label: 'Patients', color: 'text-amber-600' },
+                          { val: stats.completed, label: 'Completed', color: 'text-emerald-600' },
+                          { val: stats.noShows, label: 'No Shows', color: 'text-rose-600' },
+                        ].map((st, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2.5 bg-slate-50/80 hover:bg-white hover:shadow-md transition-all rounded-xl border border-slate-100 text-center"
+                          >
+                            <span className={`text-base font-black ${st.color} block font-mono`}>{st.val}</span>
+                            <span className="text-[9px] text-[#5E687B] font-semibold">{st.label}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 text-left space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-[#5E687B]">Live OPD Queue</span>
+                            <span className="text-[9px] text-[#4361EE] font-bold">{selectedDept}</span>
+                          </div>
+
+                          <div>
+                            <span className="text-[11px] font-black text-[#18233D] block">
+                              {selectedDept === 'Cardiology' ? 'Dr. Amit Sharma' : selectedDept === 'Orthopaedics' ? 'Dr. Ashok Verma' : 'Dr. Priya Sen'}
+                            </span>
+                            <span className="text-[9px] text-[#5E687B]">Room 101 • General OPD</span>
+                          </div>
+
+                          <div className="p-2.5 bg-white rounded-xl border border-indigo-100 shadow-sm space-y-1">
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Now In Consultation</span>
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-xl font-black text-[#4361EE] font-mono tracking-tight">
+                                {activeServing ? activeServing.token : 'C-012'}
+                              </span>
+                              <span className="text-[10px] font-bold text-[#18233D]">
+                                {activeServing ? activeServing.name : 'Ravi Kumar'}
+                              </span>
+                            </div>
+                            <p className="text-[8px] text-slate-500 font-mono pt-0.5">
+                              {activeServing?.vitals}
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                            <button
+                              onClick={handleCallNextPatient}
+                              className="w-full py-1.5 bg-[#4361EE] hover:bg-indigo-700 text-white font-bold text-[10px] rounded-lg shadow-sm transition flex items-center justify-center gap-1 active:scale-95"
+                            >
+                              <Volume2 size={12} />
+                              <span>Call Next</span>
+                            </button>
+
+                            <button
+                              onClick={handleCompleteRx}
+                              className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg shadow-sm transition flex items-center justify-center gap-1 active:scale-95"
+                            >
+                              <Send size={11} />
+                              <span>Send Rx</span>
+                            </button>
+                          </div>
+
+                          <div className="text-[9px] text-slate-500 flex items-center justify-between pt-0.5">
+                            <span>Next: <strong className="text-slate-800">{nextServing ? nextServing.token : 'None'}</strong></span>
+                            <span><strong className="text-emerald-700">{waitingCount}</strong> Waiting</span>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 text-left space-y-1.5">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] font-bold text-[#5E687B]">Today's Appointments</span>
+                            <span className="text-[8px] text-slate-400 font-medium">Click to Inspect</span>
+                          </div>
+
+                          <div className="space-y-1 max-h-[160px] overflow-y-auto">
+                            {currentPatients.map((apt) => (
+                              <div
+                                key={apt.id}
+                                onClick={() => setSelectedPatientId(apt.id)}
+                                className={`flex items-center justify-between text-[9px] p-1.5 rounded-lg cursor-pointer transition ${
+                                  selectedPatientId === apt.id
+                                    ? 'bg-white border border-indigo-200 shadow-sm'
+                                    : 'hover:bg-white/60'
+                                }`}
+                              >
+                                <span className="text-slate-500 font-mono text-[8px]">{apt.time}</span>
+                                <div className="truncate max-w-[75px]">
+                                  <span className="font-bold text-[#18233D] block truncate">{apt.name}</span>
+                                  <span className="text-[8px] text-slate-400 font-mono">{apt.token}</span>
+                                </div>
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${apt.color}`}>
+                                  {apt.status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {selectedPatientId && (
+                            <div className="p-1.5 bg-indigo-50/70 rounded-lg border border-indigo-100 text-[8px] text-[#18233D]">
+                              <span className="font-bold text-[#4361EE]">Complaint: </span>
+                              {currentPatients.find(p => p.id === selectedPatientId)?.complaint}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VIEW 2: APPOINTMENTS */}
+                  {activeTab === 'Appointments' && (
+                    <div className="space-y-3 text-left">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-black text-[#18233D]">OPD Appointment Schedule</h4>
+                          <span className="text-[9px] text-[#5E687B]">Real-time patient check-in roster</span>
+                        </div>
+                        <button
+                          onClick={() => setModalOpen(true)}
+                          className="px-2.5 py-1 bg-[#4361EE] text-white text-[10px] font-bold rounded-lg flex items-center gap-1 shadow-sm"
+                        >
+                          <Plus size={11} /> New Booking
+                        </button>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                        <table className="w-full text-left text-[9px]">
+                          <thead className="bg-slate-100 text-slate-500 font-bold uppercase text-[8px] border-b border-slate-200">
+                            <tr>
+                              <th className="p-2">Token</th>
+                              <th className="p-2">Patient</th>
+                              <th className="p-2">Doctor</th>
+                              <th className="p-2">Time</th>
+                              <th className="p-2">Status</th>
+                              <th className="p-2 text-right">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/60 font-medium">
+                            {currentPatients.map(p => (
+                              <tr key={p.id} className="hover:bg-white transition">
+                                <td className="p-2 font-mono font-bold text-[#4361EE]">{p.token}</td>
+                                <td className="p-2 font-bold text-[#18233D]">{p.name} ({p.age}y)</td>
+                                <td className="p-2 text-slate-600">{selectedDept}</td>
+                                <td className="p-2 font-mono text-slate-500">{p.time}</td>
+                                <td className="p-2">
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold border ${p.color}`}>
+                                    {p.status}
+                                  </span>
+                                </td>
+                                <td className="p-2 text-right">
+                                  <button
+                                    onClick={() => {
+                                      setSimToast(`Printed OPD Slip for ${p.name} (${p.token})`)
+                                      setTimeout(() => setSimToast(null), 2500)
+                                    }}
+                                    className="p-1 hover:bg-slate-200 rounded text-slate-600"
+                                    title="Print Token Slip"
+                                  >
+                                    <Printer size={11} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VIEW 3: LIVE QUEUE */}
+                  {activeTab === 'Live Queue' && (
+                    <div className="space-y-3 text-left">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-black text-[#18233D]">OPD Room Calling Display</h4>
+                          <span className="text-[9px] text-[#5E687B]">Live visual buzzer & queue broadcast</span>
+                        </div>
+                        <span className="px-2 py-0.5 bg-rose-50 text-rose-700 text-[9px] font-bold rounded-full border border-rose-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                          Live TV Mode
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { room: 'Room 101', doc: 'Dr. Amit Sharma', dept: 'Cardiology', now: activeServing.token, next: nextServing ? nextServing.token : 'C-014', color: 'border-[#4361EE] text-[#4361EE]' },
+                          { room: 'Room 104', doc: 'Dr. Ashok Verma', dept: 'Orthopaedics', now: 'ORT-007', next: 'ORT-008', color: 'border-emerald-500 text-emerald-600' },
+                          { room: 'Room 108', doc: 'Dr. Priya Sen', dept: 'Pediatrics', now: 'PED-015', next: 'PED-016', color: 'border-amber-500 text-amber-600' },
+                        ].map((rm, i) => (
+                          <div key={i} className={`p-3 bg-white rounded-xl border-2 ${rm.color} shadow-sm space-y-1 text-center`}>
+                            <span className="text-[9px] font-bold text-slate-400 block">{rm.room} • {rm.dept}</span>
+                            <span className="text-[10px] font-bold text-slate-900 truncate block">{rm.doc}</span>
+                            <div className="py-2 bg-slate-50 rounded-lg">
+                              <span className="text-[8px] text-slate-400 uppercase block font-bold">Now Calling</span>
+                              <span className="text-2xl font-black font-mono block tracking-tight">{rm.now}</span>
+                            </div>
+                            <span className="text-[8px] text-slate-500 block">Next: <strong>{rm.next}</strong></span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-2.5 bg-indigo-50/70 border border-indigo-100 rounded-xl flex items-center justify-between text-[10px]">
+                        <span className="font-bold text-[#4361EE] flex items-center gap-1">
+                          <Volume2 size={13} /> Automated Voice Announcement:
+                        </span>
+                        <span className="font-mono text-slate-700">"Token {activeServing.token}, Please Proceed to Room 101"</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VIEW 4: DOCTORS */}
+                  {activeTab === 'Doctors' && (
+                    <div className="space-y-3 text-left">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-black text-[#18233D]">Doctor Roster & OPD Duty</h4>
+                          <span className="text-[9px] text-[#5E687B]">Toggle availability & consultation limits</span>
+                        </div>
+                        <button
+                          onClick={() => setModalOpen(true)}
+                          className="px-2.5 py-1 bg-[#4361EE] text-white text-[10px] font-bold rounded-lg flex items-center gap-1 shadow-sm"
+                        >
+                          <UserPlus size={11} /> Add Doctor
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        {doctorsList.map((doc) => (
+                          <div key={doc.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-left space-y-2">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <span className="font-bold text-xs text-[#18233D] block">{doc.name}</span>
+                                <span className="text-[9px] text-[#4361EE] font-semibold">{doc.dept} • {doc.room}</span>
+                              </div>
+                              <button
+                                onClick={() => handleToggleDoctorDuty(doc.id)}
+                                className={`px-2 py-0.5 rounded-full text-[8px] font-bold transition ${
+                                  doc.active
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-slate-200 text-slate-600'
+                                }`}
+                              >
+                                {doc.active ? '● In OPD' : '○ On Break'}
+                              </button>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[9px] text-slate-600 pt-1 border-t border-slate-200/60">
+                              <span>Fee: <strong>{doc.fee}</strong></span>
+                              <span>Served: <strong>{doc.served}/{doc.limit}</strong></span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VIEW 5: PATIENTS */}
+                  {activeTab === 'Patients' && (
+                    <div className="space-y-3 text-left">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-black text-[#18233D]">Patient EMR Directory</h4>
+                          <span className="text-[9px] text-[#5E687B]">Medical records & prescription history</span>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Search name/UHID..."
+                            className="px-2.5 py-1 text-[9px] bg-slate-100 border border-slate-200 rounded-lg w-28"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {currentPatients.map((pt) => (
+                          <div key={pt.id} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-[9px]">
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-[#18233D] block">{pt.name} ({pt.gender}, {pt.age}y)</span>
+                              <span className="text-[8px] text-slate-500 font-mono">{pt.phone} • {pt.complaint}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-[#4361EE]">{pt.vitals.split('•')[0]}</span>
+                              <button
+                                onClick={() => {
+                                  setSimToast(`Dispatched EMR Summary to ${pt.name}`)
+                                  setTimeout(() => setSimToast(null), 2500)
+                                }}
+                                className="px-2 py-1 bg-white hover:bg-indigo-50 border border-slate-200 text-[#4361EE] font-bold rounded-lg text-[8px]"
+                              >
+                                View Rx
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VIEW 6: REPORTS */}
+                  {activeTab === 'Reports' && (
+                    <div className="space-y-3 text-left">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-black text-[#18233D]">OPD Analytics & Performance</h4>
+                          <span className="text-[9px] text-[#5E687B]">Doctor turnaround time & patient footfall</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSimToast('Downloaded Today OPD Summary PDF')
+                            setTimeout(() => setSimToast(null), 2500)
+                          }}
+                          className="px-2 py-1 bg-white border border-slate-200 text-slate-700 text-[9px] font-bold rounded-lg flex items-center gap-1"
+                        >
+                          <Download size={11} /> Export PDF
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">
+                          <span className="text-[8px] text-indigo-700 font-bold uppercase block">Avg Wait Time</span>
+                          <span className="text-lg font-black text-[#4361EE] font-mono">11.4 mins</span>
+                        </div>
+                        <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-100">
+                          <span className="text-[8px] text-emerald-700 font-bold uppercase block">Consultation Rate</span>
+                          <span className="text-lg font-black text-emerald-700 font-mono">94.2%</span>
+                        </div>
+                        <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-100">
+                          <span className="text-[8px] text-amber-700 font-bold uppercase block">Peak Footfall</span>
+                          <span className="text-lg font-black text-amber-700 font-mono">10:30 AM</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[9px] space-y-1">
+                        <span className="font-bold text-slate-700 block">Department Footfall Breakdown:</span>
+                        <div className="space-y-1 pt-1">
+                          <div>
+                            <div className="flex justify-between text-[8px] font-semibold text-slate-500 mb-0.5">
+                              <span>Cardiology (112 patients)</span>
+                              <span>44%</span>
+                            </div>
+                            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-[#4361EE] h-full w-[44%]" />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-[8px] font-semibold text-slate-500 mb-0.5">
+                              <span>Orthopaedics (82 patients)</span>
+                              <span>32%</span>
+                            </div>
+                            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-emerald-500 h-full w-[32%]" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VIEW 7: SETTINGS */}
+                  {activeTab === 'Settings' && (
+                    <div className="space-y-3 text-left">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-xs font-black text-[#18233D]">Hospital OPD System Configuration</h4>
+                          <span className="text-[9px] text-[#5E687B]">Facility parameters, QR tokens & WhatsApp gateway</span>
+                        </div>
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[8px] font-bold rounded border border-emerald-200">
+                          Enterprise Active
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-[9px]">
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                          <span className="font-bold text-[#18233D] block">Facility Identity</span>
+                          <p className="text-slate-600">City Care Multi-Specialty Hospital</p>
+                          <p className="text-slate-400 font-mono text-[8px]">Lic: MED-REG-2026-HQ • Mumbai</p>
+                        </div>
+
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                          <span className="font-bold text-[#18233D] block">Public QR Standee</span>
+                          <p className="text-[#4361EE] font-mono text-[8px]">/book/QR-CITYCARE</p>
+                          <button
+                            onClick={() => {
+                              setSimToast('Copied Hospital Booking Standee Link!')
+                              setTimeout(() => setSimToast(null), 2500)
+                            }}
+                            className="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 font-bold rounded text-[8px]"
+                          >
+                            Copy Link
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 bg-indigo-50/70 rounded-xl border border-indigo-100 text-[9px] text-slate-700 flex items-center justify-between">
+                        <span>WhatsApp Automation Webhook:</span>
+                        <strong className="text-emerald-700">Connected & Verified</strong>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 6. SPECIALTIES SUPPORTED (NEW DETAILED SECTION) */}
-      <section className="py-20 max-w-7xl mx-auto px-4 sm:px-8 space-y-12">
-        <div className="text-center space-y-3">
-          <span className="px-4 py-1.5 bg-emerald-50 text-emerald-800 rounded-full border border-emerald-200 text-xs font-bold tracking-wide">
-            TAILORED FOR ALL MEDICAL SPECIALTIES
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900">Custom EMR Templates for Every Specialty</h2>
-          <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-xl mx-auto">
-            Whether you run a single-physician clinic or a multi-specialty hospital, MedTech Fixaters adapts to your clinical workflow.
-          </p>
-        </div>
+      {/* ─── SECTION 2: EVERYTHING YOU NEED TO RUN YOUR HOSPITAL ──── */}
+      <section id="features" className="py-16 bg-white border-t border-[#E6E9F0] px-6">
+        <div className="max-w-[1360px] mx-auto space-y-10 text-center">
+          <div className="space-y-2 max-w-2xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-black text-[#18233D] tracking-tight">
+              Everything you need to run your hospital smoothly
+            </h2>
+            <p className="text-xs sm:text-sm text-[#5E687B]">
+              Med Rapidly is a complete OPD management system designed for hospitals of all sizes.
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {specialties.map((spec) => (
-            <div key={spec.title} className="bg-white p-7 rounded-3xl border border-slate-200/80 shadow-sm space-y-3 text-left hover:shadow-md transition">
-              <div className="flex justify-between items-center">
-                <h3 className="text-base font-extrabold text-slate-900">{spec.title}</h3>
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-800 font-bold text-[10px] rounded-full border border-emerald-200">
-                  {spec.count}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-center">
+            {[
+              { title: 'QR Based Booking', desc: 'Patients scan QR & book appointments instantly.', icon: <QrCode size={22} className="text-[#4361EE]" />, bg: 'bg-indigo-50' },
+              { title: 'Live Queue Management', desc: 'Real-time queue updates for better patient experience.', icon: <RefreshCw size={22} className="text-emerald-600" />, bg: 'bg-emerald-50' },
+              { title: 'Doctor Dashboard', desc: 'Doctors get their own smart dashboard & queue.', icon: <UserCheck size={22} className="text-amber-600" />, bg: 'bg-amber-50' },
+              { title: 'Patient Management', desc: 'Manage patient history, records and prescriptions.', icon: <Users size={22} className="text-blue-600" />, bg: 'bg-blue-50' },
+              { title: 'Reports & Analytics', desc: 'Get detailed insights and improve hospital performance.', icon: <BarChart3 size={22} className="text-rose-600" />, bg: 'bg-rose-50' },
+            ].map((feat, idx) => (
+              <div
+                key={idx}
+                className="bg-white p-6 rounded-2xl border border-[#E6E9F0] shadow-sm hover:shadow-md hover:border-indigo-200 transition text-center space-y-3"
+              >
+                <div className={`w-12 h-12 rounded-xl mx-auto flex items-center justify-center ${feat.bg}`}>
+                  {feat.icon}
+                </div>
+                <h3 className="text-sm font-black text-[#18233D]">{feat.title}</h3>
+                <p className="text-xs text-[#5E687B] leading-relaxed">{feat.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── NEW SECTION 1: PLATFORM ARCHITECTURE SECTION ──── */}
+      <section id="architecture" className="py-24 bg-gradient-to-b from-[#FCFCFE] via-[#F3F6FD] to-[#FCFCFE] px-6 relative overflow-hidden">
+        <div className="max-w-[1360px] mx-auto space-y-16 text-center">
+          <div className="space-y-3 max-w-2xl mx-auto">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#4361EE] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+              One Connected Healthcare Platform
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-[#18233D] tracking-tight">
+              Everything Connected. Nothing Fragmented.
+            </h2>
+            <p className="text-sm text-[#5E687B] leading-relaxed">
+              From hospital administration to doctors and patients, MedTech Fixaters connects every part of the OPD workflow in one secure digital platform.
+            </p>
+          </div>
+
+          {/* Central Platform Glassmorphism Network Map */}
+          <div className="relative max-w-4xl mx-auto p-8 sm:p-14 rounded-3xl bg-white/60 backdrop-blur-xl border border-white shadow-2xl shadow-indigo-500/10">
+            {/* Glowing lines background */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(67,97,238,0.12)_0,transparent_70%)] pointer-events-none" />
+
+            {/* Top Node: Platform Admin */}
+            <div className="flex justify-center mb-8">
+              <div className="p-4 rounded-2xl bg-white/80 backdrop-blur-md border border-indigo-100 shadow-md flex items-center gap-3 max-w-xs text-left hover:scale-105 transition-transform">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold shrink-0">
+                  <Shield size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-[#18233D]">Platform Admin</h4>
+                  <p className="text-[10px] text-[#5E687B]">Master security & hospital provisioning</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle Row: Hospital Node <-> CENTRAL PLATFORM <-> Doctors Node */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+              {/* Left Node: Hospital */}
+              <div className="p-4 rounded-2xl bg-white/80 backdrop-blur-md border border-indigo-100 shadow-md flex items-center gap-3 text-left hover:scale-105 transition-transform">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#4361EE] flex items-center justify-center font-bold shrink-0">
+                  <Building2 size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-[#18233D]">Hospital Admin</h4>
+                  <p className="text-[10px] text-[#5E687B]">Facility OPD, rosters & counters</p>
+                </div>
+              </div>
+
+              {/* CENTER HUB: MEDTECH FIXATERS */}
+              <div className="p-6 rounded-3xl bg-gradient-to-tr from-[#4361EE] to-[#5D4CC8] text-white shadow-2xl shadow-indigo-500/40 text-center space-y-2 border-2 border-white/40 transform hover:scale-105 transition-all">
+                <img src="/assets/brand-icon.png" alt="Logo" className="w-10 h-10 object-contain mx-auto brightness-200" />
+                <h3 className="text-base font-black tracking-tight">MedTech Fixaters</h3>
+                <p className="text-[10px] text-indigo-100 font-medium">Real-Time Clinical Telemetry & EMR Engine</p>
+                <span className="inline-block px-2.5 py-0.5 bg-white/20 text-white rounded-full text-[9px] font-bold">
+                  Zero-Latency Data Mesh
                 </span>
               </div>
-              <p className="text-xs text-slate-600 font-medium leading-relaxed">{spec.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
 
-      {/* 7. NUMBERED BENTO GRID (01, 02 DARK CARD, 03) (FINVORA DESIGN MATCH) */}
-      <section className="py-12 max-w-7xl mx-auto px-4 sm:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-8 rounded-3xl border border-slate-200/80 shadow-sm space-y-6 text-left flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-              <span className="text-3xl font-black text-slate-900 font-mono">01.</span>
-              <div className="w-10 h-10 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center font-bold">
-                <User size={20} />
+              {/* Right Node: Doctors */}
+              <div className="p-4 rounded-2xl bg-white/80 backdrop-blur-md border border-indigo-100 shadow-md flex items-center gap-3 text-left hover:scale-105 transition-transform">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                  <Stethoscope size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-[#18233D]">Doctors</h4>
+                  <p className="text-[10px] text-[#5E687B]">Live queue & 30s prescription pad</p>
+                </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-extrabold text-slate-900">Expertise at Every Step</h3>
-              <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                Get professional setup insights and personalized onboarding guidance for your clinic reception.
-              </p>
-            </div>
-            <div className="pt-2 flex items-center gap-1 text-emerald-700 text-xs font-bold">
-              <TrendingUp size={16} /> <span>+85% Faster Reception Processing</span>
-            </div>
-          </div>
 
-          <div className="bg-emerald-950 text-white p-8 rounded-3xl shadow-xl space-y-6 text-left flex flex-col justify-between relative overflow-hidden">
-            <div className="flex justify-between items-start">
-              <span className="text-3xl font-black text-white font-mono">02.</span>
-              <div className="w-10 h-10 bg-emerald-800 text-white rounded-xl flex items-center justify-center font-bold">
-                <Star size={20} className="text-emerald-300 fill-emerald-300" />
+            {/* Bottom Row: Patients <-> QR System */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-lg mx-auto mt-8">
+              <div className="p-4 rounded-2xl bg-white/80 backdrop-blur-md border border-indigo-100 shadow-md flex items-center gap-3 text-left hover:scale-105 transition-transform">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
+                  <Users size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-[#18233D]">Patients</h4>
+                  <p className="text-[10px] text-[#5E687B]">Self-service booking & live tracking</p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/80 backdrop-blur-md border border-indigo-100 shadow-md flex items-center gap-3 text-left hover:scale-105 transition-transform">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold shrink-0">
+                  <QrCode size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-[#18233D]">Smart QR System</h4>
+                  <p className="text-[10px] text-[#5E687B]">Facility isolated scan-to-book tokens</p>
+                </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-extrabold text-white">Industry Best Practices</h3>
-              <p className="text-xs text-emerald-100 font-medium leading-relaxed">
-                We follow the highest healthcare guidelines to ensure the safety and growth of your medical practice.
-              </p>
-            </div>
-            <Link to="/about" className="inline-flex items-center gap-2 text-xs font-extrabold text-emerald-300 hover:text-white transition pt-2">
-              <span>Learn More</span> <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          <div className="bg-emerald-50/50 p-8 rounded-3xl border border-emerald-100 shadow-sm space-y-6 text-left flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-              <span className="text-3xl font-black text-slate-900 font-mono">03.</span>
-              <div className="w-10 h-10 bg-emerald-200/60 text-emerald-800 rounded-xl flex items-center justify-center font-bold">
-                <ShieldCheck size={20} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-extrabold text-slate-900">Protected by ABDM Standards</h3>
-              <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                Your medical files and prescriptions are encrypted following national digital health guidelines.
-              </p>
-            </div>
-            <span className="inline-block px-3 py-1 bg-white text-emerald-800 font-bold text-[11px] rounded-full border border-emerald-200">
-              ABDM M3 Certified
-            </span>
           </div>
         </div>
       </section>
 
-      {/* 8. LIVE DASHBOARD SHOWCASE & "Trusted platform anytime & anywhere." (FINVORA MATCH) */}
-      <section className="py-20 max-w-7xl mx-auto px-4 sm:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-6 bg-slate-950 text-white p-8 rounded-3xl shadow-2xl border border-slate-800 space-y-6 text-left">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <span className="text-xs font-mono text-emerald-400 font-bold">LIVE OPD MANAGEMENT OVERVIEW</span>
-              <span className="text-xs bg-slate-900 px-3 py-1 rounded-full text-slate-300 font-mono">Real-time</span>
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-xs text-slate-400 font-mono">Total Patients Today</p>
-              <p className="text-3xl font-black text-white">1,480 Patients</p>
-              <p className="text-xs font-bold text-emerald-400">+12.5% increase</p>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <div className="p-3.5 bg-slate-900 rounded-xl flex justify-between items-center text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-900 text-emerald-300 flex items-center justify-center font-bold">
-                    <QrCode size={16} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">QR Reception Intake</p>
-                    <p className="text-[11px] text-slate-400">Kiosk Station #1</p>
-                  </div>
-                </div>
-                <span className="text-emerald-400 font-mono font-bold">Active</span>
-              </div>
-
-              <div className="p-3.5 bg-slate-900 rounded-xl flex justify-between items-center text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-900 text-indigo-300 flex items-center justify-center font-bold">
-                    <FileText size={16} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-white">Digital Rx EMR</p>
-                    <p className="text-[11px] text-slate-400">Dr. Rahul Sharma</p>
-                  </div>
-                </div>
-                <span className="text-indigo-400 font-mono font-bold">Synced</span>
-              </div>
-            </div>
-          </div>
-
+      {/* ─── NEW SECTION 2: LIVE QUEUE EXPERIENCE SECTION ──── */}
+      <section id="live-queue-exp" className="py-24 bg-white px-6">
+        <div className="max-w-[1360px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          {/* Left Content */}
           <div className="lg:col-span-6 space-y-6 text-left">
-            <h2 className="text-3xl sm:text-5xl font-black text-slate-900 leading-tight">
-              Trusted platform <br />
-              <span className="text-emerald-700">anytime & anywhere.</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[#4361EE] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+              Real-Time Queue Intelligence
+            </span>
+            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-black text-[#18233D] tracking-tight leading-tight">
+              Your Queue. Live. <br />
+              <span className="text-[#4361EE]">Accurate.</span>
             </h2>
-
-            <div className="flex items-center gap-2 text-amber-500 text-sm font-bold">
-              <span>★★★★★</span>
-              <span className="text-slate-900 font-black text-xs">4.9 / 5</span>
-              <span className="text-slate-500 text-xs font-normal">from 15K+ Doctor Reviews</span>
-            </div>
-
-            <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
-              MedTech Fixaters is a secure and innovative healthcare ecosystem built to help you digitize patient records, reduce waiting times, and grow your practice.
+            <p className="text-sm sm:text-base text-[#5E687B] leading-relaxed">
+              Patients see their exact live position and turnaround estimate on their smartphones, while doctors manage consultations without physical crowded hallway chaos.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                <ShieldCheck size={16} className="text-emerald-700 flex-shrink-0" />
-                <span>Encrypted & Secure</span>
+            {/* 3 Floating Glass Stats Cards */}
+            <div className="grid grid-cols-3 gap-3 pt-2">
+              <div className="p-4 rounded-2xl bg-white/80 backdrop-blur-md border border-slate-200/80 shadow-md text-center">
+                <span className="text-2xl sm:text-3xl font-black text-[#18233D] block font-mono">12</span>
+                <span className="text-[10px] font-bold text-[#5E687B]">Patients Waiting</span>
               </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                <Zap size={16} className="text-emerald-700 flex-shrink-0" />
-                <span>Zero Wait Time</span>
+
+              <div className="p-4 rounded-2xl bg-white/80 backdrop-blur-md border border-indigo-200 shadow-md text-center bg-indigo-50/40">
+                <span className="text-2xl sm:text-3xl font-black text-[#4361EE] block font-mono">C-013</span>
+                <span className="text-[10px] font-bold text-[#4361EE]">Your Current Token</span>
               </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                <Building2 size={16} className="text-emerald-700 flex-shrink-0" />
-                <span>Multi-Hospital</span>
+
+              <div className="p-4 rounded-2xl bg-white/80 backdrop-blur-md border border-slate-200/80 shadow-md text-center">
+                <span className="text-2xl sm:text-3xl font-black text-emerald-600 block font-mono">03</span>
+                <span className="text-[10px] font-bold text-emerald-700">Patients Ahead</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Mobile Phone Queue Stream Mockup */}
+          <div className="lg:col-span-6 relative flex justify-center">
+            <div className="w-[300px] bg-slate-900 p-3 rounded-[38px] shadow-2xl shadow-indigo-500/20 border-4 border-slate-800 space-y-3">
+              {/* Dynamic Island */}
+              <div className="w-20 h-4 bg-black rounded-full mx-auto" />
+
+              <div className="bg-[#F8FAFC] rounded-[28px] p-4 text-center space-y-3">
+                <div className="border-b border-slate-200 pb-2">
+                  <span className="text-[9px] font-bold text-[#4361EE] uppercase tracking-wider block">City Care Hospital</span>
+                  <h4 className="text-xs font-black text-slate-900">Dr. Amit Sharma • Room 101</h4>
+                </div>
+
+                {/* Main Live Token Card */}
+                <div className="p-4 rounded-2xl bg-gradient-to-tr from-[#4361EE] to-[#5D4CC8] text-white space-y-1 shadow-lg shadow-indigo-500/30">
+                  <span className="text-[9px] text-indigo-100 uppercase tracking-wider font-semibold block">Your Token</span>
+                  <span className="text-3xl font-black font-mono block tracking-tight">C-013</span>
+                  <span className="text-[10px] font-bold text-emerald-300 block">● Live Position #4</span>
+                </div>
+
+                {/* Stats & Turnaround */}
+                <div className="p-2.5 bg-white rounded-xl border border-slate-200 flex justify-between text-xs">
+                  <div className="text-left">
+                    <span className="text-[9px] text-slate-400 font-bold block">Ahead of You</span>
+                    <strong className="text-slate-800 text-sm font-mono">3 Patients</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 font-bold block">Estimated Wait</span>
+                    <strong className="text-[#4361EE] text-sm font-mono">~18 mins</strong>
+                  </div>
+                </div>
+
+                {/* Floating Notification Snippet */}
+                <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-left flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                  <p className="text-[9px] text-emerald-900 font-medium">
+                    Dr. Amit completed a patient. Position updated: <strong>5 → 4</strong>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── NEW SECTION 3: SMART QR BOOKING SECTION ───────── */}
+      <section id="qr-booking" className="py-24 bg-gradient-to-b from-white via-indigo-50/30 to-white px-6">
+        <div className="max-w-[1360px] mx-auto bg-white/70 backdrop-blur-xl rounded-3xl border border-white shadow-2xl p-8 sm:p-14">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            {/* Left: Realistic Acrylic QR Standee Mockup */}
+            <div className="lg:col-span-5 flex justify-center">
+              <div className="w-64 bg-gradient-to-b from-white to-slate-50 p-5 rounded-2xl border-2 border-slate-200 shadow-2xl text-center space-y-3 relative">
+                <div className="w-12 h-1 bg-slate-300 rounded-full mx-auto" />
+                <div className="flex items-center justify-center gap-2">
+                  <img src="/assets/brand-icon.png" alt="Logo" className="w-5 h-5 object-contain" />
+                  <span className="font-bold text-xs text-[#18233D]">Hospital OPD Digital Intake</span>
+                </div>
+
+                <div className="space-y-0.5">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Dedicated Hospital QR</span>
+                  <h4 className="text-sm font-black text-[#18233D]">Scan for Live Digital Token</h4>
+                </div>
+
+                {/* Scannable QR Graphic */}
+                <div className="w-40 h-40 mx-auto bg-white p-2.5 rounded-xl border border-slate-200 shadow-inner flex items-center justify-center">
+                  <img
+                    src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://medrapidly.com/book/QR-METROCARE"
+                    alt="Scan Hospital QR"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+
+                <div className="text-[10px] text-[#4361EE] font-bold bg-indigo-50 py-1 px-2 rounded-lg border border-indigo-100">
+                  Powered by Medtech Fixaters
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 pt-4">
-              <button
-                onClick={() => setModalOpen(true)}
-                className="px-7 py-3.5 bg-emerald-950 hover:bg-emerald-900 text-white font-extrabold text-xs tracking-wider rounded-full shadow-lg shadow-emerald-950/20 transition flex items-center gap-2 group"
-              >
-                <span>Start Digitizing Now</span>
-                <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
-              </button>
+            {/* Right: 5-Step Vertical Flow */}
+            <div className="lg:col-span-7 space-y-6 text-left">
+              <div className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-[#4361EE] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+                  QR-Based Appointment Booking
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-black text-[#18233D] tracking-tight">
+                  One Scan. Direct Access.
+                </h2>
+                <p className="text-sm text-[#5E687B]">
+                  Every hospital receives its own unique cryptographic QR code for patient appointment booking and automated triage.
+                </p>
+              </div>
 
-              <Link
-                to="/contact"
-                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-full transition flex items-center gap-2"
-              >
-                <HelpCircle size={15} />
-                <span>Ask a question ?</span>
+              <div className="space-y-3 pt-2">
+                {[
+                  { step: '01', title: 'Scan Hospital QR', desc: 'Patient scans the physical clinic standee with any smartphone camera.' },
+                  { step: '02', title: 'Select Appointment Date', desc: 'Choose today for immediate OPD queue, or book an upcoming date.' },
+                  { step: '03', title: 'Choose Department', desc: 'General OPD, Cardiology, Orthopaedics, Pediatrics, and more.' },
+                  { step: '04', title: 'Select Available Doctor', desc: 'System displays only doctors active and on duty for that date.' },
+                  { step: '05', title: 'Receive Live Queue Token', desc: 'Permanent token number generated with zero duplicate collisions.' },
+                ].map((st, i) => (
+                  <div key={i} className="flex items-start gap-4 p-3 rounded-xl bg-white/90 border border-slate-200/80 shadow-sm hover:border-indigo-300 transition">
+                    <span className="w-8 h-8 rounded-full bg-indigo-50 text-[#4361EE] font-black text-xs flex items-center justify-center shrink-0 border border-indigo-100 font-mono">
+                      {st.step}
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-black text-[#18233D]">{st.title}</h4>
+                      <p className="text-[11px] text-[#5E687B]">{st.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── NEW SECTION 4: THREE SECURE WORKSPACES ─────────── */}
+      <section id="workspaces" className="py-24 bg-white px-6">
+        <div className="max-w-[1360px] mx-auto space-y-14 text-center">
+          <div className="space-y-2 max-w-2xl mx-auto">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#4361EE] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+              Right Access. Right Person.
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-[#18233D] tracking-tight">
+              One Platform. Three Secure Workspaces.
+            </h2>
+            <p className="text-sm text-[#5E687B]">
+              Role-based consoles tailored specifically for administrative control, hospital operations, and doctor consultation workflows.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            {/* 1. Platform Admin */}
+            <div className="p-8 rounded-3xl bg-white border border-purple-100 shadow-xl shadow-purple-500/5 hover:-translate-y-1 transition space-y-6">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Shield size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest block">Root Authority</span>
+                <h3 className="text-xl font-black text-[#18233D]">Platform Admin</h3>
+              </div>
+              <ul className="space-y-2 text-xs text-[#5E687B] font-medium">
+                <li className="flex items-center gap-2"><Check size={14} className="text-purple-600" /> Provision & Onboard Hospitals</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-purple-600" /> Account Suspend / Ban / Delete</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-purple-600" /> Platform Multi-Tenant Telemetry</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-purple-600" /> Global Security Policies</li>
+              </ul>
+              <Link to="/mrshahidbabu" className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-600 hover:text-purple-800">
+                Explore Admin Node <ArrowRight size={13} />
+              </Link>
+            </div>
+
+            {/* 2. Hospital Administration */}
+            <div className="p-8 rounded-3xl bg-white border border-blue-100 shadow-xl shadow-blue-500/5 hover:-translate-y-1 transition space-y-6">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#4361EE] flex items-center justify-center">
+                <Building2 size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-[#4361EE] uppercase tracking-widest block">Facility Operations</span>
+                <h3 className="text-xl font-black text-[#18233D]">Hospital Administration</h3>
+              </div>
+              <ul className="space-y-2 text-xs text-[#5E687B] font-medium">
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#4361EE]" /> Manage Doctor Roster & Limits</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#4361EE]" /> Download & Print QR Standees</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#4361EE]" /> Live OPD Footfall Analytics</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#4361EE]" /> Counter Reception & Cashier Sync</li>
+              </ul>
+              <Link to="/hospitaladmin" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4361EE] hover:text-indigo-800">
+                Explore Hospital Console <ArrowRight size={13} />
+              </Link>
+            </div>
+
+            {/* 3. Doctor Workspace */}
+            <div className="p-8 rounded-3xl bg-white border border-teal-100 shadow-xl shadow-teal-500/5 hover:-translate-y-1 transition space-y-6">
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
+                <Stethoscope size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-teal-600 uppercase tracking-widest block">Clinical Console</span>
+                <h3 className="text-xl font-black text-[#18233D]">Doctor Dashboard</h3>
+              </div>
+              <ul className="space-y-2 text-xs text-[#5E687B] font-medium">
+                <li className="flex items-center gap-2"><Check size={14} className="text-teal-600" /> One-Click Audio/Visual Patient Caller</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-teal-600" /> 30-Second Prescription Pad</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-teal-600" /> WhatsApp E-Prescription Delivery</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-teal-600" /> Patient Medical History & Vitals</li>
+              </ul>
+              <Link to="/doctor" className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-teal-800">
+                Explore Doctor Portal <ArrowRight size={13} />
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 9. BOTTOM HORIZONTAL FEATURE PILL BAR */}
-      <section className="bg-white border-y border-slate-200 py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-slate-700 font-bold text-xs">
-            <div className="flex items-center justify-center gap-2">
-              <ShieldCheck size={16} className="text-emerald-700" />
-              <span>Secure EMR Vault</span>
+      {/* ─── NEW SECTION 5: DOCTOR AVAILABILITY SECTION ─────── */}
+      <section id="doctor-availability" className="py-24 bg-slate-50/70 border-t border-[#E6E9F0] px-6">
+        <div className="max-w-[1360px] mx-auto space-y-12 text-center">
+          <div className="space-y-2 max-w-2xl mx-auto">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#4361EE] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+              Smart Doctor Availability
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-[#18233D] tracking-tight">
+              Show the Right Doctor at the Right Time.
+            </h2>
+            <p className="text-sm text-[#5E687B]">
+              Patients see only doctors who belong to the selected hospital and are actively on duty for the appointment date.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-6 sm:p-8 max-w-4xl mx-auto text-left space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">Date:</span>
+                {['Today', 'Tomorrow', 'Saturday, Jun 2'].map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setAvailDate(d)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                      availDate === d ? 'bg-[#4361EE] text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">Department:</span>
+                {['Cardiology', 'Orthopaedics', 'Pediatrics'].map(dep => (
+                  <button
+                    key={dep}
+                    onClick={() => setAvailDept(dep)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                      availDept === dep ? 'bg-indigo-50 text-[#4361EE] border border-indigo-200' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    {dep}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center justify-center gap-2">
-              <QrCode size={16} className="text-emerald-700" />
-              <span>Instant QR Tokens</span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <BarChart2 size={16} className="text-emerald-700" />
-              <span>Real-time OPD Analytics</span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <Building2 size={16} className="text-emerald-700" />
-              <span>Multi-Hospital Support</span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { name: 'Dr. Amit Sharma', spec: 'Interventional Cardiology', room: 'Room 101', status: 'Available', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+                { name: 'Dr. Neha Singh', spec: 'Clinical Cardiology', room: 'Room 102', status: 'Available', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+                { name: 'Dr. Rahul Verma', spec: 'Pediatric Cardiology', room: 'Room 105', status: 'Unavailable (Off Duty)', color: 'text-slate-500 bg-slate-100 border-slate-200 opacity-60' },
+              ].map((doc, i) => (
+                <div key={i} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="text-xs font-black text-[#18233D]">{doc.name}</h4>
+                      <span className="text-[10px] text-slate-500 block">{doc.spec}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${doc.color}`}>
+                      {doc.status}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-600 font-mono">
+                    {doc.room} • OPD Slot: 09:00 AM - 01:00 PM
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* 10. FAQ SECTION */}
-      <section className="py-20 max-w-4xl mx-auto px-4 sm:px-8 space-y-8 text-left">
-        <div className="text-center space-y-2">
-          <h2 className="text-3xl font-black text-slate-900">Frequently Asked Questions</h2>
-          <p className="text-xs text-slate-500 font-medium">Everything you need to know about MedTech Fixaters</p>
-        </div>
+      {/* ─── NEW SECTION 6: HOSPITAL DATA ISOLATION (DARK NAVY) ── */}
+      <section id="data-isolation" className="py-24 bg-[#111827] text-white px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(67,97,238,0.2)_0,transparent_60%)] pointer-events-none" />
 
-        <div className="space-y-4">
-          {faqs.map((faq, idx) => (
-            <div key={idx} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-              <button
-                onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
-                className="w-full px-6 py-4 text-left flex items-center justify-between text-sm font-bold text-slate-900 focus:outline-none"
-              >
-                <span>{faq.q}</span>
-                <ChevronDown size={18} className={`transition-transform ${activeFaq === idx ? 'rotate-180 text-emerald-700' : 'text-slate-400'}`} />
-              </button>
-              {activeFaq === idx && (
-                <div className="px-6 pb-5 text-xs text-slate-600 font-medium leading-relaxed border-t border-slate-100 pt-3">
-                  {faq.a}
+        <div className="max-w-[1360px] mx-auto space-y-16 text-center relative z-10">
+          <div className="space-y-3 max-w-2xl mx-auto">
+            <span className="text-xs font-bold uppercase tracking-widest text-indigo-400 bg-indigo-950/60 px-3 py-1 rounded-full border border-indigo-800">
+              Independent. Secure. Isolated.
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+              Every Hospital Works in Its Own Secure Space.
+            </h2>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              Hospital data stays strictly separated through database-level row security (RLS), multi-tenant cryptographic isolation, and zero-cross-facility leakage.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto text-left">
+            {[
+              { id: 'H1', name: 'City Care Hospital', city: 'Mumbai', token: 'UUID-H1-NODE' },
+              { id: 'H2', name: 'Sunrise Hospital', city: 'Pune', token: 'UUID-H2-NODE' },
+              { id: 'H3', name: 'Life Plus Hospital', city: 'Delhi', token: 'UUID-H3-NODE' },
+            ].map((h, i) => (
+              <div key={i} className="p-6 rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="w-8 h-8 rounded-xl bg-indigo-600/60 text-white font-bold text-xs flex items-center justify-center">
+                    {h.id}
+                  </span>
+                  <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-800/60">
+                    <Lock size={10} /> Encrypted RLS
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+
+                <div>
+                  <h4 className="text-sm font-black text-white">{h.name}</h4>
+                  <span className="text-[10px] text-slate-400 font-mono">{h.city} • {h.token}</span>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-white/10 text-xs text-slate-300">
+                  <div className="flex justify-between text-[11px]"><span>Doctors:</span> <strong className="text-white font-mono">Isolated</strong></div>
+                  <div className="flex justify-between text-[11px]"><span>Patients:</span> <strong className="text-white font-mono">Isolated</strong></div>
+                  <div className="flex justify-between text-[11px]"><span>Queue Stream:</span> <strong className="text-white font-mono">Isolated</strong></div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="max-w-md mx-auto p-3 rounded-2xl bg-white/5 border border-white/10 text-xs text-slate-300 flex items-center justify-center gap-2">
+            <ShieldCheck size={16} className="text-indigo-400" />
+            <span>Cryptographically Verified Multi-Hospital Architecture</span>
+          </div>
         </div>
       </section>
 
-      <PublicFooter />
-      <ContactModal isOpen={modalOpen} onClose={() => setModalOpen(false)} planName="MedTech Fixaters Enterprise" planPrice="Free Consultation" />
+      {/* ─── NEW SECTION 7: PLATFORM SECURITY ───────────────── */}
+      <section id="security" className="py-24 bg-white px-6">
+        <div className="max-w-[1360px] mx-auto space-y-14 text-center">
+          <div className="space-y-2 max-w-2xl mx-auto">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#4361EE] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+              Security Built Into Every Layer
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-[#18233D] tracking-tight">
+              Healthcare Data Deserves Better Protection.
+            </h2>
+            <p className="text-sm text-[#5E687B]">
+              Engineered with medical privacy in mind, from multi-factor role authentication to immutable clinical audit logs.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
+            {[
+              { title: 'Authentication', desc: 'Secure two-layer auth token verification with periodic heartbeat access checks.', icon: <Lock size={22} className="text-[#4361EE]" /> },
+              { title: 'Data Isolation', desc: 'Each hospital strictly accesses only its own data with zero cross-tenant visibility.', icon: <Database size={22} className="text-purple-600" /> },
+              { title: 'Role-Based Access', desc: 'Fine-grained permissions for platform admins, hospital managers, and doctors.', icon: <UserCheck size={22} className="text-teal-600" /> },
+              { title: 'Secure Cloud Mesh', desc: 'AES-256 encrypted database architecture with advisory transaction locking.', icon: <ShieldCheck size={22} className="text-emerald-600" /> },
+            ].map((sec, i) => (
+              <div key={i} className="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 shadow-sm space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center">
+                  {sec.icon}
+                </div>
+                <h4 className="text-sm font-black text-[#18233D]">{sec.title}</h4>
+                <p className="text-xs text-[#5E687B] leading-relaxed">{sec.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── NEW SECTION 8: PLATFORM NUMBERS ────────────────── */}
+      <section className="py-16 bg-gradient-to-r from-[#4361EE] to-[#5D4CC8] text-white px-6 shadow-lg">
+        <div className="max-w-[1360px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-white/20">
+          <div className="space-y-1">
+            <span className="text-4xl sm:text-5xl font-black font-mono block">100+</span>
+            <span className="text-xs sm:text-sm text-indigo-100 font-bold uppercase tracking-wider">Hospitals Active</span>
+          </div>
+          <div className="space-y-1 pt-4 md:pt-0">
+            <span className="text-4xl sm:text-5xl font-black font-mono block">10,000+</span>
+            <span className="text-xs sm:text-sm text-indigo-100 font-bold uppercase tracking-wider">Appointments Managed</span>
+          </div>
+          <div className="space-y-1 pt-4 md:pt-0">
+            <span className="text-4xl sm:text-5xl font-black font-mono block">500+</span>
+            <span className="text-xs sm:text-sm text-indigo-100 font-bold uppercase tracking-wider">Healthcare Specialists</span>
+          </div>
+          <div className="space-y-1 pt-4 md:pt-0">
+            <span className="text-4xl sm:text-5xl font-black font-mono block">99.9%</span>
+            <span className="text-xs sm:text-sm text-indigo-100 font-bold uppercase tracking-wider">Platform Availability</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── NEW SECTION 9: TESTIMONIALS CAROUSEL ───────────── */}
+      <section className="py-24 bg-[#FCFCFE] border-t border-[#E6E9F0] px-6">
+        <div className="max-w-[1360px] mx-auto space-y-14 text-center">
+          <div className="space-y-2 max-w-2xl mx-auto">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#4361EE] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+              Built for People Who Run Healthcare
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-[#18233D] tracking-tight">
+              Loved by Hospitals. Trusted by Doctors.
+            </h2>
+            <p className="text-sm text-[#5E687B]">
+              Discover why leading multi-specialty hospitals and clinics rely on MedTech Fixaters to run high-speed OPDs.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            {[
+              {
+                name: 'Dr. Amit Sharma',
+                role: 'Head of Cardiology',
+                hosp: 'City Care Multi-Specialty Hospital',
+                quote: 'The live queue system has completely transformed our morning OPD. Patients wait peacefully in the cafeteria rather than crowding outside Room 101.',
+                rating: 5,
+              },
+              {
+                name: 'Dr. Neha Singh',
+                role: 'Medical Director',
+                hosp: 'Sunrise Hospital, Pune',
+                quote: 'We cut average patient check-in time from 14 minutes down to 30 seconds with the QR standee. Doctors love the one-click WhatsApp prescription dispatch.',
+                rating: 5,
+              },
+              {
+                name: 'Dr. Rajesh Verma',
+                role: 'Chief of Surgery',
+                hosp: 'Life Plus Hospital, Delhi',
+                quote: 'Data isolation and doctor duty management are seamless. We handle over 400 outpatients every day with zero duplicate token errors.',
+                rating: 5,
+              },
+            ].map((t, i) => (
+              <div key={i} className="p-8 rounded-3xl bg-white border border-[#E6E9F0] shadow-sm hover:shadow-md transition space-y-4">
+                <div className="flex gap-1 text-amber-400">
+                  {[...Array(t.rating)].map((_, idx) => (
+                    <Star key={idx} size={16} className="fill-amber-400" />
+                  ))}
+                </div>
+                <p className="text-xs sm:text-sm text-[#18233D] leading-relaxed italic">
+                  "{t.quote}"
+                </p>
+                <div className="pt-2 border-t border-slate-100">
+                  <h4 className="text-xs font-black text-[#18233D]">{t.name}</h4>
+                  <span className="text-[10px] text-[#4361EE] font-bold block">{t.role}</span>
+                  <span className="text-[9px] text-slate-400 block">{t.hosp}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── NEW SECTION 10: FAQ ACCORDION SECTION ──────────── */}
+      <section id="faq" className="py-24 bg-white border-t border-[#E6E9F0] px-6">
+        <div className="max-w-[1360px] mx-auto space-y-12 text-center">
+          <div className="space-y-2 max-w-2xl mx-auto">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#4361EE] bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+              Frequently Asked Questions
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-[#18233D] tracking-tight">
+              Everything You Need to Know.
+            </h2>
+            <p className="text-sm text-[#5E687B]">
+              Quick answers regarding hospital QR deployment, live queue stream, data privacy, and doctor consoles.
+            </p>
+          </div>
+
+          <div className="max-w-3xl mx-auto space-y-3 text-left">
+            {[
+              {
+                q: 'How does the hospital QR system work?',
+                a: 'Each hospital receives its own dedicated cryptographic QR code. Patients scan the QR code at the reception or entrance using their phone camera, select an appointment date and doctor, and immediately receive a permanent token with live queue tracking.'
+              },
+              {
+                q: 'Can each hospital have its own doctors?',
+                a: 'Yes, absolutely. Doctors belong strictly to their assigned hospital. When patients scan Hospital H1 QR, they only see H1 active doctors. Hospital H2 doctors never appear on Hospital H1 queues.'
+              },
+              {
+                q: 'Does each doctor have a separate queue?',
+                a: 'Yes. Each doctor maintains an independent sequential queue. If Dr. Amit has 15 patients and Dr. Ashok has 8 patients, their token numbers and live queue positions advance independently without interference.'
+              },
+              {
+                q: 'How is patient medical data protected?',
+                a: 'All records are protected using PostgreSQL Row-Level Security (RLS) and cryptographic tokens. Hospital H1 cannot access or view Hospital H2 patient history, and patient tracking tokens allow live queue viewing without exposing sensitive medical charts.'
+              },
+              {
+                q: 'Can hospital administrators manage doctor accounts?',
+                a: 'Yes. Hospital Admins can add doctors, set OPD consultation fees and daily patient limits, toggle on/off duty status, and temporarily suspend or block doctor accounts from the Hospital Admin portal.'
+              },
+              {
+                q: 'Does the platform work on mobile devices?',
+                a: 'Yes. Med Rapidly is fully responsive and optimized for smartphones, tablets, TV display boards, and desktop computers with zero installation needed.'
+              },
+              {
+                q: 'Can hospitals block doctor access?',
+                a: 'Yes. Hospital administrators have instant authority to block or suspend a doctor account. A blocked doctor is barred from accessing the consultation dashboard or modifying prescriptions.'
+              },
+            ].map((faq, i) => (
+              <div key={i} className="border border-[#E6E9F0] rounded-2xl overflow-hidden bg-[#FCFCFE]">
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full p-4 sm:p-5 flex items-center justify-between text-left font-bold text-xs sm:text-sm text-[#18233D] hover:bg-slate-50 transition"
+                >
+                  <span>{faq.q}</span>
+                  <ChevronDown size={16} className={`text-slate-400 transition-transform ${openFaq === i ? 'rotate-180 text-[#4361EE]' : ''}`} />
+                </button>
+                {openFaq === i && (
+                  <div className="px-5 pb-5 text-xs text-[#5E687B] leading-relaxed border-t border-slate-100 pt-3">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── FINAL CTA SECTION ──────────────────────────────── */}
+      <section id="pricing" className="py-20 px-6 max-w-[1360px] mx-auto">
+        <div className="bg-gradient-to-r from-[#3A57E8] to-[#5046E5] rounded-3xl p-8 sm:p-14 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-indigo-500/25 relative overflow-hidden">
+          <div className="space-y-2 text-center md:text-left relative z-10 max-w-xl">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight">
+              Ready to Modernize Your OPD?
+            </h2>
+            <p className="text-sm text-indigo-100 leading-relaxed">
+              Bring appointments, doctors, patients, and live queues into one connected digital platform. Deploy in under 15 minutes.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 relative z-10">
+            <button
+              onClick={() => setModalOpen(true)}
+              className="px-8 py-4 bg-white hover:bg-slate-50 text-[#3A57E8] font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition transform hover:-translate-y-0.5"
+            >
+              Get Started Free →
+            </button>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="px-8 py-4 bg-white/10 hover:bg-white/20 border border-white/30 text-white font-bold text-xs rounded-xl transition"
+            >
+              Book a Demo
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── PREMIUM FOOTER ─────────────────────────────────── */}
+      <footer id="contact" className="bg-[#18233D] text-slate-400 py-16 px-6 text-xs border-t border-slate-800">
+        <div className="max-w-[1360px] mx-auto grid grid-cols-1 md:grid-cols-5 gap-10 pb-12 border-b border-slate-800">
+          <div className="space-y-3 md:col-span-2">
+            <div className="flex items-center gap-2.5">
+              <img src="/assets/brand-icon.png" alt="Logo" className="w-8 h-8 object-contain" />
+              <span className="font-bold text-lg text-white">Med Rapidly</span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
+              Smart Healthcare. Connected Digitally. MedTech Fixaters transforms hospital OPDs into high-speed digital machines with QR check-in, live queue streams, and automated WhatsApp prescriptions.
+            </p>
+          </div>
+
+          <div>
+            <span className="font-bold text-white uppercase text-[10px] tracking-wider block mb-3">Product</span>
+            <ul className="space-y-2 text-xs">
+              <li><a href="#features" className="hover:text-white transition">Overview</a></li>
+              <li><Link to="/hospitaladmin" className="hover:text-white transition">Hospital Platform</Link></li>
+              <li><Link to="/doctor" className="hover:text-white transition">Doctor Platform</Link></li>
+              <li><Link to="/track" className="hover:text-white transition">Patient Booking & Queue</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <span className="font-bold text-white uppercase text-[10px] tracking-wider block mb-3">Solutions</span>
+            <ul className="space-y-2 text-xs">
+              <li><a href="#workspaces" className="hover:text-white transition">For Hospitals</a></li>
+              <li><a href="#workspaces" className="hover:text-white transition">For Doctors</a></li>
+              <li><a href="#data-isolation" className="hover:text-white transition">For Healthcare Networks</a></li>
+              <li><Link to="/mrshahidbabu" className="hover:text-white transition">Platform Admin</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <span className="font-bold text-white uppercase text-[10px] tracking-wider block mb-3">Resources & Legal</span>
+            <ul className="space-y-2 text-xs">
+              <li><Link to="/privacy" className="hover:text-white transition">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-white transition">Terms of Service</Link></li>
+              <li><a href="mailto:support@medtechfixaters.com" className="hover:text-white transition">Support: support@medtechfixaters.com</a></li>
+              <li><span className="text-slate-500 font-mono">+91 98765 43210</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="max-w-[1360px] mx-auto pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-3">
+          <p>© 2026 MedTech Fixaters. All rights reserved.</p>
+          <div className="flex gap-4">
+            <span className="text-slate-400">ISO 27001 & HIPAA Compliant Healthcare Architecture</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* ─── LEAD / ONBOARDING MODAL ───────────────────────── */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border border-slate-200 shadow-2xl space-y-4 relative">
+            <button onClick={() => setModalOpen(false)} className="absolute top-5 right-5 text-slate-400 hover:text-slate-700">
+              <X size={18} />
+            </button>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-black text-[#4361EE] uppercase tracking-wider">Hospital Onboarding</span>
+              <h3 className="text-xl font-black text-[#18233D]">Start Free Hospital Trial</h3>
+              <p className="text-xs text-[#5E687B]">Get your hospital QR code and live OPD queue running in minutes.</p>
+            </div>
+
+            {leadSubmitted ? (
+              <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-2">
+                <CheckCircle2 size={36} className="text-emerald-600 mx-auto" />
+                <h4 className="font-bold text-emerald-900 text-sm">Request Submitted!</h4>
+                <p className="text-xs text-emerald-700">Our medical deployment specialist will contact you shortly.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleLeadSubmit} className="space-y-3 text-xs">
+                <div>
+                  <label className="font-bold text-[#18233D] block mb-1">Your Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={leadForm.name}
+                    onChange={e => setLeadForm({ ...leadForm, name: e.target.value })}
+                    placeholder="e.g. Dr. Rajesh Sharma"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-[#E6E9F0] rounded-xl font-semibold text-[#18233D]"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-[#18233D] block mb-1">Hospital / Clinic Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={leadForm.hospital_name}
+                    onChange={e => setLeadForm({ ...leadForm, hospital_name: e.target.value })}
+                    placeholder="e.g. City Care Multi-Specialty Hospital"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-[#E6E9F0] rounded-xl font-semibold text-[#18233D]"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-[#18233D] block mb-1">Mobile Phone *</label>
+                    <input
+                      type="tel"
+                      required
+                      value={leadForm.phone}
+                      onChange={e => setLeadForm({ ...leadForm, phone: e.target.value })}
+                      placeholder="+91 98765 43210"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-[#E6E9F0] rounded-xl font-semibold text-[#18233D]"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-[#18233D] block mb-1">City *</label>
+                    <input
+                      type="text"
+                      required
+                      value={leadForm.city}
+                      onChange={e => setLeadForm({ ...leadForm, city: e.target.value })}
+                      placeholder="e.g. Mumbai"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-[#E6E9F0] rounded-xl font-semibold text-[#18233D]"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-gradient-to-r from-[#4361EE] to-[#5D4CC8] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-indigo-500/25 mt-2"
+                >
+                  Deploy Hospital OPD Node →
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

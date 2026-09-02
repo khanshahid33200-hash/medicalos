@@ -1,511 +1,858 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useSearchParams } from 'react-router-dom'
-import { Clock, CheckCircle, MapPin, DollarSign, Stethoscope, ShieldAlert, Building2, User, Calendar } from 'lucide-react'
-import { Card, CardContent } from '../components/Card'
-import PaymentUI from '../components/PaymentUI'
-import { addCheckinToDoctorQueue, getQueueForDoctor, notifyQueueUpdated } from '../utils/doctorStore'
+import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom'
+import {
+  Clock, CheckCircle2, MapPin, Stethoscope, ShieldAlert,
+  Building2, User, Calendar, Search, ArrowRight, ArrowLeft,
+  AlertCircle, FileText, Phone, Activity, Sparkles, Check
+} from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { useSEO } from '../hooks/useSEO'
 
-interface HospitalData {
+interface Department {
   id: string
   name: string
-  intake_token: string
-  status: string
-  phone?: string
-  address?: string
+  description?: string
+  is_opd?: boolean
 }
 
-interface DoctorData {
+interface Doctor {
   id: string
-  hospital_id: string
+  doctor_code: string
   name: string
-  email: string
-  dept: string
-  specialization?: string
-  qualification?: string
-  room?: string
+  department: string
+  specialization: string
   fee: number
-  limit: number
-  status: string
-  is_available?: boolean
+  room: string
+  daily_limit: number
+  availability_status: string
+}
+
+interface HospitalInfo {
+  id: string
+  name: string
+  license?: string
+  phone?: string
+  email?: string
+  address?: string
 }
 
 export default function IntakePage() {
   const { token } = useParams()
   const [searchParams] = useSearchParams()
-  const tokenQuery = searchParams.get('token') || searchParams.get('hosp') || token || ''
+  const navigate = useNavigate()
+  const tokenQuery = token || searchParams.get('token') || searchParams.get('t') || searchParams.get('hosp_id') || searchParams.get('hospital_id') || ''
 
-  const [hospital, setHospital] = useState<HospitalData | null>(null)
-  const [doctorsList, setDoctorsList] = useState<DoctorData[]>([])
+  useSEO({
+    title: 'Hospital OPD Appointment & Fast Queue Check-In — Medtech Fixaters',
+    description: 'Book instant clinical appointment, select specialist doctor, and receive real-time queue token.',
+  })
+
+  // Data Loading State
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [hospital, setHospital] = useState<HospitalInfo | null>(null)
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
 
-  // Step state (1: Date, 2: Doctor, 3: Details, 4: Payment, 5: Success Token)
-  const [selectedDate, setSelectedDate] = useState<string>('Today')
-  const [selectedDoctor, setSelectedDoctor] = useState<DoctorData | null>(null)
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  // Multi-Step Workflow (1: Date & Dept, 2: Doctor, 3: Patient Info & History, 4: Confirmed Token)
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
 
-  // Patient Details Form State
+  // Booking State
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const d = new Date()
+    return d.toISOString().split('T')[0]
+  })
+  const [selectedDept, setSelectedDept] = useState<string>('')
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null)
+
+  // Patient Number Lookup State
+  const [patientLookupInput, setPatientLookupInput] = useState('')
+  const [isSearchingPatient, setIsSearchingPatient] = useState(false)
+  const [lookupMessage, setLookupMessage] = useState<string | null>(null)
+  const [existingPatientFound, setExistingPatientFound] = useState(false)
+
+  // Patient Form Fields
   const [formData, setFormData] = useState({
+    patient_number: '',
     name: '',
-    age: '',
     phone: '',
-    address: '',
+    gender: 'Male',
+    age: '',
+    date_of_birth: '',
     symptoms: '',
-    previous_meds: '',
+    known_diseases: '',
+    previous_medicine: '',
+    previous_doctor_id: '',
+    previous_doctor_name: '',
+    emergency_contact: '',
+    blood_group: '',
     consent: true
   })
 
-  const [confirmedToken, setConfirmedToken] = useState<any>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [confirmedBooking, setConfirmedBooking] = useState<any | null>(null)
 
-  // Dynamic Available Dates
-  const todayDate = new Date()
-  const dates = [
-    { label: 'Today', date: todayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) },
-    { label: 'Tomorrow', date: new Date(Date.now() + 86400000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) },
-    { label: 'Day After', date: new Date(Date.now() + 172800000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) },
+  // Quick Date Selectors (Today, Tomorrow, Day After)
+  const todayObj = new Date()
+  const tomorrowObj = new Date(Date.now() + 86400000)
+  const dayAfterObj = new Date(Date.now() + 172800000)
+
+  const dateOptions = [
+    {
+      label: 'Today',
+      val: todayObj.toISOString().split('T')[0],
+      display: todayObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    },
+    {
+      label: 'Tomorrow',
+      val: tomorrowObj.toISOString().split('T')[0],
+      display: tomorrowObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    },
+    {
+      label: 'Day After',
+      val: dayAfterObj.toISOString().split('T')[0],
+      display: dayAfterObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    }
   ]
 
-  // 1. Resolve Scanned Hospital & Registered Doctors on Mount
+  // 1. Fetch Hospital Info, Departments & Doctors via Secure RPC
   useEffect(() => {
-    setIsLoading(true)
+    const loadBookingData = async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        if (!tokenQuery.trim()) {
+          throw new Error('No hospital QR booking token provided. Please scan the QR code displayed at your hospital facility.')
+        }
+
+        const { data, error: rpcErr } = await supabase.rpc('get_qr_booking_info', {
+          p_token: tokenQuery.trim()
+        })
+
+        if (rpcErr) throw rpcErr
+
+        if (!data || !data.success) {
+          throw new Error(data?.error || 'Invalid or inactive hospital QR booking code.')
+        }
+
+        setHospital(data.hospital)
+        const depts: Department[] = data.departments || []
+        setDepartments(depts)
+        const docs: Doctor[] = data.doctors || []
+        setDoctors(docs)
+
+        // Set default selected department if available
+        if (depts.length > 0) {
+          const opdDept = depts.find(d => d.is_opd || d.name.toLowerCase().includes('opd'))
+          setSelectedDept(opdDept ? opdDept.name : depts[0].name)
+        } else {
+          setSelectedDept('')
+        }
+      } catch (err: any) {
+        console.warn('QR Booking Info Load Notice:', err.message)
+        // STRICT ZERO-FALLBACK MULTI-TENANT ISOLATION:
+        // NEVER inject demo doctors, mock hospitals, or hardcoded profiles!
+        setError(err.message || 'Hospital QR booking portal unavailable.')
+        setHospital(null)
+        setDepartments([])
+        setDoctors([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadBookingData()
+  }, [tokenQuery])
+
+  // 2. Patient Number / Mobile History Lookup
+  const handlePatientLookup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!patientLookupInput.trim()) return
+
+    setIsSearchingPatient(true)
+    setLookupMessage(null)
+
+    try {
+      const isNum = patientLookupInput.trim().toUpperCase().startsWith('MR-')
+      const { data, error: lookupErr } = await supabase.rpc('lookup_patient_by_qr', {
+        p_token: tokenQuery.trim(),
+        p_patient_number: isNum ? patientLookupInput.trim() : null,
+        p_mobile: !isNum ? patientLookupInput.trim() : null
+      })
+
+      if (lookupErr) throw lookupErr
+
+      if (data && data.found && data.patient) {
+        const p = data.patient
+        setFormData(prev => ({
+          ...prev,
+          patient_number: p.patient_number || '',
+          name: p.name || prev.name,
+          phone: p.phone || prev.phone,
+          gender: p.gender || prev.gender,
+          age: p.age ? p.age.toString() : prev.age,
+          date_of_birth: p.date_of_birth || prev.date_of_birth,
+          known_diseases: p.known_diseases || prev.known_diseases,
+          allergies: p.allergies || '',
+          previous_medicine: p.previous_medicine || prev.previous_medicine,
+          previous_doctor_id: p.previous_doctor_id || '',
+          previous_doctor_name: p.previous_doctor_name || ''
+        }))
+        setExistingPatientFound(true)
+        setLookupMessage(`✓ Found medical history for: ${p.name} (Patient #${p.patient_number})`)
+      } else {
+        setLookupMessage('ℹ️ No previous records found in this hospital. Proceeding as New Patient.')
+        setExistingPatientFound(false)
+      }
+    } catch (err: any) {
+      console.warn('Patient lookup notice:', err.message)
+      setLookupMessage('Proceeding with new registration.')
+    } finally {
+      setIsSearchingPatient(false)
+    }
+  }
+
+  // Filter doctors by selected department
+  const filteredDoctors = doctors.filter(doc => {
+    if (!selectedDept) return true
+    return doc.department.toLowerCase() === selectedDept.toLowerCase() ||
+           (selectedDept.toLowerCase().includes('opd') && (doc.department.toLowerCase().includes('general') || doc.department.toLowerCase().includes('opd')))
+  })
+
+  // 3. Handle Appointment Booking Submission
+  const handleBookAppointment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedDoctor) {
+      alert('Please select a doctor to continue.')
+      return
+    }
+
+    setIsSubmitting(true)
     setError(null)
 
     try {
-      const savedHospitalsRaw = localStorage.getItem('clinicos_hospitals')
-      const hospitals: HospitalData[] = savedHospitalsRaw ? JSON.parse(savedHospitalsRaw) : []
+      const { data, error: bookErr } = await supabase.rpc('book_qr_appointment', {
+        p_qr_token: tokenQuery.trim(),
+        p_doctor_id: selectedDoctor.id,
+        p_appointment_date: selectedDate,
+        p_patient_name: formData.name.trim(),
+        p_patient_phone: formData.phone.trim(),
+        p_patient_gender: formData.gender,
+        p_patient_age: parseInt(formData.age) || 30,
+        p_patient_dob: formData.date_of_birth || null,
+        p_symptoms: formData.symptoms.trim(),
+        p_known_diseases: formData.known_diseases.trim() || null,
+        p_previous_medicine: formData.previous_medicine.trim() || null,
+        p_previous_doctor_id: formData.previous_doctor_id || null,
+        p_patient_number: formData.patient_number.trim() || null
+      })
 
-      // Match hospital by intake_token, id, or default fallback if single hospital exists
-      let matchedHosp = hospitals.find(
-        (h) =>
-          h.intake_token === tokenQuery ||
-          h.id === tokenQuery ||
-          `tok_${h.id}` === tokenQuery ||
-          tokenQuery.includes(h.id)
-      )
+      if (bookErr) throw bookErr
 
-      // Fallback: If only 1 hospital exists in storage, use it
-      if (!matchedHosp && hospitals.length > 0) {
-        matchedHosp = hospitals[0]
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to generate appointment token.')
       }
 
-      if (!matchedHosp) {
-        // Create default active hospital record if none registered yet
-        matchedHosp = {
-          id: 'hosp-001',
-          name: 'City Care Hospital',
-          intake_token: tokenQuery || 'default-token',
-          status: 'active',
-          address: 'Main Healthcare Boulevard',
-        }
-      }
-
-      if (matchedHosp.status === 'suspended') {
-        setError(`Hospital "${matchedHosp.name}" is currently suspended. Online QR booking is temporarily unavailable.`)
-        setIsLoading(false)
-        return
-      }
-
-      setHospital(matchedHosp)
-
-      // Fetch ONLY Registered & Active Doctors for this specific hospital ID
-      const savedDoctorsRaw = localStorage.getItem('clinicos_hospital_doctors')
-      const allDoctors: DoctorData[] = savedDoctorsRaw ? JSON.parse(savedDoctorsRaw) : []
-
-      // Filter doctors belonging to THIS hospital who are active
-      const hospitalDocs = allDoctors.filter(
-        (d) =>
-          (d.hospital_id === matchedHosp!.id || !d.hospital_id || matchedHosp!.id === 'hosp-001') &&
-          d.status !== 'inactive'
-      )
-
-      setDoctorsList(hospitalDocs)
-    } catch (e) {
-      console.error('Error resolving QR token:', e)
-      setError('Failed to resolve hospital details from QR token.')
+      setConfirmedBooking(data)
+      setStep(4)
+    } catch (err: any) {
+      console.warn('Booking error:', err.message)
+      setError(err.message || 'Unable to book appointment. Please try again.')
     } finally {
-      setIsLoading(false)
+      setIsSubmitting(false)
     }
-  }, [tokenQuery])
-
-  const handleProceedToPayment = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedDoctor || !formData.name || !formData.phone) return
-    setStep(4) // Move to Payment Step
   }
 
-  const handlePaymentSuccess = (paymentId: string, transactionId: string) => {
-    if (!selectedDoctor || !hospital) return
-
-    // Calculate Doctor-Independent Queue Number
-    const existingQueue = getQueueForDoctor(selectedDoctor.id)
-    const queueNum = existingQueue.length + 1
-    const deptCode = (selectedDoctor.dept || 'GEN').substring(0, 3).toUpperCase()
-    const queueCode = `${deptCode}-${String(queueNum).padStart(2, '0')}`
-
-    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const visitToken = `${todayStr}${String(queueNum).padStart(2, '0')}`
-
-    // Create Atomic Queue & Appointment Record strictly assigned to hospital_id and doctor_id
-    const checkinPayload = {
-      name: formData.name,
-      phone: formData.phone,
-      age: Number(formData.age) || 30,
-      gender: 'Other',
-      symptoms: formData.symptoms,
-      hospital_id: hospital.id,
-      hospital_name: hospital.name,
-      doctor_id: selectedDoctor.id,
-      department: selectedDoctor.dept,
-    }
-
-    addCheckinToDoctorQueue(selectedDoctor.id, checkinPayload)
-    notifyQueueUpdated(selectedDoctor.id)
-
-    // Save Appointment in persistent hospital appointments store
-    try {
-      const savedAptsRaw = localStorage.getItem('clinicos_appointments')
-      const allApts: any[] = savedAptsRaw ? JSON.parse(savedAptsRaw) : []
-      const newApt = {
-        id: `apt-${Date.now()}`,
-        hospital_id: hospital.id,
-        hospital_name: hospital.name,
-        doctor_id: selectedDoctor.id,
-        doctor_name: selectedDoctor.name,
-        patient_name: formData.name,
-        patient_phone: formData.phone,
-        appointment_date: selectedDate,
-        appointment_time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        queue_number: queueNum,
-        token_number: visitToken,
-        department: selectedDoctor.dept,
-        room: selectedDoctor.room || 'Room 101',
-        fee: selectedDoctor.fee || 500,
-        status: 'Scheduled',
-        payment_id: paymentId,
-        transaction_id: transactionId,
-        created_at: new Date().toISOString()
-      }
-      allApts.push(newApt)
-      localStorage.setItem('clinicos_appointments', JSON.stringify(allApts))
-    } catch (e) {}
-
-    setConfirmedToken({
-      token_number: visitToken,
-      queue_code: queueCode,
-      queue_number: queueNum,
-      hospital: hospital.name,
-      doctor: selectedDoctor.name,
-      dept: selectedDoctor.dept,
-      room: selectedDoctor.room || 'Room 101',
-      fee: selectedDoctor.fee || 500,
-      ahead: queueNum - 1,
-      estimated_wait: Math.max(5, (queueNum - 1) * 10),
-      date: selectedDate,
-      payment_id: paymentId,
-      transaction_id: transactionId
-    })
-    setStep(5)
-  }
-
+  // --------------------------------------------------------------------------
+  // RENDER: LOADING STATE
+  // --------------------------------------------------------------------------
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans text-white">
-        <div className="text-center space-y-3">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm font-bold text-slate-300">Resolving Secure Hospital QR Token...</p>
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 animate-spin mb-4">
+          <Activity size={24} />
         </div>
+        <h2 className="text-base font-black text-slate-800">Validating Hospital QR Access...</h2>
+        <p className="text-xs text-slate-500 mt-1">Connecting securely to facility OPD node.</p>
       </div>
     )
   }
 
-  if (error || !hospital) {
+  // --------------------------------------------------------------------------
+  // RENDER: ERROR STATE (BLOCKED HOSPITAL OR INVALID TOKEN)
+  // --------------------------------------------------------------------------
+  if (error && !hospital) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans text-white">
-        <div className="max-w-md w-full bg-slate-950 border border-red-500/30 rounded-3xl p-8 text-center space-y-4 shadow-2xl">
-          <ShieldAlert size={48} className="mx-auto text-red-400" />
-          <h2 className="text-xl font-black text-white">Invalid or Suspended Hospital QR Code</h2>
-          <p className="text-xs text-slate-400 font-medium">
-            {error || 'This QR token is not recognized by Clinic OS. Please scan a valid hospital entrance QR code.'}
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-8 text-center space-y-4 shadow-xl">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-600">
+            <ShieldAlert size={32} />
+          </div>
+          <h2 className="text-xl font-black text-slate-900">Booking Portal Unavailable</h2>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            {error || 'This clinical facility booking portal is currently restricted or inactive.'}
           </p>
-          <Link
-            to="/"
-            className="inline-block px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition shadow-lg shadow-blue-600/30"
-          >
-            Go to Clinic OS Home
-          </Link>
+          <div className="pt-2">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl"
+            >
+              <ArrowLeft size={14} /> Return to Homepage
+            </Link>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-6 selection:bg-blue-600 selection:text-white">
-      {/* 2. QR PAGE DYNAMIC HEADING FROM DATABASE */}
-      <header className="max-w-xl mx-auto text-center space-y-2 mb-6">
-        <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 mx-auto object-contain bg-white px-2 py-1 rounded-xl shadow-md" />
-        
-        {/* Dynamic Hospital Name */}
-        <h1 className="text-3xl font-black text-white tracking-tight font-recoleta">
-          {hospital.name}
-        </h1>
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/20 text-blue-300 font-bold text-xs rounded-full border border-blue-500/30">
-          <Building2 size={14} /> Book Your Appointment
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans pb-16 antialiased selection:bg-emerald-500 selection:text-white">
+      {/* ─── TOP CLINICAL BAR: RESOLVED HOSPITAL IDENTITY ───── */}
+      <header className="bg-white border-b border-slate-200/90 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex items-center justify-center font-black text-white text-lg shadow-md shadow-emerald-500/20">
+              <Building2 size={20} />
+            </div>
+            <div>
+              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider block">
+                Official OPD Booking Portal
+              </span>
+              <h1 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight leading-tight">
+                {hospital?.name || 'City Care Hospital'}
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+              Live Queue Online
+            </span>
+          </div>
         </div>
-        {hospital.address && <p className="text-xs text-slate-400">📍 {hospital.address}</p>}
       </header>
 
-      <div className="max-w-xl mx-auto">
-        {/* STEP 5: CONFIRMATION TOKEN */}
-        {step === 5 && confirmedToken ? (
-          <Card className="rounded-3xl border-2 border-emerald-500 bg-slate-900 shadow-2xl overflow-hidden text-center space-y-6 p-8 text-white">
-            <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto shadow-md">
-              <CheckCircle size={40} />
+      {/* ─── MAIN CONTAINER ─────────────────────────────────── */}
+      <main className="max-w-3xl mx-auto px-4 pt-6 space-y-6">
+
+        {/* Step Indicator Tracker (1 to 3) */}
+        {step < 4 && (
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between text-xs">
+            <div className={`flex items-center gap-2 font-bold ${step >= 1 ? 'text-emerald-700' : 'text-slate-400'}`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] ${step >= 1 ? 'bg-emerald-600 text-white font-black' : 'bg-slate-100 text-slate-400'}`}>
+                1
+              </div>
+              <span className="hidden sm:inline">Date & Specialty</span>
             </div>
 
+            <div className="w-8 h-[2px] bg-slate-200" />
+
+            <div className={`flex items-center gap-2 font-bold ${step >= 2 ? 'text-emerald-700' : 'text-slate-400'}`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] ${step >= 2 ? 'bg-emerald-600 text-white font-black' : 'bg-slate-100 text-slate-400'}`}>
+                2
+              </div>
+              <span className="hidden sm:inline">Select Doctor</span>
+            </div>
+
+            <div className="w-8 h-[2px] bg-slate-200" />
+
+            <div className={`flex items-center gap-2 font-bold ${step >= 3 ? 'text-emerald-700' : 'text-slate-400'}`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] ${step >= 3 ? 'bg-emerald-600 text-white font-black' : 'bg-slate-100 text-slate-400'}`}>
+                3
+              </div>
+              <span className="hidden sm:inline">Patient & Medical Details</span>
+            </div>
+          </div>
+        )}
+
+        {/* ─── STEP 1: DATE & DEPARTMENT SELECTION ────────────── */}
+        {step === 1 && (
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xl shadow-slate-200/50 space-y-6">
             <div>
-              <span className="px-3.5 py-1.5 bg-emerald-500/20 text-emerald-300 font-extrabold text-xs rounded-full border border-emerald-500/30 uppercase tracking-widest">
-                ✓ Booking Confirmed & Fee Paid (₹{confirmedToken.fee})
-              </span>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-4">Live Visit Token Number</p>
-              <p className="text-4xl font-black text-white font-mono mt-1">{confirmedToken.token_number}</p>
-              <p className="text-[11px] font-mono text-slate-500">Txn Ref: {confirmedToken.transaction_id}</p>
-            </div>
-
-            <div className="bg-blue-600/10 border border-blue-500/30 p-6 rounded-2xl space-y-2">
-              <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">Independent Doctor Queue Position</p>
-              <p className="text-5xl font-black text-blue-300 font-mono">{confirmedToken.queue_code}</p>
-              <p className="text-base font-extrabold text-white">{confirmedToken.doctor} • {confirmedToken.dept}</p>
-              <p className="text-xs text-slate-300 flex items-center justify-center gap-1">
-                <MapPin size={14} className="text-blue-400" /> {confirmedToken.room}
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                1. Select Desired Appointment Date
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Choose the consultation date to view doctor schedules and active queue slots.
               </p>
             </div>
 
-            <div className="flex items-center justify-center gap-6 text-xs font-bold text-slate-300 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <div>
-                <p className="text-slate-400 font-normal">Patients Ahead</p>
-                <p className="text-lg text-white font-black">{confirmedToken.ahead} Patients</p>
-              </div>
-              <div className="h-8 w-px bg-slate-800" />
-              <div>
-                <p className="text-slate-400 font-normal">Estimated Wait</p>
-                <p className="text-lg text-blue-400 font-black flex items-center gap-1">
-                  <Clock size={16} /> ~{confirmedToken.estimated_wait} Mins
-                </p>
+            {/* Quick Date Selector Cards */}
+            <div className="grid grid-cols-3 gap-3">
+              {dateOptions.map(opt => (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => setSelectedDate(opt.val)}
+                  className={`p-4 rounded-2xl border text-center transition-all ${
+                    selectedDate === opt.val
+                      ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 shadow-sm'
+                      : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <span className="text-[10px] font-black uppercase tracking-wider block opacity-70 mb-0.5">{opt.label}</span>
+                  <span className="text-sm font-black block">{opt.display}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Date Input for Advance Booking */}
+            <div className="pt-2">
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">Or Choose Advance Date:</label>
+              <input
+                type="date"
+                min={todayObj.toISOString().split('T')[0]}
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="w-full sm:w-auto px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+              />
+            </div>
+
+            {/* Department Selection (OPD Top & Default) */}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <label className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                Select Department / Specialty
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {departments.length === 0 ? (
+                  <div className="sm:col-span-2 p-6 text-center bg-slate-50 border border-slate-200 rounded-2xl">
+                    <p className="text-xs font-bold text-slate-600">No departments currently configured for this hospital.</p>
+                  </div>
+                ) : (
+                  departments.map(dept => {
+                    const isSelected = selectedDept.toLowerCase() === dept.name.toLowerCase()
+                    return (
+                      <button
+                        key={dept.id}
+                        type="button"
+                        onClick={() => setSelectedDept(dept.name)}
+                        className={`p-4 rounded-2xl border text-left transition-all ${
+                          isSelected
+                            ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
+                            : 'bg-white border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-black text-slate-900">{dept.name}</span>
+                          {dept.is_opd && (
+                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black rounded-full uppercase">
+                              Default OPD
+                            </span>
+                          )}
+                        </div>
+                        {dept.description && (
+                          <p className="text-[11px] text-slate-500 mt-1 leading-tight">{dept.description}</p>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
               </div>
             </div>
 
-            <Link
-              to={`/track?token=${confirmedToken.token_number}&phone=${formData.phone}`}
-              className="block w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-blue-600/30 transition text-center"
-            >
-              Track Live Queue Position on Phone →
-            </Link>
-          </Card>
-        ) : step === 4 && selectedDoctor ? (
-          <PaymentUI
-            appointmentId={`appt-${Date.now()}`}
-            consultationFee={selectedDoctor.fee}
-            doctorName={selectedDoctor.name}
-            patientPhone={formData.phone}
-            patientName={formData.name}
-            onPaymentSuccess={handlePaymentSuccess}
-            onPaymentError={(err) => alert(`Payment error: ${err}`)}
-          />
-        ) : (
-          <form onSubmit={handleProceedToPayment} className="space-y-6">
-            {/* STEP 1: DATE SELECTION */}
-            <Card className="rounded-3xl border border-slate-800 bg-slate-950 shadow-xl">
-              <CardContent className="p-6 space-y-3">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <Calendar size={14} className="text-blue-400" /> Step 1. Select Appointment Date
+            {/* Next Button */}
+            <div className="pt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="w-full sm:w-auto px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
+              >
+                <span>View Available Doctors</span>
+                <ArrowRight size={15} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── STEP 2: DOCTOR SELECTION (SCOPED STRICTLY TO HOSPITAL & DEPT) ──── */}
+        {step === 2 && (
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xl shadow-slate-200/50 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                  2. Choose Specialist Doctor
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Available practitioners in <strong className="text-slate-800">{selectedDept || 'all departments'}</strong> for {selectedDate}.
                 </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {dates.map((d) => (
-                    <button
-                      key={d.label}
-                      type="button"
-                      onClick={() => setSelectedDate(d.label)}
-                      className={`p-3 rounded-2xl border text-center transition ${
-                        selectedDate === d.label
-                          ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/30 font-bold'
-                          : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800 font-medium'
+              </div>
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1"
+              >
+                <ArrowLeft size={13} /> Change Date
+              </button>
+            </div>
+
+            {/* Doctor Cards List */}
+            <div className="space-y-3">
+              {filteredDoctors.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-1">
+                    <AlertCircle size={26} />
+                  </div>
+                  <h3 className="font-extrabold text-slate-900 text-sm">No Doctors Available</h3>
+                  <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+                    This hospital currently has no doctors available for online appointments.
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Please select another date or contact the hospital directly.
+                  </p>
+                </div>
+              ) : (
+                filteredDoctors.map(doc => {
+                  const isSelected = selectedDoctor?.id === doc.id
+                  return (
+                    <div
+                      key={doc.id}
+                      onClick={() => setSelectedDoctor(doc)}
+                      className={`p-5 rounded-2xl border cursor-pointer transition-all ${
+                        isSelected
+                          ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/25 shadow-md'
+                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
                       }`}
                     >
-                      <p className="text-xs font-bold">{d.label}</p>
-                      <p className="text-[10px] opacity-80 mt-0.5">{d.date}</p>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* STEP 2: SHOW ONLY REGISTERED REAL DOCTORS FOR THIS HOSPITAL */}
-            <Card className="rounded-3xl border border-slate-800 bg-slate-950 shadow-xl">
-              <CardContent className="p-6 space-y-3">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <Stethoscope size={14} className="text-blue-400" /> Step 2. Select Registered Doctor at {hospital.name}
-                </p>
-
-                {doctorsList.length === 0 ? (
-                  <div className="p-8 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-2">
-                    <Stethoscope size={36} className="mx-auto text-slate-600" />
-                    <p className="text-sm font-bold text-slate-300">No doctors are currently available.</p>
-                    <p className="text-xs text-slate-500">The hospital administration has not onboarded active doctors for QR booking yet.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {doctorsList.map((doc) => {
-                      const isSelected = selectedDoctor?.id === doc.id
-                      const docQueue = getQueueForDoctor(doc.id)
-                      const waitingCount = docQueue.filter((q) => q.status === 'Waiting' || q.status === 'With Doctor').length
-                      const slotsLimit = doc.limit || 25
-                      const slotsLeft = Math.max(0, slotsLimit - waitingCount)
-                      const isFull = slotsLeft === 0
-
-                      return (
-                        <button
-                          key={doc.id}
-                          type="button"
-                          disabled={isFull}
-                          onClick={() => {
-                            setSelectedDoctor(doc)
-                            setStep(3)
-                          }}
-                          className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition ${
-                            isSelected
-                              ? 'bg-blue-600/10 border-2 border-blue-500 shadow-lg shadow-blue-500/20'
-                              : isFull
-                              ? 'bg-slate-900 border-slate-800 opacity-50 cursor-not-allowed'
-                              : 'bg-slate-900 border-slate-800 hover:border-blue-500/40'
-                          }`}
-                        >
-                          <div className="space-y-1">
-                            <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 font-mono text-[10px] font-bold rounded border border-blue-500/20 uppercase">
-                              {doc.dept || 'GENERAL'}
-                            </span>
-                            <p className="font-bold text-white text-base mt-1">
-                              {doc.name}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              {doc.qualification || 'MBBS, MD'} • <span className="text-slate-300 font-medium">{doc.specialization || doc.dept}</span>
-                            </p>
-                            <div className="flex items-center gap-3 text-xs pt-1">
-                              <span className="text-slate-400 flex items-center gap-1">
-                                <MapPin size={12} className="text-blue-400" /> {doc.room || 'Room 101'}
-                              </span>
-                              <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 font-black rounded border border-emerald-500/20">
-                                Fee: ₹{doc.fee || 500}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3.5">
+                          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-sm shrink-0">
+                            Dr.
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-black text-base text-slate-900">{doc.name}</h3>
+                              <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                {doc.doctor_code}
                               </span>
                             </div>
+                            <p className="text-xs text-slate-500 font-medium">{doc.specialization}</p>
+                            <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-1">
+                              <MapPin size={12} className="text-slate-400" /> {doc.room}
+                            </span>
                           </div>
+                        </div>
 
-                          <div className="text-right text-xs">
-                            {isFull ? (
-                              <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 font-extrabold rounded-full text-[10px]">
-                                Fully Booked Today
-                              </span>
-                            ) : (
-                              <div className="space-y-0.5">
-                                <p className="font-black text-amber-400">{waitingCount} Currently Waiting</p>
-                                <p className="text-slate-400 text-[11px] font-medium">{slotsLeft} of {slotsLimit} slots available</p>
-                              </div>
-                            )}
+                        <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+                          <div className="text-left sm:text-right">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Consultation Fee</span>
+                            <span className="text-base font-black text-emerald-600">₹{doc.fee}</span>
                           </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* STEP 3: PATIENT DETAILS FORM */}
-            {selectedDoctor && (
-              <Card className="rounded-3xl border-2 border-blue-500 bg-slate-950 shadow-2xl">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <p className="text-xs font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <User size={14} /> Step 3. Patient Details for {selectedDoctor.name}
-                    </p>
-                    <span className="font-extrabold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 text-xs">
-                      Consultation Fee: ₹{selectedDoctor.fee || 500}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Full Name *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Patient Full Name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold text-white focus:border-blue-500 outline-none"
-                      />
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+                            Available Today
+                          </span>
+                        </div>
+                      </div>
                     </div>
+                  )
+                })
+              )}
+            </div>
 
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Mobile Phone *</label>
-                      <input
-                        type="tel"
-                        required
-                        maxLength={10}
-                        placeholder="9876543210"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold text-white focus:border-blue-500 outline-none"
-                      />
-                    </div>
-                  </div>
+            {/* Navigation Buttons */}
+            <div className="pt-4 flex items-center justify-between border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="px-5 py-3 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-100 transition"
+              >
+                ← Back
+              </button>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Age</label>
-                      <input
-                        type="number"
-                        placeholder="35"
-                        value={formData.age}
-                        onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold text-white focus:border-blue-500 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">City / Address</label>
-                      <input
-                        type="text"
-                        placeholder="City"
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold text-white focus:border-blue-500 outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">Reason for Visit / Symptoms *</label>
-                    <textarea
-                      required
-                      rows={2}
-                      placeholder="e.g. Chest tightness or routine checkup"
-                      value={formData.symptoms}
-                      onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold text-white focus:border-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-blue-600/30 transition flex items-center justify-center gap-2"
-                  >
-                    <DollarSign size={16} /> Proceed to Pay ₹{selectedDoctor.fee || 500} & Confirm Booking
-                  </button>
-                </CardContent>
-              </Card>
-            )}
-          </form>
+              <button
+                type="button"
+                disabled={!selectedDoctor}
+                onClick={() => setStep(3)}
+                className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition"
+              >
+                <span>Continue to Patient Details</span>
+                <ArrowRight size={15} />
+              </button>
+            </div>
+          </div>
         )}
-      </div>
+
+        {/* ─── STEP 3: PATIENT MEDICAL FORM & HISTORY ──────────── */}
+        {step === 3 && (
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xl shadow-slate-200/50 space-y-6">
+            <div>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                3. Patient & Clinical Information
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Appointments are generated with an atomic queue token for <strong className="text-slate-800">{selectedDoctor?.name}</strong>.
+              </p>
+            </div>
+
+            {/* SECTION B: PATIENT NUMBER SEARCH (SCOPED TO THIS HOSPITAL) */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Returning Patient History Lookup (Optional)
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">Hospital #{hospital?.id?.slice(0, 8)}</span>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={patientLookupInput}
+                  onChange={e => setPatientLookupInput(e.target.value)}
+                  placeholder="Enter Patient Number (e.g. MR-1234) or Mobile..."
+                  className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold placeholder:text-slate-400"
+                />
+                <button
+                  type="button"
+                  onClick={handlePatientLookup}
+                  disabled={isSearchingPatient}
+                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1.5"
+                >
+                  <Search size={13} />
+                  <span>{isSearchingPatient ? 'Searching...' : 'Search'}</span>
+                </button>
+              </div>
+
+              {lookupMessage && (
+                <p className={`text-xs font-bold ${existingPatientFound ? 'text-emerald-700' : 'text-slate-600'}`}>
+                  {lookupMessage}
+                </p>
+              )}
+            </div>
+
+            {/* MAIN APPOINTMENT FORM */}
+            <form onSubmit={handleBookAppointment} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Patient Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Rajesh Kumar"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
+                  />
+                </div>
+
+                {/* Mobile Phone */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Mobile Phone (For WhatsApp Rx) *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={formData.phone}
+                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+91 98765 43210"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
+                  />
+                </div>
+
+                {/* Gender */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Gender *</label>
+                  <select
+                    value={formData.gender}
+                    onChange={e => setFormData({ ...formData, gender: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                {/* Age or DOB */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Age (Years) / Date of Birth *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    required
+                    value={formData.age}
+                    onChange={e => setFormData({ ...formData, age: e.target.value })}
+                    placeholder="e.g. 35"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
+                  />
+                </div>
+              </div>
+
+              {/* Symptoms (Required) */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Chief Symptoms / Reason for Visit *</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={formData.symptoms}
+                  onChange={e => setFormData({ ...formData, symptoms: e.target.value })}
+                  placeholder="e.g. High fever for 3 days, dry cough, severe body aches..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                />
+              </div>
+
+              {/* Known Diseases (Optional) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Known Conditions (Optional)</label>
+                  <input
+                    type="text"
+                    value={formData.known_diseases}
+                    onChange={e => setFormData({ ...formData, known_diseases: e.target.value })}
+                    placeholder="e.g. Diabetes Type 2, Hypertension, Asthma"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                  />
+                </div>
+
+                {/* Previous Medicine (Optional) */}
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Current / Previous Medicine (Optional)</label>
+                  <input
+                    type="text"
+                    value={formData.previous_medicine}
+                    onChange={e => setFormData({ ...formData, previous_medicine: e.target.value })}
+                    placeholder="e.g. Metformin 500mg, Telmisartan 40mg"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                  />
+                </div>
+              </div>
+
+              {/* Consent Checkbox */}
+              <div className="pt-2">
+                <label className="flex items-start gap-2.5 cursor-pointer text-slate-600">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={formData.consent}
+                    onChange={e => setFormData({ ...formData, consent: e.target.checked })}
+                    className="mt-0.5 rounded text-emerald-600"
+                  />
+                  <span>
+                    I confirm that the medical information provided is accurate and consent to digital queue dispatch and WhatsApp prescription delivery.
+                  </span>
+                </label>
+              </div>
+
+              {error && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle size={15} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Submit Buttons */}
+              <div className="pt-4 flex items-center justify-between border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="px-5 py-3 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-100 transition"
+                >
+                  ← Back
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-xl shadow-emerald-600/25 flex items-center gap-2 transition transform hover:-translate-y-0.5"
+                >
+                  <CheckCircle2 size={16} />
+                  <span>{isSubmitting ? 'Generating Queue Token...' : 'Confirm Appointment & Get Token →'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ─── STEP 4: CONFIRMED APPOINTMENT & LIVE QUEUE TOKEN ──── */}
+        {step === 4 && confirmedBooking && (
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-2xl shadow-slate-200/60 space-y-6 text-center">
+            {/* Success Animation Badge */}
+            <div className="w-16 h-16 rounded-3xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 size={36} />
+            </div>
+
+            <div className="space-y-1">
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-full">
+                Appointment Confirmed
+              </span>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                {confirmedBooking.hospital_name}
+              </h2>
+              <p className="text-xs text-slate-500">
+                Your queue spot has been assigned directly to {confirmedBooking.doctor_name}'s live room.
+              </p>
+            </div>
+
+            {/* Permanent Token & Live Position Display Box */}
+            <div className="p-6 bg-gradient-to-b from-slate-50 to-white border border-slate-200 rounded-3xl grid grid-cols-2 gap-4 text-center shadow-sm">
+              <div className="border-r border-slate-200 pr-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Original Token #
+                </span>
+                <span className="text-4xl sm:text-5xl font-black text-emerald-600 font-mono block mt-1">
+                  #{confirmedBooking.token_number}
+                </span>
+                <span className="text-[10px] font-bold text-slate-500 mt-1 block">Permanent Token</span>
+              </div>
+
+              <div className="pl-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Current Live Position
+                </span>
+                <span className="text-4xl sm:text-5xl font-black text-slate-900 font-mono block mt-1">
+                  {confirmedBooking.live_position}
+                </span>
+                <span className="text-[10px] font-bold text-emerald-700 mt-1 block">
+                  {confirmedBooking.patients_ahead} Patients Ahead
+                </span>
+              </div>
+            </div>
+
+            {/* Consultation Details Card */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-left space-y-2 text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200/70">
+                <span className="text-slate-500 font-medium">Assigned Doctor:</span>
+                <span className="font-black text-slate-900">{confirmedBooking.doctor_name} ({confirmedBooking.doctor_code})</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200/70">
+                <span className="text-slate-500 font-medium">Department:</span>
+                <span className="font-bold text-slate-800">{confirmedBooking.department}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200/70">
+                <span className="text-slate-500 font-medium">Date:</span>
+                <span className="font-bold text-slate-800">{confirmedBooking.appointment_date}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Tracking Token:</span>
+                <span className="font-mono text-emerald-800 font-bold">{confirmedBooking.tracking_token}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2.5 pt-2">
+              <Link
+                to={`/track?t=${confirmedBooking.tracking_token}`}
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-xl shadow-emerald-600/25 flex items-center justify-center gap-2 transition transform hover:-translate-y-0.5"
+              >
+                <Activity size={16} />
+                <span>Open Live Real-Time Queue Tracker →</span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1)
+                  setConfirmedBooking(null)
+                }}
+                className="w-full py-3 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition"
+              >
+                Book Another Appointment
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   )
 }

@@ -1,226 +1,350 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { AlertCircle, Stethoscope, Key, ArrowRight } from 'lucide-react'
+import {
+  AlertCircle, Stethoscope, Building2, Lock, Mail,
+  Eye, EyeOff, ArrowRight, ShieldCheck, Zap,
+  CheckCircle2, Sparkles, PhoneCall
+} from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useSEO } from '../hooks/useSEO'
 
 export default function Login() {
   useSEO({
-    title: 'Doctor Portal Login - MedTech Fixaters',
-    description: 'Sign in to your doctor clinical dashboard to manage OPD patient queues and generate 30-second EMR prescriptions.',
+    title: 'Sign In — Clinical OS by MedTech Fixaters',
+    description: 'Secure Doctor and Hospital Administrator sign-in portal for MedTech Fixaters Clinical OS.',
   })
 
   const navigate = useNavigate()
   const { loginWithSupabase } = useAuth()
 
   const [selectedRole, setSelectedRole] = useState<'doctor' | 'hospital_admin'>('doctor')
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  })
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
-  }
+  const [showForgotModal, setShowForgotModal] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setIsLoading(true)
 
-    if (selectedRole === 'hospital_admin') {
+    const cleanEmail = email.trim().toLowerCase()
+    const cleanPass = password.trim()
+
+    if (!cleanEmail || !cleanPass) {
       setIsLoading(false)
-      navigate('/hospitaladminmedtech')
+      setError('Please enter your registered email address and password.')
       return
     }
 
-    const cleanEmail = formData.email.trim().toLowerCase()
-    const cleanPass = formData.password.trim()
-
     try {
-      await loginWithSupabase(cleanEmail, cleanPass, 'doctor')
-      navigate('/dashboard')
+      const res = await loginWithSupabase(cleanEmail, cleanPass, selectedRole)
+      const actualRole = res?.role || selectedRole
+      if (actualRole === 'hospital_admin') {
+        navigate('/hospitaldashboard/dashboard')
+      } else if (actualRole === 'super_admin') {
+        navigate('/mrshahidbabu')
+      } else {
+        navigate('/dashboard')
+      }
     } catch (err: any) {
-      setError(err.message || 'Invalid Doctor email or password. Please verify credentials.')
+      setError(err.message || 'Invalid email or password. Please verify your credentials.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleDemoFill = (email: string, pass: string) => {
-    setFormData({ email, password: pass })
-  }
-
   return (
-    <div className="min-h-screen bg-[#18362b] flex items-center justify-center p-4 sm:p-6 font-sans text-slate-100 selection:bg-emerald-600 selection:text-white relative overflow-hidden">
-      {/* Background Decorative Subtle Radial Glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-700/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-teal-700/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 sm:p-6 lg:p-8 font-sans text-slate-900 selection:bg-emerald-500 selection:text-white relative overflow-hidden">
+      {/* Subtle Background Glows */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-200/40 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-teal-200/30 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Main Split Container Card */}
-      <div className="max-w-5xl w-full bg-[#122a21] rounded-3xl shadow-2xl overflow-hidden border border-emerald-900/40 grid grid-cols-1 md:grid-cols-12 min-h-[580px]">
-        {/* LEFT PANEL: White Curved Branding Graphic Section */}
-        <div className="md:col-span-6 bg-white text-slate-900 p-8 sm:p-12 flex flex-col justify-between items-center text-center relative md:rounded-r-[90px] shadow-lg z-10">
+      {/* Main Container Card */}
+      <div className="max-w-5xl w-full bg-white rounded-3xl shadow-2xl shadow-slate-200/80 border border-slate-200/90 overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[640px] relative z-10">
+        
+        {/* ─── LEFT BRANDING & VALUE PANEL (lg: 5 cols) ─── */}
+        <div className="lg:col-span-5 bg-gradient-to-br from-slate-950 via-slate-900 to-[#0c1f18] text-white p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
+          {/* Subtle Ambient Mesh */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
+
           {/* Top Logo */}
-          <div className="w-full flex justify-between items-center">
-            <Link to="/" className="flex items-center gap-3">
-              <img src="/assets/logo.png" alt="MedTech Fixaters Logo" className="h-10 object-contain" />
-              <div className="flex flex-col text-left">
-                <span className="font-black text-lg text-slate-900 tracking-tight leading-none">MedTech Fixaters</span>
-                <span className="text-[10px] font-bold text-emerald-700 tracking-widest uppercase mt-0.5">Clinical OS</span>
+          <div className="relative z-10 space-y-6">
+            <Link to="/" className="inline-flex items-center gap-3 group">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 p-0.5 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition">
+                <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-black text-emerald-400 text-lg">
+                  ⚡
+                </div>
+              </div>
+              <div>
+                <span className="text-base font-black text-white tracking-tight block">MedTech Fixaters</span>
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                  Clinical Operating System
+                </span>
               </div>
             </Link>
-          </div>
 
-          {/* Center Medical Tree / Stethoscope Vector Graphic */}
-          <div className="my-auto py-8 space-y-4 max-w-xs mx-auto">
-            <div className="w-32 h-32 bg-emerald-50 rounded-full border-4 border-emerald-100 flex items-center justify-center mx-auto shadow-inner text-[#00875A]">
-              <Stethoscope size={64} className="animate-pulse" />
-            </div>
-            <div className="space-y-1">
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">Smart OPD & EMR System</h2>
-              <p className="text-xs text-slate-500 font-medium">
-                High-speed digital prescription writing & queue management for Indian healthcare practices.
+            {/* Main Pitch */}
+            <div className="space-y-2 pt-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[11px] font-bold">
+                <Sparkles size={13} />
+                <span>Next-Gen Healthcare OS</span>
+              </div>
+              <h2 className="text-2xl font-black text-white tracking-tight leading-tight">
+                High-Speed OPD, Smart Queue & EMR Console.
+              </h2>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Sign in to manage patient consultations, issue 30-second digital prescriptions, and monitor live tokens.
               </p>
             </div>
+
+            {/* Feature Highlights */}
+            <div className="space-y-3 pt-2">
+              {[
+                { icon: <Zap size={15} className="text-emerald-400" />, title: '30-Second Prescription EMR', sub: 'Instant drug auto-complete & dosing.' },
+                { icon: <ShieldCheck size={15} className="text-teal-400" />, title: 'Zero-Leakage Multi-Tenant RLS', sub: 'Database-level PostgreSQL isolation.' },
+                { icon: <CheckCircle2 size={15} className="text-emerald-400" />, title: 'Smart QR Kiosk & WhatsApp Rx', sub: 'Automated patient check-in delivery.' },
+              ].map((feat, i) => (
+                <div key={i} className="flex items-start gap-3 p-2.5 rounded-2xl bg-white/[0.03] border border-white/5">
+                  <div className="p-1.5 bg-white/5 rounded-xl shrink-0 mt-0.5">
+                    {feat.icon}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">{feat.title}</h4>
+                    <p className="text-[11px] text-slate-400">{feat.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Left Footer */}
-          <div className="w-full text-center text-[11px] text-slate-400 font-medium border-t border-slate-100 pt-4">
-            <p>© 2026 MedTech Fixaters. ABDM & HIPAA Compliant.</p>
+          {/* Bottom Security Trust Badges */}
+          <div className="pt-6 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400 relative z-10">
+            <span className="font-semibold flex items-center gap-1">
+              <ShieldCheck size={13} className="text-emerald-400" /> ABDM & HIPAA Ready
+            </span>
+            <span className="font-mono">256-Bit SSL Encrypted</span>
           </div>
         </div>
 
-        {/* RIGHT PANEL: Dark Forest Green Login Form */}
-        <div className="md:col-span-6 p-8 sm:p-12 flex flex-col justify-between text-left space-y-6 bg-[#122a21]">
-          {/* Top Navigation & Role Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="p-1 bg-[#1a382e] rounded-full border border-emerald-900/60 flex items-center text-[11px] font-bold">
+        {/* ─── RIGHT AUTHENTICATION FORM (lg: 7 cols) ─── */}
+        <div className="lg:col-span-7 p-8 sm:p-12 flex flex-col justify-between bg-white text-left space-y-6">
+          
+          {/* Top Bar: Return Link & Role Switcher */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Role Switcher Pill */}
+            <div className="p-1 bg-slate-100 rounded-2xl border border-slate-200/80 inline-flex items-center text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setSelectedRole('doctor')}
-                className={`px-4 py-1.5 rounded-full transition ${
-                  selectedRole === 'doctor' ? 'bg-[#3b7c77] text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all ${
+                  selectedRole === 'doctor'
+                    ? 'bg-white text-emerald-700 shadow-sm font-extrabold'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                Doctor
+                <Stethoscope size={15} />
+                <span>Doctor Portal</span>
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedRole('hospital_admin')
-                  navigate('/hospitaladminmedtech')
-                }}
-                className={`px-4 py-1.5 rounded-full transition ${
-                  selectedRole === 'hospital_admin' ? 'bg-[#3b7c77] text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                onClick={() => setSelectedRole('hospital_admin')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all ${
+                  selectedRole === 'hospital_admin'
+                    ? 'bg-white text-emerald-700 shadow-sm font-extrabold'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                Hospital Admin
+                <Building2 size={15} />
+                <span>Hospital Admin</span>
               </button>
             </div>
 
-            <Link to="/" className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1">
-              <span>Home</span> <ArrowRight size={14} />
+            <Link
+              to="/"
+              className="text-xs font-bold text-slate-500 hover:text-slate-900 transition flex items-center gap-1 self-end sm:self-auto"
+            >
+              <span>Back to Home</span>
+              <ArrowRight size={13} />
             </Link>
           </div>
 
-          {/* Login Header */}
-          <div className="space-y-1">
-            <h1 className="text-3xl font-extrabold text-white tracking-tight">Login</h1>
-            <p className="text-xs text-emerald-300/80 font-medium">
-              Enter your clinical doctor credentials to access OPD queue
+          {/* Header Title */}
+          <div className="space-y-1.5">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              {selectedRole === 'doctor' ? 'Doctor Clinical Sign In' : 'Hospital Admin Portal'}
+            </h1>
+            <p className="text-xs text-slate-500">
+              {selectedRole === 'doctor'
+                ? 'Enter your assigned practitioner email to open today’s OPD consult queue.'
+                : 'Access hospital doctor seats, live lobby display, and reception settings.'}
             </p>
           </div>
 
+          {/* Error Banner */}
           {error && (
-            <div className="p-3 bg-rose-950/80 border border-rose-800 text-rose-200 rounded-2xl text-xs font-bold flex items-center gap-2">
-              <AlertCircle size={16} className="flex-shrink-0 text-rose-400" />
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-semibold flex items-center gap-2.5 animate-shake">
+              <AlertCircle size={17} className="shrink-0 text-rose-500" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Form */}
+          {/* Sign In Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">Username / Email</label>
-              <input
-                type="email"
-                name="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email"
-                className="w-full px-5 py-3 bg-[#1a382e] border border-emerald-900/60 rounded-full text-xs text-white placeholder-slate-400 focus:ring-2 focus:ring-[#3b7c77] outline-none transition"
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-1.5 ml-1">
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">Password</label>
-                <Link to="/contact" className="text-[11px] text-emerald-400 hover:underline">
-                  Forgot Password?
-                </Link>
+            {/* Identifier (Doctor ID or Email) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>{selectedRole === 'doctor' ? 'Doctor ID or Email' : 'Hospital Admin Email'}</span>
+                <span className="text-[10px] text-slate-400 font-normal">
+                  {selectedRole === 'doctor' ? 'e.g. H1-D-0001' : 'Supabase Auth'}
+                </span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Mail size={16} />
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={selectedRole === 'doctor' ? 'Doctor ID (e.g. H1-D-0001) or Email' : 'admin@hospital.com'}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition"
+                />
               </div>
-              <input
-                type="password"
-                name="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter your password"
-                className="w-full px-5 py-3 bg-[#1a382e] border border-emerald-900/60 rounded-full text-xs text-white placeholder-slate-400 focus:ring-2 focus:ring-[#3b7c77] outline-none transition"
-              />
             </div>
 
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">Password</label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(true)}
+                  className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Lock size={16} />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full pl-10 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Remember Me */}
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-xs font-medium text-slate-600">Keep me logged in on this clinical workstation</span>
+              </label>
+            </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3.5 bg-[#3b7c77] hover:bg-[#2f6661] text-white font-extrabold text-xs uppercase tracking-wider rounded-full shadow-lg shadow-teal-950/40 transition flex items-center justify-center gap-2 mt-2"
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-600/25 transition-all transform active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 mt-2 cursor-pointer"
             >
-              <Key size={16} /> {isLoading ? 'Authenticating...' : 'Login to Doctor Console'}
+              {isLoading ? (
+                <span>Authenticating with Supabase...</span>
+              ) : (
+                <>
+                  <span>
+                    {selectedRole === 'doctor' ? 'Sign In to Doctor Console' : 'Sign In to Hospital Admin'}
+                  </span>
+                  <ArrowRight size={15} />
+                </>
+              )}
             </button>
           </form>
 
-          {/* Quick Demo Fill Buttons */}
-          <div className="pt-2 border-t border-emerald-900/40 space-y-2">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Demo Accounts:</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoFill('doctor@shahidkhan.site', 'Shahideeba@19019')}
-                className="px-3 py-2 bg-[#1a382e] hover:bg-emerald-900/40 text-emerald-300 rounded-xl text-[11px] font-mono text-left border border-emerald-800/40"
-              >
-                <strong>Dr. Rahul Sharma</strong>
-                <span className="block text-[10px] opacity-70">General Medicine</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDemoFill('drshahid@medtech.com', 'Shahideeba@19019')}
-                className="px-3 py-2 bg-[#1a382e] hover:bg-emerald-900/40 text-emerald-300 rounded-xl text-[11px] font-mono text-left border border-emerald-800/40"
-              >
-                <strong>Dr. Shahid Khan</strong>
-                <span className="block text-[10px] opacity-70">Cardiology Specialist</span>
-              </button>
+          {/* Bottom Security Info & Support */}
+          <div className="pt-4 border-t border-slate-100 space-y-2">
+            <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
+              <div className="flex items-center gap-3">
+                <Link to="/privacy" className="hover:text-slate-700 transition">Privacy Policy</Link>
+                <span>•</span>
+                <Link to="/terms" className="hover:text-slate-700 transition">Terms of Service</Link>
+              </div>
+              <div className="text-[11px]">
+                Need credentials?{' '}
+                <a href="mailto:support@medtechfixaters.com" className="font-bold text-emerald-600 hover:underline">
+                  Contact Super Admin
+                </a>
+              </div>
             </div>
-          </div>
-
-          {/* Bottom Footer links */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2 border-t border-emerald-900/40">
-            <Link to="/terms" className="hover:text-emerald-300 underline">
-              Terms & Services
-            </Link>
-            <span className="text-[10px]">
-              Have a problem? <a href="mailto:shahidbcsm@gmail.com" className="text-emerald-400 hover:underline">Contact Support</a>
-            </span>
           </div>
         </div>
       </div>
+
+      {/* ─── MODAL: FORGOT PASSWORD RECOVERY ─── */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl space-y-4 text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <PhoneCall size={16} />
+                </div>
+                <h3 className="font-black text-base text-slate-900">Credential Recovery</h3>
+              </div>
+              <button
+                onClick={() => setShowForgotModal(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600">
+              <p>
+                Clinical practitioner accounts and hospital admin credentials are cryptographically secured by Supabase Auth and provisioned by your facility or platform super administrator.
+              </p>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-[11px]">
+                <strong className="text-slate-800 block">How to reset your password:</strong>
+                <p>1. Contact your Hospital Administrator to trigger a password reset.</p>
+                <p>2. For Master Hospital Admin access, request a key renewal from Super Admin at <code>/mrshahidbabu</code>.</p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setShowForgotModal(false)}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition"
+              >
+                Understood, Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -8,7 +8,7 @@ import { getAppointmentsForDoctor, saveAppointmentsForDoctor, AppointmentItem } 
 
 export default function Appointments() {
   const { doctorProfile } = useAuth()
-  const doctorId = doctorProfile?.doctor_id || 'doc-001'
+  const doctorId = doctorProfile?.doctor_id || ''
   const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
 
   const [filterTab, setFilterTab] = useState<'todays' | 'upcoming' | 'completed' | 'cancelled'>('todays')
@@ -25,7 +25,7 @@ export default function Appointments() {
 
   const reloadAppointments = () => {
     const userRole = localStorage.getItem('user_role')
-    const currentHospId = doctorProfile?.hospital_id || localStorage.getItem('hospital_id') || 'hosp-001'
+    const currentHospId = doctorProfile?.hospital_id || ''
 
     const storeAppointments = getAppointmentsForDoctor(doctorId)
     const savedAptsRaw = localStorage.getItem('clinicos_appointments')
@@ -35,11 +35,11 @@ export default function Appointments() {
 
     if (userRole === 'hospital_admin') {
       // Hospital Admin sees all appointments for their hospital
-      const matchedGlobal = globalApts.filter((a) => a.hospital_id === currentHospId || !a.hospital_id)
+      const matchedGlobal = globalApts.filter((a) => a.hospital_id === currentHospId && currentHospId)
       filtered = [...matchedGlobal, ...storeAppointments]
     } else {
-      // Doctor D1 sees ONLY appointments where doctor_id === D1.id
-      const matchedGlobal = globalApts.filter((a) => a.doctor_id === doctorId && (a.hospital_id === currentHospId || !a.hospital_id))
+      // Doctor D1 sees ONLY appointments explicitly assigned to doctor_id === D1.id
+      const matchedGlobal = globalApts.filter((a) => a.doctor_id === doctorId && doctorId && a.hospital_id === currentHospId)
       filtered = [...matchedGlobal, ...storeAppointments]
     }
 

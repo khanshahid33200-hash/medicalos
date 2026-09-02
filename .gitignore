@@ -70,3 +70,6 @@ med-rapidly/.next/
 webapp/dist/
 
 .vercel
+.agents/
+skills-lock.json
+*.log

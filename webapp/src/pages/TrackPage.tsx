@@ -1,136 +1,307 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Clock, Search } from 'lucide-react'
-import { Card } from '../components/Card'
+import {
+  Clock, Search, Activity, Building2, User, Stethoscope,
+  MapPin, CheckCircle2, AlertCircle, ArrowLeft, RefreshCw, Bell
+} from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { useSEO } from '../hooks/useSEO'
+
+interface QueueStatus {
+  appointment_id: string
+  hospital_name: string
+  hospital_phone?: string
+  doctor_name: string
+  doctor_code: string
+  department: string
+  room_number: string
+  appointment_date: string
+  original_token: number
+  live_position: number
+  patients_ahead: number
+  estimated_wait_mins: number
+  status: 'waiting' | 'called' | 'in_consultation' | 'completed' | 'cancelled' | 'no_show'
+  created_at: string
+}
 
 export default function TrackPage() {
   const [searchParams] = useSearchParams()
+  const trackingTokenParam = searchParams.get('t') || searchParams.get('token') || ''
 
-  const [tokenInput, setTokenInput] = useState(searchParams.get('token') || '2026082230')
-  const [phoneInput, setPhoneInput] = useState(searchParams.get('phone') || '9876543210')
-  const [activeTracking, setActiveTracking] = useState<any>({
-    token_number: '2026082230',
-    queue_code: 'ORT-07',
-    doctor_name: 'Dr. Ashok Verma',
-    department: 'Orthopaedics',
-    room: 'Room 4',
-    now_serving: 'ORT-04',
-    patients_ahead: 3,
-    estimated_wait: 26,
-    hospital: 'City Care Hospital'
+  useSEO({
+    title: 'Live OPD Queue & Token Tracker — Med Rapidly',
+    description: 'Track your real-time doctor queue position, live room status, and estimated consultation wait time.',
   })
 
-  const handleSearchTrack = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!tokenInput || !phoneInput) return
+  const [tokenInput, setTokenInput] = useState(trackingTokenParam)
+  const [queueData, setQueueData] = useState<QueueStatus | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
-    setActiveTracking({
-      token_number: tokenInput,
-      queue_code: 'ORT-07',
-      doctor_name: 'Dr. Ashok Verma',
-      department: 'Orthopaedics',
-      room: 'Room 4',
-      now_serving: 'ORT-04',
-      patients_ahead: 3,
-      estimated_wait: 26,
-      hospital: 'City Care Hospital'
-    })
+  // 1. Fetch Live Queue Status via RPC
+  const fetchLiveStatus = async (trkToken: string) => {
+    if (!trkToken.trim()) return
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const { data, error: rpcErr } = await supabase.rpc('get_live_queue_status', {
+        p_tracking_token: trkToken.trim()
+      })
+
+      if (rpcErr) throw rpcErr
+
+      if (data && data.success) {
+        setQueueData(data)
+        setLastUpdated(new Date())
+      } else {
+        throw new Error(data?.error || 'Appointment record not found.')
+      }
+    } catch (err: any) {
+      console.warn('Queue tracking notice:', err.message)
+      // Fallback state if query token not found
+      setError(err.message || 'Tracking token not recognized. Please check your token.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (trackingTokenParam) {
+      fetchLiveStatus(trackingTokenParam)
+    }
+  }, [trackingTokenParam])
+
+  // 2. Real-Time Subscription to Live Appointments Queue
+  useEffect(() => {
+    if (!queueData?.appointment_id) return
+
+    const channel = supabase
+      .channel(`live_queue_${queueData.appointment_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments'
+        },
+        () => {
+          // Re-fetch queue status immediately on any change in appointments
+          fetchLiveStatus(tokenInput || trackingTokenParam)
+        }
+      )
+      .subscribe()
+
+    // 15-second polling fallback
+    const interval = setInterval(() => {
+      if (tokenInput || trackingTokenParam) {
+        fetchLiveStatus(tokenInput || trackingTokenParam)
+      }
+    }, 15000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
+  }, [queueData?.appointment_id, tokenInput, trackingTokenParam])
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!tokenInput.trim()) return
+    fetchLiveStatus(tokenInput.trim())
+  }
+
+  // Get status color & badge
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'called':
+        return {
+          label: 'Called — Proceed to Room',
+          bg: 'bg-amber-100 text-amber-900 border-amber-300',
+          dot: 'bg-amber-500 animate-ping',
+          desc: 'Your token has been called by the doctor. Please proceed immediately to the consultation room.'
+        }
+      case 'in_consultation':
+        return {
+          label: 'In Consultation',
+          bg: 'bg-blue-100 text-blue-900 border-blue-300',
+          dot: 'bg-blue-600 animate-pulse',
+          desc: 'Consultation currently in progress with doctor.'
+        }
+      case 'completed':
+        return {
+          label: 'Consultation Completed',
+          bg: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+          dot: 'bg-emerald-600',
+          desc: 'Consultation finished. Your WhatsApp e-prescription has been dispatched.'
+        }
+      case 'no_show':
+        return {
+          label: 'Marked No-Show',
+          bg: 'bg-slate-100 text-slate-700 border-slate-300',
+          dot: 'bg-slate-500',
+          desc: 'Patient was not present when token was called.'
+        }
+      case 'cancelled':
+        return {
+          label: 'Appointment Cancelled',
+          bg: 'bg-rose-100 text-rose-800 border-rose-200',
+          dot: 'bg-rose-500',
+          desc: 'This appointment was cancelled.'
+        }
+      default:
+        return {
+          label: 'Waiting in Queue',
+          bg: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+          dot: 'bg-emerald-500 animate-ping',
+          desc: 'Your token is active in the OPD queue. Monitor live position below.'
+        }
+    }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 selection:bg-blue-600 selection:text-white">
-      <header className="max-w-xl mx-auto text-center space-y-2 mb-6">
-        <Link to="/">
-          <img src="/assets/logo.png" alt="Clinic OS Logo" className="h-10 mx-auto object-contain" />
-        </Link>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight font-recoleta">Live Queue Position Tracker</h1>
-        <p className="text-xs text-slate-500 font-medium">Track your place in line live without waiting in crowded OPD corridors</p>
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans pb-16 antialiased selection:bg-emerald-500 selection:text-white">
+      {/* ─── HEADER ────────────────────────────────────────── */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-xl mx-auto px-4 py-3.5 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex items-center justify-center font-black text-white text-sm shadow-md shadow-emerald-600/20">
+              M
+            </div>
+            <div>
+              <span className="font-black text-xs text-slate-900 block leading-tight">Med Rapidly</span>
+              <span className="text-[10px] text-slate-400 font-semibold">Live Patient Telemetry</span>
+            </div>
+          </Link>
+
+          {queueData && (
+            <button
+              onClick={() => fetchLiveStatus(tokenInput || trackingTokenParam)}
+              className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+              title="Refresh Queue"
+            >
+              <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Sync</span>
+            </button>
+          )}
+        </div>
       </header>
 
-      <div className="max-w-xl mx-auto space-y-6">
-        {/* Search Bar */}
-        <form onSubmit={handleSearchTrack} className="bg-white p-4 rounded-3xl border border-slate-200 shadow-md space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-extrabold text-slate-700 uppercase tracking-wider mb-1">Visit Token Number *</label>
-              <input
-                type="text"
-                required
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                placeholder="e.g. 2026082230"
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-extrabold text-slate-700 uppercase tracking-wider mb-1">Mobile Phone *</label>
-              <input
-                type="tel"
-                required
-                maxLength={10}
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                placeholder="9876543210"
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold"
-              />
-            </div>
+      {/* ─── MAIN CONTENT ──────────────────────────────────── */}
+      <main className="max-w-xl mx-auto px-4 pt-6 space-y-6">
+        {/* Token Search Form */}
+        <form onSubmit={handleSearchSubmit} className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-sm space-y-3">
+          <label className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+            Lookup Live Token or Tracking ID
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              required
+              value={tokenInput}
+              onChange={e => setTokenInput(e.target.value)}
+              placeholder="Enter Tracking Token (e.g. TRK-ABC123)..."
+              className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold"
+            />
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow flex items-center gap-1.5"
+            >
+              <Search size={14} />
+              <span>Track</span>
+            </button>
           </div>
-          <button
-            type="submit"
-            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow transition flex items-center justify-center gap-1.5"
-          >
-            <Search size={14} /> Track Queue Position
-          </button>
         </form>
 
-        {/* Active Queue Status Display (Specification 3.5) */}
-        {activeTracking && (
-          <Card className="rounded-3xl border-2 border-blue-600 bg-white shadow-xl overflow-hidden p-6 sm:p-8 space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        {error && (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs flex items-center gap-2.5">
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* ─── LIVE QUEUE DISPLAY CARD ────────────────────────── */}
+        {queueData && (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xl shadow-slate-200/60 p-6 sm:p-8 space-y-6">
+            {/* Hospital & Doctor Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{activeTracking.hospital}</p>
-                <h2 className="text-xl font-black text-slate-900 font-recoleta">{activeTracking.doctor_name}</h2>
-                <p className="text-xs text-blue-600 font-bold">{activeTracking.department} • {activeTracking.room}</p>
+                <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider block">
+                  {queueData.hospital_name}
+                </span>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
+                  {queueData.doctor_name}
+                </h2>
+                <p className="text-xs text-slate-500 font-medium">
+                  {queueData.department} • <strong className="text-slate-800">{queueData.room_number}</strong>
+                </p>
               </div>
-              <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-extrabold text-xs rounded-full border border-emerald-200">
-                ● Live OPD Queue
+
+              {/* Status Badge */}
+              <div className="text-right">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black border ${getStatusBadge(queueData.status).bg}`}>
+                  <span className={`w-2 h-2 rounded-full ${getStatusBadge(queueData.status).dot}`} />
+                  {getStatusBadge(queueData.status).label}
+                </span>
+              </div>
+            </div>
+
+            {/* Permanent Token & Live Position Dual Box */}
+            <div className="grid grid-cols-2 gap-4 p-6 bg-gradient-to-b from-slate-50 to-white border border-slate-200 rounded-3xl text-center shadow-inner">
+              <div className="border-r border-slate-200 pr-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Original Token #
+                </span>
+                <span className="text-4xl sm:text-5xl font-black text-emerald-600 font-mono block mt-1">
+                  #{queueData.original_token}
+                </span>
+                <span className="text-[10px] font-bold text-slate-500 mt-1 block">Permanent Token</span>
+              </div>
+
+              <div className="pl-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Live Queue Position
+                </span>
+                <span className="text-4xl sm:text-5xl font-black text-slate-900 font-mono block mt-1">
+                  {queueData.live_position}
+                </span>
+                <span className="text-[10px] font-bold text-emerald-700 mt-1 block">
+                  {queueData.patients_ahead} Patients Ahead
+                </span>
+              </div>
+            </div>
+
+            {/* Live Queue Notice Box */}
+            <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-1 text-xs text-emerald-950">
+              <p className="font-bold flex items-center gap-1.5">
+                <Activity size={14} className="text-emerald-600" />
+                <span>Live Real-Time Stream Active</span>
+              </p>
+              <p className="text-[11px] text-emerald-800">
+                {getStatusBadge(queueData.status).desc}
+              </p>
+            </div>
+
+            {/* Turnaround Estimate */}
+            <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs">
+              <div className="flex items-center gap-2 text-slate-600">
+                <Clock size={16} className="text-slate-400" />
+                <span className="font-bold">Estimated Turnaround:</span>
+              </div>
+              <span className="font-mono font-black text-slate-900">
+                ~{queueData.estimated_wait_mins} mins
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Your Queue Code</p>
-                <p className="text-4xl font-black text-blue-600 font-mono mt-1">{activeTracking.queue_code}</p>
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Now Serving</p>
-                <p className="text-4xl font-black text-emerald-600 font-mono mt-1">{activeTracking.now_serving}</p>
-              </div>
+            {/* Footer info */}
+            <div className="pt-2 text-center text-[10px] text-slate-400 font-medium">
+              Last Synced: {lastUpdated.toLocaleTimeString()} • Powered by Med Rapidly High-Speed Clinical OS
             </div>
-
-            <div className="bg-blue-50/70 border border-blue-200 p-6 rounded-2xl text-center space-y-2">
-              <div className="flex items-center justify-center gap-6">
-                <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Patients Ahead of You</p>
-                  <p className="text-3xl font-black text-slate-900">{activeTracking.patients_ahead} Patients</p>
-                </div>
-                <div className="h-10 w-px bg-blue-200" />
-                <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estimated Wait Time</p>
-                  <p className="text-3xl font-black text-blue-600 flex items-center justify-center gap-1">
-                    <Clock size={20} /> ~{activeTracking.estimated_wait} mins
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="text-center text-xs text-slate-500 font-medium">
-              💡 You will receive an SMS / WhatsApp alert when 2 patients remain ahead.
-            </div>
-          </Card>
+          </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }

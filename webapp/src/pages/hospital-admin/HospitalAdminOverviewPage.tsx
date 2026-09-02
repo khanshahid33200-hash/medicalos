@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Stethoscope, MessageSquare, Send, ArrowUpRight, Trash2 } from 'lucide-react'
 import HospitalAdminHeader from '../../components/HospitalAdminHeader'
 import { useAuth } from '../../context/AuthContext'
@@ -9,7 +9,6 @@ interface DoctorItem {
   id: string
   name: string
   email: string
-  password?: string
   dept: string
   specialization: string
   fee: number
@@ -26,19 +25,21 @@ interface ChatMessage {
   status: 'sent' | 'delivered' | 'read'
 }
 
+import { getDoctorRealStats, getQueueForDoctor } from '../../utils/doctorStore'
+
 export default function HospitalAdminOverviewPage() {
   useSEO({
     title: 'Overview Page - Hospital Admin Dashboard',
     description: 'Hospital administration executive overview page.',
   })
 
-  const navigate = useNavigate()
-  const { registerUserInSupabase } = useAuth()
+  const { registerUserInSupabase, doctorProfile } = useAuth()
+  const currentHospId = doctorProfile?.hospital_id || ''
 
   const [notice, setNotice] = useState<string | null>(null)
   const [hospitalDoctors, setHospitalDoctors] = useState<DoctorItem[]>(() => {
     try {
-      const saved = localStorage.getItem('clinicos_hospital_doctors')
+      const saved = localStorage.getItem(`clinicos_hospital_doctors_${currentHospId}`)
       if (saved) return JSON.parse(saved)
     } catch (e) {}
     return []
@@ -67,10 +68,13 @@ export default function HospitalAdminOverviewPage() {
   })
 
   useEffect(() => {
+    if (!currentHospId) return
     try {
-      localStorage.setItem('clinicos_hospital_doctors', JSON.stringify(hospitalDoctors))
+      // Hospital-scoped key ONLY — writing the unscoped global key here was
+      // one of the cross-hospital leak paths.
+      localStorage.setItem(`clinicos_hospital_doctors_${currentHospId}`, JSON.stringify(hospitalDoctors))
     } catch (e) {}
-  }, [hospitalDoctors])
+  }, [hospitalDoctors, currentHospId])
 
   useEffect(() => {
     try {
@@ -80,13 +84,20 @@ export default function HospitalAdminOverviewPage() {
 
   const handleOnboardDoctor = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!currentHospId) {
+      alert('No hospital linked to this admin account — cannot onboard a doctor.')
+      return
+    }
     setIsRegisteringDoctor(true)
     const docId = `doc-${Date.now().toString().slice(-4)}`
 
     try {
+      // hospital_id was previously omitted — see HospitalAdminDoctorsPage.tsx
+      // for the same fix and rationale.
       await registerUserInSupabase(doctorForm.email, doctorForm.password, {
         role: 'doctor',
         name: doctorForm.name,
+        hospital_id: currentHospId,
         dept: doctorForm.dept,
         fee: Number(doctorForm.fee) || 500,
         limit: Number(doctorForm.limit) || 25,
@@ -97,7 +108,6 @@ export default function HospitalAdminOverviewPage() {
       id: docId,
       name: doctorForm.name,
       email: doctorForm.email,
-      password: doctorForm.password,
       dept: doctorForm.dept,
       specialization: doctorForm.specialization,
       fee: Number(doctorForm.fee) || 500,
@@ -136,7 +146,7 @@ export default function HospitalAdminOverviewPage() {
 
   const currentChatDoctorObj = hospitalDoctors.find((d) => d.id === selectedChatDoctor) || hospitalDoctors[0]
   const currentDocMessages = chatMessages.filter((m) => m.doctorId === selectedChatDoctor)
-  const totalRevenue = hospitalDoctors.reduce((acc, d) => acc + (d.fee * 15), 0)
+  const totalRevenue = hospitalDoctors.reduce((acc, d) => acc + getDoctorRealStats(d.id, d.fee).revenue, 0)
 
   return (
     <div className="min-h-screen bg-[#f4f6f8] text-slate-800 font-sans p-4 sm:p-6">
@@ -185,9 +195,9 @@ export default function HospitalAdminOverviewPage() {
                   <h3 className="text-base font-extrabold text-slate-900">Today's OPD Activity</h3>
                   <p className="text-xs text-slate-400 font-medium">Real-time consultation summary</p>
                 </div>
-                <button onClick={() => navigate('/hospitaladmin/queues')} className="text-xs font-bold text-emerald-700 hover:underline">
+                <Link to="/hospitaladmin/queues" className="text-xs font-bold text-emerald-700 hover:underline">
                   View Live Queues →
-                </button>
+                </Link>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -197,11 +207,15 @@ export default function HospitalAdminOverviewPage() {
                 </div>
                 <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Consulting</p>
-                  <p className="text-xl font-black text-emerald-700 font-mono mt-0.5">14 In-Room</p>
+                  <p className="text-xl font-black text-emerald-700 font-mono mt-0.5">
+                    {hospitalDoctors.reduce((acc, doc) => acc + getQueueForDoctor(doc.id).filter((q) => q.status === 'With Doctor').length, 0)} In-Room
+                  </p>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Waiting</p>
-                  <p className="text-xl font-black text-amber-600 font-mono mt-0.5">18 Patients</p>
+                  <p className="text-xl font-black text-amber-600 font-mono mt-0.5">
+                    {hospitalDoctors.reduce((acc, doc) => acc + getQueueForDoctor(doc.id).filter((q) => q.status === 'Waiting').length, 0)} Patients
+                  </p>
                 </div>
               </div>
             </div>
@@ -212,9 +226,9 @@ export default function HospitalAdminOverviewPage() {
                   <h3 className="text-base font-extrabold text-slate-900">Doctor OPD Revenue Breakdown</h3>
                   <p className="text-xs text-slate-400 font-medium">Calculated OPD collection</p>
                 </div>
-                <button onClick={() => navigate('/hospitaladmin/doctors')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+                <Link to="/hospitaladmin/doctors" className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
                   <ArrowUpRight size={16} />
-                </button>
+                </Link>
               </div>
 
               <div className="overflow-x-auto">
@@ -239,19 +253,17 @@ export default function HospitalAdminOverviewPage() {
                         </td>
                         <td className="py-3 text-slate-500 font-medium">{doc.dept}</td>
                         <td className="py-3 text-center font-mono font-bold text-slate-700">₹{doc.fee}</td>
-                        <td className="py-3 text-right font-mono font-black text-emerald-700">₹{(doc.fee * 15).toLocaleString()}</td>
+                        <td className="py-3 text-right font-mono font-black text-emerald-700">₹{getDoctorRealStats(doc.id, doc.fee).revenue.toLocaleString()}</td>
                         <td className="py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => {
-                                setSelectedChatDoctor(doc.id)
-                                navigate('/hospitaladmin/messages')
-                              }}
+                            <Link
+                              to="/hospitaladmin/messages"
+                              onClick={() => setSelectedChatDoctor(doc.id)}
                               className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition"
                               title="Send Message"
                             >
                               <MessageSquare size={13} />
-                            </button>
+                            </Link>
                             <button
                               onClick={() => handleDeleteDoctor(doc.id, doc.name)}
                               className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition"

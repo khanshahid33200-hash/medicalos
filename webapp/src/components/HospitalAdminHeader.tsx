@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { UserPlus, LogOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -9,10 +10,16 @@ interface HeaderProps {
 export default function HospitalAdminHeader({ onOpenOnboardModal }: HeaderProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { doctorProfile, logout } = useAuth()
+  const { doctorProfile, userRole, logout } = useAuth()
+
+  useEffect(() => {
+    if (!doctorProfile || userRole !== 'hospital_admin') {
+      navigate('/login')
+    }
+  }, [doctorProfile, userRole, navigate])
 
   const hospitalName = doctorProfile?.hospital_name || localStorage.getItem('hospital_name') || 'Hospital Facility'
-  const adminEmail = doctorProfile?.email || 'admin@hospital.com'
+  const adminEmail = doctorProfile?.email || ''
 
   const currentPath = location.pathname.toLowerCase()
 

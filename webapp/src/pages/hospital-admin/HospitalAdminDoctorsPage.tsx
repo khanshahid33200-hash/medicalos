@@ -4,12 +4,14 @@ import { UserPlus, MessageSquare, Trash2, Edit3, Key, CheckCircle2 } from 'lucid
 import HospitalAdminHeader from '../../components/HospitalAdminHeader'
 import { useAuth } from '../../context/AuthContext'
 import { useSEO } from '../../hooks/useSEO'
+import { getDoctorRealStats } from '../../utils/doctorStore'
+import { supabase } from '../../lib/supabase'
 
 interface DoctorItem {
   id: string
+  hospital_id?: string
   name: string
   email: string
-  password?: string
   dept: string
   specialization: string
   fee: number
@@ -24,17 +26,49 @@ export default function HospitalAdminDoctorsPage() {
   })
 
   const navigate = useNavigate()
-  const { registerUserInSupabase } = useAuth()
+  const { doctorProfile, registerUserInSupabase } = useAuth()
+  // Sourced ONLY from the authenticated session — never localStorage, which
+  // can hold a stale/other-hospital value on a shared browser.
+  const currentHospId = doctorProfile?.hospital_id || ''
 
   const [notice, setNotice] = useState<string | null>(null)
   const [doctorSeatLimit] = useState(5)
   const [hospitalDoctors, setHospitalDoctors] = useState<DoctorItem[]>(() => {
     try {
-      const saved = localStorage.getItem('clinicos_hospital_doctors')
+      const saved = localStorage.getItem(`clinicos_hospital_doctors_${currentHospId}`)
       if (saved) return JSON.parse(saved)
     } catch (e) {}
     return []
   })
+
+  // Also sync from Supabase profiles on mount
+  useEffect(() => {
+    async function loadDocs() {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('hospital_id', currentHospId)
+          .eq('role', 'doctor')
+          .eq('is_active', true)
+        if (data && data.length > 0) {
+          const mapped: DoctorItem[] = data.map(d => ({
+            id: d.id,
+            hospital_id: d.hospital_id,
+            name: d.full_name,
+            email: d.email,
+            dept: d.department || 'General Medicine',
+            specialization: d.specialization || 'Consultant Physician',
+            fee: 500,
+            limit: 25,
+            status: d.is_active ? 'active' : 'inactive'
+          }))
+          setHospitalDoctors(mapped)
+        }
+      } catch (e) {}
+    }
+    loadDocs()
+  }, [currentHospId])
 
   // Onboarding Modal State
   const [showDoctorModal, setShowDoctorModal] = useState(false)
@@ -63,10 +97,14 @@ export default function HospitalAdminDoctorsPage() {
   })
 
   useEffect(() => {
+    if (!currentHospId) return
     try {
-      localStorage.setItem('clinicos_hospital_doctors', JSON.stringify(hospitalDoctors))
+      // Hospital-scoped key ONLY — a global unscoped key here was one of the
+      // cross-hospital leak paths (other pages read it with no hospital
+      // filter at all, showing whichever hospital last wrote it).
+      localStorage.setItem(`clinicos_hospital_doctors_${currentHospId}`, JSON.stringify(hospitalDoctors))
     } catch (e) {}
-  }, [hospitalDoctors])
+  }, [hospitalDoctors, currentHospId])
 
   const handleOnboardDoctor = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,10 +117,21 @@ export default function HospitalAdminDoctorsPage() {
     setIsRegisteringDoctor(true)
     const docId = `doc-${Date.now().toString().slice(-4)}`
 
+    if (!currentHospId) {
+      alert('No hospital linked to this admin account — cannot onboard a doctor.')
+      setIsRegisteringDoctor(false)
+      return
+    }
+
     try {
+      // hospital_id was previously omitted here — new doctors were created
+      // with NO hospital_id at all, making them invisible to hospital-scoped
+      // RLS queries (or worse, editable across hospitals wherever a query
+      // wasn't scoped). Always pass the admin's own resolved hospital_id.
       await registerUserInSupabase(doctorForm.email, doctorForm.password, {
         role: 'doctor',
         name: doctorForm.name,
+        hospital_id: currentHospId,
         dept: doctorForm.dept,
         fee: Number(doctorForm.fee) || 500,
         limit: Number(doctorForm.limit) || 25,
@@ -91,9 +140,9 @@ export default function HospitalAdminDoctorsPage() {
 
     const newDoc: DoctorItem = {
       id: docId,
+      hospital_id: currentHospId,
       name: doctorForm.name,
       email: doctorForm.email,
-      password: doctorForm.password,
       dept: doctorForm.dept,
       specialization: doctorForm.specialization,
       fee: Number(doctorForm.fee) || 500,
@@ -113,7 +162,7 @@ export default function HospitalAdminDoctorsPage() {
     setEditForm({
       name: doc.name,
       email: doc.email,
-      password: doc.password || '',
+      password: '',
       dept: doc.dept,
       specialization: doc.specialization,
       fee: doc.fee,
@@ -136,14 +185,13 @@ export default function HospitalAdminDoctorsPage() {
           specialization: editForm.specialization,
           fee: Number(editForm.fee) || 500,
           limit: Number(editForm.limit) || 25,
-          password: editForm.password ? editForm.password : doc.password,
         }
       }
       return doc
     })
 
     setHospitalDoctors(updated)
-    localStorage.setItem('clinicos_hospital_doctors', JSON.stringify(updated))
+    // (the scoped-key write happens automatically via the useEffect above)
 
     // Save to local registry
     try {
@@ -155,7 +203,6 @@ export default function HospitalAdminDoctorsPage() {
             ...u,
             name: editForm.name,
             dept: editForm.dept,
-            password: editForm.password ? editForm.password : u.password,
           }
         }
         return u
@@ -235,9 +282,10 @@ export default function HospitalAdminDoctorsPage() {
                     <p><span className="text-slate-400 font-sans">Dept:</span> <strong className="text-slate-800">{doc.dept}</strong></p>
                     <p><span className="text-slate-400 font-sans">Specialty:</span> <strong className="text-slate-700">{doc.specialization}</strong></p>
                     <p><span className="text-slate-400 font-sans">Login Email:</span> <strong className="text-emerald-700">{doc.email}</strong></p>
-                    <p><span className="text-slate-400 font-sans">Login Password:</span> <strong className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{doc.password || '••••••••'}</strong></p>
+                    <p><span className="text-slate-400 font-sans">Auth Credential:</span> <strong className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Supabase Secured (Encrypted)</strong></p>
                     <p><span className="text-slate-400 font-sans">Fee:</span> <strong className="text-slate-900">₹{doc.fee}</strong></p>
                     <p><span className="text-slate-400 font-sans">Daily Limit:</span> <strong className="text-slate-800">{doc.limit} Patients</strong></p>
+                    <p><span className="text-slate-400 font-sans">Total Revenue:</span> <strong className="text-emerald-700">₹{getDoctorRealStats(doc.id, doc.fee).revenue.toLocaleString()}</strong></p>
                   </div>
                 </div>
 

@@ -23,9 +23,6 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   // User MUST be authenticated
   if (!currentUser && !doctorProfile) {
-    if (requiredRole === 'hospital_admin') {
-      return <Navigate to="/hospitaladminmedtech" replace />
-    }
     return <Navigate to="/login" replace />
   }
 

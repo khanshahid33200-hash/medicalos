@@ -10,18 +10,42 @@ const generateQRCode = (text: string): string => {
   return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encoded}`
 }
 
+import { supabase } from '../lib/supabase'
+
 export default function QRKiosk() {
   const { doctorProfile } = useAuth()
-  const hospitalName = doctorProfile?.hospital_name || localStorage.getItem('hospital_name') || 'City Care Hospital'
-  const hospitalId = doctorProfile?.hospital_id || localStorage.getItem('hospital_id') || 'hosp-001'
+  // Sourced ONLY from the authenticated session — never localStorage. This
+  // used to be able to resolve to a stale/other-hospital id on a shared
+  // device, which meant the "hospital" QR could point at the wrong tenant.
+  const hospitalName = doctorProfile?.hospital_name || 'Hospital Portal'
+  const hospitalId = doctorProfile?.hospital_id || ''
 
-  const [intakeToken, setIntakeToken] = useState(`tok_${hospitalId}`)
+  const [intakeToken, setIntakeToken] = useState('')
   const [intakeUrl, setIntakeUrl] = useState('')
   const [qrUrl, setQrUrl] = useState('')
   const [copied, setCopied] = useState(false)
   const [displayMode, setDisplayMode] = useState<'kiosk' | 'fullscreen' | 'poster'>('kiosk')
+  const [regenerating, setRegenerating] = useState(false)
 
   useEffect(() => {
+    if (!hospitalId) return
+    async function fetchToken() {
+      try {
+        const { data } = await supabase
+          .from('qr_codes')
+          .select('token')
+          .eq('hospital_id', hospitalId)
+          .maybeSingle()
+        if (data?.token) {
+          setIntakeToken(data.token)
+        }
+      } catch (e) {}
+    }
+    fetchToken()
+  }, [hospitalId])
+
+  useEffect(() => {
+    if (!intakeToken) return
     const baseUrl = window.location.origin
     const url = `${baseUrl}/book/${intakeToken}`
     setIntakeUrl(url)
@@ -43,11 +67,30 @@ export default function QRKiosk() {
     document.body.removeChild(link)
   }
 
-  const handleRegenerateToken = () => {
-    if (window.confirm('Are you sure you want to regenerate the hospital QR token? The old poster QR code will immediately be invalidated!')) {
-      const newToken = `tok_${hospitalId}_${Math.floor(1000 + Math.random() * 9000)}`
-      setIntakeToken(newToken)
+  const handleRegenerateToken = async () => {
+    if (!hospitalId) return
+    if (!window.confirm('Are you sure you want to regenerate the hospital QR token? The old poster QR code will immediately be invalidated!')) return
+
+    // Previously this generated a predictable token
+    // (`tok_<hospitalId>_<4-digit-random>`) purely client-side and never
+    // persisted it — the "regenerate" was cosmetic and the real qr_codes row
+    // was untouched. Now it calls the server, which mints a cryptographically
+    // random token and updates the actual qr_codes row for this hospital.
+    setRegenerating(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-ops', {
+        body: { action: 'regenerate_qr_token', payload: { hospital_id: hospitalId } },
+      })
+      if (error || !data?.success) {
+        alert(`Could not regenerate the QR token: ${error?.message || data?.error || 'Unknown error'}`)
+        return
+      }
+      setIntakeToken(data.qr.token)
       alert('Hospital Single QR Token regenerated. Please print and mount the new poster at the entrance.')
+    } catch (e: any) {
+      alert(`Could not regenerate the QR token: ${e.message || e}`)
+    } finally {
+      setRegenerating(false)
     }
   }
 
@@ -197,9 +240,10 @@ export default function QRKiosk() {
                   </Button>
                   <button
                     onClick={handleRegenerateToken}
-                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-2xl text-xs transition border border-red-200 flex items-center gap-1.5"
+                    disabled={regenerating}
+                    className="px-4 py-2 bg-red-50 hover:bg-red-100 disabled:opacity-60 text-red-700 font-bold rounded-2xl text-xs transition border border-red-200 flex items-center gap-1.5"
                   >
-                    <ShieldAlert size={16} /> Regenerate Token
+                    <ShieldAlert size={16} /> {regenerating ? 'Regenerating…' : 'Regenerate Token'}
                   </button>
                 </div>
               </CardContent>

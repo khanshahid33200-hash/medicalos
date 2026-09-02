@@ -271,3 +271,43 @@ export function saveReportsForDoctor(doctorId: string, items: ReportItem[]): voi
   localStorage.setItem(`clinic_os_reports_${doctorId}`, JSON.stringify(items))
   notifyQueueUpdated(doctorId)
 }
+
+// Calculate Real Doctor Revenue & Consultation Stats (Zero Fake Data)
+export function getDoctorRealStats(doctorId: string, fee: number) {
+  if (!doctorId) return { completedCount: 0, totalCount: 0, revenue: 0 }
+  try {
+    const rawQueue = localStorage.getItem(`clinic_os_queue_${doctorId}`)
+    const queue: QueueItem[] = rawQueue ? JSON.parse(rawQueue) : []
+
+    const rawApts = localStorage.getItem(`clinic_os_appointments_${doctorId}`)
+    const apts: AppointmentItem[] = rawApts ? JSON.parse(rawApts) : []
+
+    const rawGlobal = localStorage.getItem('clinicos_appointments')
+    const globalApts: any[] = rawGlobal ? JSON.parse(rawGlobal) : []
+    const matchedGlobal = globalApts.filter((a) => a.doctor_id === doctorId)
+
+    const allItems = [...queue, ...apts, ...matchedGlobal]
+    const uniqueIds = new Set()
+    let completedCount = 0
+    let totalCount = 0
+
+    for (const item of allItems) {
+      if (!item || !item.id || uniqueIds.has(item.id)) continue
+      uniqueIds.add(item.id)
+      totalCount++
+      if (item.status === 'Completed' || item.status === 'With Doctor') {
+        completedCount++
+      }
+    }
+
+    const docFee = Number(fee) || 500
+    const calculatedRevenue = completedCount * docFee
+    return {
+      completedCount,
+      totalCount,
+      revenue: calculatedRevenue,
+    }
+  } catch (e) {
+    return { completedCount: 0, totalCount: 0, revenue: 0 }
+  }
+}

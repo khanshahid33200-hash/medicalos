@@ -32,7 +32,7 @@ import {
 
 export default function Queue() {
   const { doctorProfile } = useAuth()
-  const doctorId = doctorProfile?.doctor_id || 'doc-001'
+  const doctorId = doctorProfile?.doctor_id || ''
   const doctorName = doctorProfile?.name || 'Dr. Authorized Doctor'
   const departmentName = doctorProfile?.department_name || 'Cardiology'
   const hospitalName = doctorProfile?.hospital_name || 'Metro Care General Hospital'
