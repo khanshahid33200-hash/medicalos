@@ -63,3 +63,57 @@
 ::-webkit-scrollbar-thumb {
   @apply bg-slate-300 rounded-full hover:bg-slate-400;
 }
+
+/* Ambient hero motion — CSS-only (transform/opacity, GPU-composited) so
+   these continuous loops don't run a JS animation frame callback for the
+   life of the page, and so a single prefers-reduced-motion query disables
+   every use of them at once instead of each component needing its own
+   guard. */
+@keyframes float-blob-a {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, -20px); }
+}
+@keyframes float-blob-b {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-24px, 16px); }
+}
+@keyframes float-card-up {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes float-card-down {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.06); }
+}
+
+.animate-float-blob-a { animation: float-blob-a 18s ease-in-out infinite; }
+.animate-float-blob-b { animation: float-blob-b 22s ease-in-out infinite; }
+.animate-float-card-up { animation: float-card-up 5s ease-in-out infinite; }
+.animate-float-card-down { animation: float-card-down 6s ease-in-out infinite 0.5s; }
+.animate-pulse-glow { animation: pulse-glow 2.8s ease-in-out infinite; z-index: -1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-blob-a,
+  .animate-float-blob-b,
+  .animate-float-card-up,
+  .animate-float-card-down,
+  .animate-pulse-glow {
+    animation: none;
+  }
+}
+
+/* Paused once the hero scrolls out of view — see LandingPage.tsx's
+   IntersectionObserver. These are continuous infinite loops; there's no
+   reason to keep compositing them for the rest of the page's lifetime. */
+.hero-anims-paused .animate-float-blob-a,
+.hero-anims-paused .animate-float-blob-b,
+.hero-anims-paused .animate-float-card-up,
+.hero-anims-paused .animate-float-card-down,
+.hero-anims-paused .animate-pulse-glow {
+  animation-play-state: paused;
+}

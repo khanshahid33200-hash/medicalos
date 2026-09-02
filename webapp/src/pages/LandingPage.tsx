@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   QrCode, RefreshCw, UserCheck, Users, BarChart3,
@@ -11,7 +11,75 @@ import {
   ChevronDown, Star, Shield, Database, Cpu, Smartphone,
   Layers, CheckCircle, Network, ArrowUpRight, Award, Zap
 } from 'lucide-react'
+import { motion, useScroll, useTransform, MotionValue } from 'framer-motion'
 import { useSEO } from '../hooks/useSEO'
+import PublicHeader from '../components/PublicHeader'
+
+/**
+ * Scroll-linked kinetic-type headline: words brighten from faint to full
+ * ink progressively as the section scrolls through the viewport, rather
+ * than a one-shot fade-in — each word's opacity is mapped to its own
+ * slice of the section's scroll progress.
+ */
+function KineticSentence({ text }: { text: string }) {
+  const ref = useRef<HTMLParagraphElement>(null)
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start 0.85', 'start 0.25'] })
+  const words = text.split(' ')
+  return (
+    <p
+      ref={ref}
+      className="font-display flex flex-wrap gap-x-3 gap-y-1 text-3xl sm:text-4xl lg:text-[44px] font-bold text-[#131A2E] tracking-tight leading-[1.25]"
+    >
+      {words.map((word, i) => (
+        <KineticWord key={i} word={word} index={i} total={words.length} progress={scrollYProgress} />
+      ))}
+    </p>
+  )
+}
+
+function KineticWord({ word, index, total, progress }: { word: string; index: number; total: number; progress: MotionValue<number> }) {
+  const start = index / total
+  const end = start + 1 / total
+  const opacity = useTransform(progress, [start, end], [0.16, 1])
+  return (
+    <motion.span style={{ opacity }} className="inline-block">
+      {word}
+    </motion.span>
+  )
+}
+
+const heroContainer = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.1 } },
+}
+const heroItem = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 260, damping: 26 } },
+}
+
+/** Counts up from 0 to `value` once, the moment it first mounts. Respects
+ * prefers-reduced-motion by just showing the final value immediately. */
+function AnimatedCounter({ value, className }: { value: number; className?: string }) {
+  const [display, setDisplay] = useState(0)
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setDisplay(value)
+      return
+    }
+    let raf: number
+    const start = performance.now()
+    const duration = 1100
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(eased * value))
+      if (progress < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value])
+  return <span className={className}>{display}</span>
+}
 
 interface PatientRow {
   id: string
@@ -32,6 +100,21 @@ export default function LandingPage() {
     title: 'Med Rapidly — Smart OPD Management for Modern Hospitals | MedTech Fixaters',
     description: 'Med Rapidly by MedTech Fixaters helps hospitals manage appointments, live queues, doctors and patients efficiently with QR based smart system.',
   })
+
+  // Pause the hero's ambient CSS animations (blobs, floating accent
+  // cards, CTA glow) once it scrolls out of view. They're continuous
+  // `animation: ... infinite` loops that never unmount, so left running
+  // they keep compositing indefinitely for the rest of the page's life —
+  // wasted GPU/battery on a section the visitor can no longer see.
+  const heroRef = useRef<HTMLElement>(null)
+  const [heroVisible, setHeroVisible] = useState(true)
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(([entry]) => setHeroVisible(entry.isIntersecting), { threshold: 0.05 })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   // ─── ONBOARDING MODAL STATE ────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false)
@@ -151,97 +234,85 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#FCFCFE] text-[#18233D] font-sans antialiased selection:bg-[#4361EE] selection:text-white">
-      {/* ─── NAVIGATION BAR ─────────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E6E9F0]">
-        <div className="max-w-[1360px] mx-auto px-6 h-[72px] flex items-center justify-between">
-          {/* Brand Logo with Cropped Logo Mark */}
-          <Link to="/" className="flex items-center gap-3 group">
-            <img
-              src="/assets/brand-icon.png"
-              alt="MedTech Fixaters Logo"
-              className="w-9 h-9 object-contain group-hover:scale-105 transition-transform"
-            />
-            <div>
-              <span className="text-lg font-extrabold text-[#18233D] block leading-tight tracking-tight">
-                Med Rapidly
-              </span>
-              <span className="text-[10px] text-[#5E687B] font-medium block">
-                by MedTech Fixaters • Smart Hospital
-              </span>
-            </div>
-          </Link>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-7 text-[13px] font-semibold text-[#5E687B]">
-            <Link to="/" className="text-[#4361EE] font-bold border-b-2 border-[#4361EE] pb-0.5">Home</Link>
-            <Link to="/features" className="hover:text-[#18233D] transition">Features</Link>
-            <Link to="/how-it-works" className="hover:text-[#18233D] transition">How It Works</Link>
-            <Link to="/pricing" className="hover:text-[#18233D] transition">Pricing</Link>
-            <Link to="/about" className="hover:text-[#18233D] transition">About Us</Link>
-            <Link to="/architecture" className="hover:text-[#18233D] transition">Platform</Link>
-            <Link to="/contact" className="hover:text-[#18233D] transition">Contact</Link>
-          </nav>
-
-          {/* Auth & CTA Buttons */}
-          <div className="flex items-center gap-3">
-            <Link
-              to="/login"
-              className="px-4 py-2 text-xs font-bold text-[#18233D] hover:text-[#4361EE] bg-white hover:bg-slate-50 rounded-xl border border-[#E6E9F0] transition"
-            >
-              Login
-            </Link>
-            <button
-              onClick={() => setModalOpen(true)}
-              className="px-5 py-2.5 bg-gradient-to-r from-[#4361EE] to-[#5D4CC8] hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/20 transition transform hover:-translate-y-0.5"
-            >
-              Get Started
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* ─── NAVIGATION BAR (shared, animated on scroll) ─────── */}
+      <PublicHeader />
 
       {/* ─── HERO SECTION ───────────────────────────────────── */}
-      <section id="home" className="relative pt-10 lg:pt-14 pb-20 px-6 max-w-[1360px] mx-auto">
-        <div className="absolute top-10 right-1/4 w-96 h-96 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <section
+        id="home"
+        ref={heroRef}
+        className={`relative pt-14 lg:pt-16 pb-20 px-6 max-w-[1360px] mx-auto overflow-hidden ${heroVisible ? '' : 'hero-anims-paused'}`}
+      >
+        {/* Atmosphere: soft gradient blobs + faint grid, low opacity so text stays crisp */}
+        <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+          <div
+            className="absolute inset-0 opacity-[0.035]"
+            style={{
+              backgroundImage: 'linear-gradient(#18233D 1px, transparent 1px), linear-gradient(90deg, #18233D 1px, transparent 1px)',
+              backgroundSize: '48px 48px',
+              maskImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%)',
+            }}
+          />
+          <div className="animate-float-blob-a absolute top-0 right-[8%] w-[30rem] h-[30rem] bg-gradient-to-br from-indigo-400/20 to-violet-400/10 rounded-full blur-3xl" />
+          <div className="animate-float-blob-b absolute -top-10 left-[2%] w-96 h-96 bg-gradient-to-br from-sky-300/15 to-indigo-300/10 rounded-full blur-3xl" />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           {/* LEFT COLUMN: HEADLINE, DESCRIPTION & ACTIONS */}
-          <div className="lg:col-span-5 space-y-6 text-left pt-2">
-            <h1 className="text-4xl sm:text-5xl lg:text-[52px] font-black text-[#18233D] tracking-tight leading-[1.12]">
-              Smart OPD Management <br />
-              for{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4361EE] to-[#5D4CC8]">
-                Modern Hospitals
-              </span>
-            </h1>
+          <motion.div
+            variants={heroContainer}
+            initial="hidden"
+            animate="show"
+            className="lg:col-span-5 space-y-6 text-left pt-2"
+          >
+            <motion.div variants={heroItem} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-[11px] font-bold text-[#4361EE]">
+              <Sparkles size={12} />
+              <span>Digital Hospital Operating System</span>
+            </motion.div>
 
-            <p className="text-base text-[#5E687B] font-normal leading-relaxed max-w-lg">
-              Med Rapidly helps hospitals manage appointments, queues, doctors and patients efficiently with QR based smart system.
-            </p>
+            <motion.h1 variants={heroItem} className="font-display text-4xl sm:text-5xl lg:text-[54px] font-extrabold text-[#131A2E] tracking-tight leading-[1.08]">
+              Your hospital.
+              <br />
+              Connected{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4361EE] to-[#7C5CFC]">
+                digitally.
+              </span>
+            </motion.h1>
+
+            <motion.p variants={heroItem} className="text-base text-[#5E687B] font-normal leading-relaxed max-w-lg">
+              One platform for hospital administration, doctor dashboards, and QR-based patient appointments — live, isolated per hospital, built for modern OPDs.
+            </motion.p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <button
-                onClick={() => setModalOpen(true)}
-                className="px-6 py-3.5 bg-gradient-to-r from-[#4361EE] to-[#5D4CC8] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-500/25 transition transform hover:-translate-y-0.5 flex items-center gap-2"
-              >
-                <span>Get Started Free</span>
-                <ArrowRight size={14} />
-              </button>
+            <motion.div variants={heroItem} className="flex flex-wrap items-center gap-3 pt-1">
+              <div className="relative">
+                <span className="animate-pulse-glow absolute inset-0 rounded-xl bg-gradient-to-br from-[#4361EE] to-[#7C5CFC] blur-md" />
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setModalOpen(true)}
+                  className="relative group px-6 py-3.5 bg-gradient-to-br from-[#4361EE] to-[#7C5CFC] text-white font-bold text-xs rounded-xl shadow-[0_10px_24px_-6px_rgba(67,97,238,0.5)] transition-shadow hover:shadow-[0_16px_32px_-6px_rgba(67,97,238,0.6)] flex items-center gap-2"
+                >
+                  <span>Get Started Free</span>
+                  <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+                </motion.button>
+              </div>
 
-              <button
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => setModalOpen(true)}
-                className="px-6 py-3.5 bg-white hover:bg-slate-50 border border-[#E6E9F0] text-[#18233D] font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-2"
+                className="px-6 py-3.5 bg-white/70 backdrop-blur-sm hover:bg-white border border-[#E6E9F0] text-[#18233D] font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-2"
               >
                 <div className="w-5 h-5 rounded-full bg-indigo-50 text-[#4361EE] flex items-center justify-center">
                   <Play size={10} className="fill-[#4361EE] ml-0.5" />
                 </div>
                 <span>Watch Demo</span>
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
 
             {/* 4 Feature Pills Row */}
-            <div className="pt-2 flex flex-wrap items-center gap-2.5 text-[11px] font-bold text-[#4361EE]">
+            <motion.div variants={heroItem} className="pt-2 flex flex-wrap items-center gap-2.5 text-[11px] font-bold text-[#4361EE]">
               <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
                 <QrCode size={13} /> QR Based Booking
               </span>
@@ -254,21 +325,46 @@ export default function LandingPage() {
               <span className="px-3 py-1.5 rounded-full bg-indigo-50/70 border border-indigo-100 flex items-center gap-1.5">
                 <ShieldCheck size={13} /> Secure & Reliable
               </span>
-            </div>
+            </motion.div>
 
             {/* Interactive Simulator Tip Card */}
-            <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs space-y-1">
+            <motion.div variants={heroItem} className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs space-y-1">
               <span className="font-bold text-[#4361EE] flex items-center gap-1.5">
                 <Sparkles size={14} /> Live Interactive Simulator
               </span>
               <p className="text-[11px] text-[#5E687B]">
                 Click on any sidebar button (<strong className="text-slate-800">Live Queue, Appointments, Doctors, Patients, Reports, Settings</strong>) to test real-time OPD hospital controls.
               </p>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* RIGHT COLUMN: REAL DASHBOARD SIMULATOR */}
-          <div className="lg:col-span-7 relative">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 24 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 24, delay: 0.35 }}
+            className="lg:col-span-7 relative"
+          >
+            {/* Floating accent cards — nod to the connected-ecosystem feel
+                without touching the working simulator's internal state */}
+            <div className="animate-float-card-up hidden xl:flex absolute -top-6 -left-8 z-20 items-center gap-2 px-3.5 py-2.5 bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl shadow-lg">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <QrCode size={16} />
+              </div>
+              <div className="leading-tight">
+                <span className="block text-[10px] font-bold text-slate-800">Queue #13</span>
+                <span className="block text-[9px] text-slate-400">Just booked via QR</span>
+              </div>
+            </div>
+            <div className="animate-float-card-down hidden xl:flex absolute -bottom-5 -right-6 z-20 items-center gap-2 px-3.5 py-2.5 bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl shadow-lg">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-[#4361EE] flex items-center justify-center">
+                <Activity size={16} />
+              </div>
+              <div className="leading-tight">
+                <span className="block text-[10px] font-bold text-slate-800">Dr. Mehta</span>
+                <span className="block text-[9px] text-slate-400">In consultation</span>
+              </div>
+            </div>
             <div className="bg-white rounded-3xl border border-[#E6E9F0] shadow-2xl shadow-slate-300/60 p-4 sm:p-5 relative overflow-hidden transition-all min-h-[460px]">
               {simToast && (
                 <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-30 bg-[#18233D] text-white px-4 py-2 rounded-full text-xs font-bold shadow-2xl border border-indigo-500/30 flex items-center gap-2 animate-bounce">
@@ -382,9 +478,9 @@ export default function LandingPage() {
                         ].map((st, idx) => (
                           <div
                             key={idx}
-                            className="p-2.5 bg-slate-50/80 hover:bg-white hover:shadow-md transition-all rounded-xl border border-slate-100 text-center"
+                            className="p-2.5 bg-slate-50/80 hover:bg-white hover:shadow-md hover:-translate-y-0.5 transition-all rounded-xl border border-slate-100 text-center"
                           >
-                            <span className={`text-base font-black ${st.color} block font-mono`}>{st.val}</span>
+                            <AnimatedCounter value={st.val} className={`text-base font-black ${st.color} block font-mono`} />
                             <span className="text-[9px] text-[#5E687B] font-semibold">{st.label}</span>
                           </div>
                         ))}
@@ -777,7 +873,17 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ─── KINETIC MANIFESTO ─────────────────────────────────
+          Words brighten progressively as this scrolls through the
+          viewport (see KineticSentence above) — the section's own scroll
+          progress drives each word's opacity, not a one-shot trigger. */}
+      <section className="py-24 sm:py-32 px-6 bg-white border-t border-[#E6E9F0]">
+        <div className="max-w-4xl mx-auto">
+          <KineticSentence text="Every hospital, every doctor, every patient appointment — connected on one platform, isolated by design, live the moment it happens." />
         </div>
       </section>
 
@@ -793,7 +899,13 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-center">
+          <motion.div
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-center"
+          >
             {[
               { title: 'QR Based Booking', desc: 'Patients scan QR & book appointments instantly.', icon: <QrCode size={22} className="text-[#4361EE]" />, bg: 'bg-indigo-50' },
               { title: 'Live Queue Management', desc: 'Real-time queue updates for better patient experience.', icon: <RefreshCw size={22} className="text-emerald-600" />, bg: 'bg-emerald-50' },
@@ -801,18 +913,23 @@ export default function LandingPage() {
               { title: 'Patient Management', desc: 'Manage patient history, records and prescriptions.', icon: <Users size={22} className="text-blue-600" />, bg: 'bg-blue-50' },
               { title: 'Reports & Analytics', desc: 'Get detailed insights and improve hospital performance.', icon: <BarChart3 size={22} className="text-rose-600" />, bg: 'bg-rose-50' },
             ].map((feat, idx) => (
-              <div
+              <motion.div
                 key={idx}
-                className="bg-white p-6 rounded-2xl border border-[#E6E9F0] shadow-sm hover:shadow-md hover:border-indigo-200 transition text-center space-y-3"
+                variants={{ hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 24 } } }}
+                whileHover={{ y: -6 }}
+                className="bg-white p-6 rounded-2xl border border-[#E6E9F0] shadow-sm hover:shadow-xl hover:border-indigo-200 transition-shadow text-center space-y-3"
               >
-                <div className={`w-12 h-12 rounded-xl mx-auto flex items-center justify-center ${feat.bg}`}>
+                <motion.div
+                  whileHover={{ scale: 1.08, rotate: 4 }}
+                  className={`w-12 h-12 rounded-xl mx-auto flex items-center justify-center ${feat.bg}`}
+                >
                   {feat.icon}
-                </div>
+                </motion.div>
                 <h3 className="text-sm font-black text-[#18233D]">{feat.title}</h3>
                 <p className="text-xs text-[#5E687B] leading-relaxed">{feat.desc}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
