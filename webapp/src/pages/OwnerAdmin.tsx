@@ -570,13 +570,26 @@ export default function OwnerAdmin() {
     setTimeout(() => setNotice(null), 3000)
   }
 
-  // Delete Hospital
-  const handleDeleteHospital = (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete ${name}?`)) return
+  // Delete Hospital — previously this only filtered local React state and a
+  // localStorage cache, never touching Supabase at all, so the hospital
+  // reappeared on every refresh once loadPlatformData() re-fetched the real
+  // (unchanged) table. Now actually deletes the row; RLS's "Super Admin full
+  // access to hospitals" policy authorizes this for the real super_admin
+  // session. Cascades (ON DELETE CASCADE) to every hospital-owned table —
+  // doctors, patients, appointments, qr_codes, departments — irreversibly.
+  const handleDeleteHospital = async (id: string, name: string) => {
+    if (!window.confirm(`Delete "${name}" permanently? This also deletes every doctor, patient, appointment, and QR code under it. This cannot be undone.`)) return
+
+    const { error } = await supabase.from('hospitals').delete().eq('id', id)
+    if (error) {
+      alert(`Could not delete "${name}": ${error.message}`)
+      return
+    }
+
     const updated = hospitalsList.filter(h => h.id !== id)
     setHospitalsList(updated)
     localStorage.setItem('clinicos_hospitals', JSON.stringify(updated))
-    setNotice(`Hospital "${name}" deleted.`)
+    setNotice(`Hospital "${name}" permanently deleted.`)
     setTimeout(() => setNotice(null), 3000)
   }
 
