@@ -23,4 +23,8 @@ webapp/dist/
 .agents/
 .gemini/
 scratch/
-
+clinic_os.db
+reference_dashboard.png
+.git/
+*.db
+*.log
