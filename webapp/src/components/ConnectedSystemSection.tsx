@@ -84,8 +84,8 @@ export default function ConnectedSystemSection() {
         {/* ─── SECTION HEADER ─── */}
         <div className="mx-auto max-w-4xl text-center">
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 15, filter: "blur(8px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
             className="inline-flex items-center gap-2.5 rounded-full border border-black/[0.06] bg-white/70 px-4 py-2 shadow-2xs backdrop-blur-xl"
@@ -99,8 +99,8 @@ export default function ConnectedSystemSection() {
           </motion.div>
 
           <motion.h2
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 30, filter: "blur(14px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.1 }}
             className="mt-6 text-4xl font-semibold tracking-[-0.05em] text-[#17191F] sm:text-5xl md:text-6xl lg:text-7xl leading-[1.12]"
@@ -113,8 +113,8 @@ export default function ConnectedSystemSection() {
           </motion.h2>
 
           <motion.p
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 15, filter: "blur(8px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: 0.2 }}
             className="mx-auto mt-6 max-w-2xl text-base leading-8 text-[#6B6F78] md:text-lg"
@@ -143,7 +143,7 @@ export default function ConnectedSystemSection() {
             <div className="flex justify-center">
               <motion.div
                 initial={{ opacity: 0, y: -20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6 }}
                 className="w-full max-w-md rounded-2xl border border-white bg-[#17191F] px-5 py-4 shadow-[0_15px_40px_rgba(15,23,42,0.18)] flex items-center gap-3.5 text-left text-white"
@@ -205,8 +205,8 @@ export default function ConnectedSystemSection() {
 
               {/* HOSPITAL H1 (LEFT) */}
               <motion.div
-                initial={{ opacity: 0, x: -30 }}
-                whileInView={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, x: -40, filter: "blur(10px)" }}
+                whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.65 }}
                 className="rounded-3xl border border-white bg-white/80 p-5 shadow-[0_15px_35px_rgba(15,23,42,0.06)] backdrop-blur-xl text-left space-y-3.5"
@@ -288,7 +288,7 @@ export default function ConnectedSystemSection() {
               {/* MEDTECH FIXATERS CONNECTED MEDTECH AI CORE (CENTER) */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
+                whileInView={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.7 }}
                 className="relative rounded-3xl bg-[#111827] border border-blue-500/20 p-5 shadow-[0_25px_60px_rgba(15,23,42,0.3)] text-center text-white overflow-hidden space-y-3.5"
@@ -344,8 +344,8 @@ export default function ConnectedSystemSection() {
 
               {/* HOSPITAL H2 (RIGHT) */}
               <motion.div
-                initial={{ opacity: 0, x: 30 }}
-                whileInView={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, x: 40, filter: "blur(10px)" }}
+                whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.65 }}
                 className="rounded-3xl border border-white bg-white/80 p-5 shadow-[0_15px_35px_rgba(15,23,42,0.06)] backdrop-blur-xl text-left space-y-3.5"
@@ -429,7 +429,7 @@ export default function ConnectedSystemSection() {
             {/* Bottom: Patient Journey within Assigned Hospital Flow */}
             <motion.div
               initial={{ opacity: 0, y: 15 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               viewport={{ once: true }}
               className="rounded-2xl border border-slate-100 bg-white/90 p-4 shadow-xs text-center space-y-2.5"
             >
@@ -469,8 +469,8 @@ export default function ConnectedSystemSection() {
             return (
               <motion.div
                 key={item.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 25, filter: "blur(8px)" }}
+                whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.08 }}
                 whileHover={{ y: -4 }}
@@ -489,7 +489,7 @@ export default function ConnectedSystemSection() {
         {/* ─── BOTTOM FULL-WIDTH DATA SEPARATION CALLOUT BANNER ─── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           viewport={{ once: true }}
           className="mt-8 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/70 via-white to-orange-50/60 p-4 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-4 text-left"
         >

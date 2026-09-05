@@ -1,6 +1,7 @@
 import AIAutomationSection from '../components/AIAutomationSection'
 import FAQSection from '../components/FAQSection'
 import QRAppointmentShowcase from '../components/QRAppointmentShowcase'
+import KeyBenefits from '../components/KeyBenefits'
 import ConnectedSystemSection from '../components/ConnectedSystemSection'
 import HowPlatformWorks from '../components/HowPlatformWorks'
 import WhatWeSolveSection from '../components/what-we-solve/WhatWeSolveSection'
@@ -90,7 +91,6 @@ export default function LandingPage() {
 
   const { scrollYProgress } = useScroll()
   const [demoModalOpen, setDemoModalOpen] = useState(false)
-  const [simulatorTab, setSimulatorTab] = useState<'overview' | 'doctors' | 'appointments' | 'queue'>('overview')
 
   // ─── SCROLL PARALLAX & HERO FADE TRANSITIONS ─────────────────────
   const heroOpacity = useTransform(scrollYProgress, [0, 0.22], [1, 0.05])
@@ -133,16 +133,20 @@ export default function LandingPage() {
         >
           {/* ─── LEFT COLUMN: CLEAN HEADLINE, DESCRIPTION & DUAL CTAS (NO PILLS) ─── */}
           <div className="lg:col-span-6 text-left space-y-6">
-            {/* AI Platform Badge */}
+            {/* AI Platform Badge with Inbuilt CRM Highlight */}
             <motion.div
               variants={fadeInUp}
               initial="hidden"
               animate="visible"
-              className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3.5 py-1.5 backdrop-blur-md shadow-xs"
+              className="inline-flex flex-wrap items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3.5 py-1.5 backdrop-blur-md shadow-xs"
             >
               <Sparkles size={13} className="text-amber-400 animate-pulse" />
               <span className="text-[10.5px] font-bold tracking-[0.14em] text-amber-300 uppercase">
-                AI-POWERED HEALTHCARE PLATFORM
+                AI-POWERED HEALTHCARE OS
+              </span>
+              <span className="text-amber-400/60">•</span>
+              <span className="text-[10.5px] font-bold tracking-[0.12em] text-orange-200 uppercase">
+                INBUILT PATIENT CRM
               </span>
             </motion.div>
             {/* Main Headline */}
@@ -158,7 +162,7 @@ export default function LandingPage() {
               </span>
             </motion.h1>
 
-            {/* Product description */}
+            {/* Product description featuring Inbuilt CRM */}
             <motion.div
               variants={fadeInUp}
               initial="hidden"
@@ -167,10 +171,10 @@ export default function LandingPage() {
               className="space-y-2 max-w-lg"
             >
               <p className="text-sm sm:text-base text-slate-200 font-normal leading-relaxed">
-                One AI-powered connected platform for hospital administration, doctors, patients, appointments, intelligent booking, automated workflows, and live queues.
+                One AI-powered connected platform for hospital administration, <strong>inbuilt patient CRM</strong>, doctor workspaces, intelligent booking, automated workflows, and live queues.
               </p>
               <p className="text-xs sm:text-sm text-amber-200/90 font-medium leading-relaxed">
-                MedTech AI helps every workflow move with greater intelligence, automation, and clarity.
+                360° patient journey tracking, automated WhatsApp recall campaigns, and chronic care management built directly in.
               </p>
             </motion.div>
 
@@ -186,7 +190,7 @@ export default function LandingPage() {
                 <motion.button
                   whileHover={{ scale: 1.04, y: -2 }}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full sm:w-auto px-7 py-3.5 rounded-full bg-gradient-to-r from-[#4A3AFF] to-[#6049FE] hover:from-[#3D2DE0] hover:to-[#4A3AFF] text-white font-bold text-xs sm:text-sm shadow-xl shadow-indigo-500/25 transition-all flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-7 py-3.5 rounded-full bg-gradient-to-r from-[#FF6B00] via-[#FF8533] to-[#FF4500] hover:from-[#E65100] hover:to-[#FF6B00] text-white font-bold text-xs sm:text-sm shadow-xl shadow-orange-500/35 transition-all flex items-center justify-center gap-2"
                 >
                   <span>Book a Demo</span>
                   <ArrowRight size={15} />
@@ -239,9 +243,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-                        <WhatWeSolveSection />
+      {/* ─── SECTION 2A: WHAT WE SOLVE ─── */}
+      <WhatWeSolveSection />
 
-      {/* ─── SECTION 2B: HOW PLATFORM WORKS ─── */}
+      {/* ─── SECTION 2B: KEY BENEFITS (WHY MED RAPIDLY) ─── */}
+      <KeyBenefits />
+
+      {/* ─── SECTION 2C: HOW PLATFORM WORKS ─── */}
       <HowPlatformWorks />
 
       {/* ─── SECTION 3: CONNECTED SYSTEM & MULTI-TENANT ARCHITECTURE ─── */}

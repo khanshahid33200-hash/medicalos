@@ -175,23 +175,25 @@ export default function FAQAndAIAssistant() {
 
     // Contextual AI Response Logic for MedTech Platform
     setTimeout(() => {
-      let reply = "MedTech Fixaters provides a unified clinical operating system connecting hospital management, private doctor workspaces, and patient QR booking with strict multi-tenant data isolation.";
-      const q = textToSend.toLowerCase();
+      const q = textToSend.toLowerCase().trim();
+      let reply = "MedTech Fixaters is an all-in-one AI-powered Healthcare Operating System with an Inbuilt Patient CRM, Smart QR Appointments, Independent Doctor Workspaces, and Real-Time Live Queue Management.";
 
-      if (q.includes("qr") || q.includes("scan")) {
-        reply = "Every hospital receives a dedicated unique QR code. Patients scan the QR, access only that hospital's doctors, choose AI or manual booking, and receive an instant live queue token.";
-      } else if (q.includes("data") || q.includes("protect") || q.includes("separat") || q.includes("isolat") || q.includes("security")) {
-        reply = "Each hospital operates in a fully isolated workspace with database-level security rules. Hospital H1 cannot view Hospital H2 records, and doctors only see their assigned patients.";
-      } else if (q.includes("doctor") || q.includes("dashboard") || q.includes("manage")) {
-        reply = "Doctors receive a private dashboard with daily appointments, live queue tracking, patient medical history, digital prescription tools, and consultation status management.";
-      } else if (q.includes("ai") || q.includes("assist") || q.includes("triage")) {
-        reply = "MedTech AI collects symptoms, duration, and patient details to intelligently guide patients toward the right department and doctor. It is fully optional and skippable.";
-      } else if (q.includes("queue") || q.includes("token") || q.includes("wait")) {
-        reply = "Every doctor has an independent live queue. When consultations are completed, waiting positions and countdowns update live for all patients in real time.";
-      } else if (q.includes("block") || q.includes("suspend")) {
-        reply = "Authorized hospital administrators can immediately block or restore doctor accounts. Platform admins can manage hospital-level access.";
-      } else if (q.includes("revenue") || q.includes("report") || q.includes("history")) {
-        reply = "Hospital admins can track revenue, appointment volume, and staff roles, while patients and doctors maintain secure access to historical consultation records.";
+      if (q.includes("crm") || q.includes("retention") || q.includes("recall") || q.includes("whatsapp") || q.includes("nps") || q.includes("chronic")) {
+        reply = "MedTech Fixaters features an Inbuilt Patient & Hospital CRM Suite: 360° unified patient history, automated WhatsApp/SMS recall reminders 48 hours prior to visits, chronic care management pathways (Hypertension, Diabetes), and patient NPS feedback collection without needing third-party software.";
+      } else if (q.includes("qr") || q.includes("scan") || q.includes("standee") || q.includes("kiosk")) {
+        reply = "Every hospital receives a dedicated unique QR code and booking link. Patients scan the QR using any smartphone camera, access only that hospital's doctors, choose AI or direct booking, and receive an instant live mobile queue token.";
+      } else if (q.includes("data") || q.includes("protect") || q.includes("separat") || q.includes("isolat") || q.includes("security") || q.includes("hipaa") || q.includes("h1") || q.includes("h2")) {
+        reply = "Each hospital operates in a fully isolated workspace with database-level PostgreSQL Row-Level Security (RLS). Hospital H1 cannot view Hospital H2 records, and doctors strictly see only their assigned patients.";
+      } else if (q.includes("doctor") || q.includes("dashboard") || q.includes("prescription") || q.includes("rx") || q.includes("consult")) {
+        reply = "Doctors receive a private clinical workspace featuring sub-30-second consultations, live queue management, 1-click patient calling, complete longitudinal EMR history, and a digital prescription builder with WhatsApp PDF delivery and thermal printing.";
+      } else if (q.includes("queue") || q.includes("token") || q.includes("wait") || q.includes("display") || q.includes("lounge")) {
+        reply = "Every doctor has an independent live queue. When consultations are completed, waiting positions and countdowns update live simultaneously on patient phones and hospital waiting lounge display boards.";
+      } else if (q.includes("ai") || q.includes("assist") || q.includes("triage") || q.includes("symptom")) {
+        reply = "MedTech AI collects symptoms, duration, and patient details in natural language to intelligently guide patients toward the right department and doctor. It is completely optional and skippable.";
+      } else if (q.includes("price") || q.includes("pricing") || q.includes("cost") || q.includes("plan") || q.includes("demo")) {
+        reply = "MedTech Fixaters offers flexible deployment plans for standalone clinics, polyclinics, and multi-specialty hospitals with zero expensive hardware required. Click 'Book a Demo' in the navigation bar to schedule a 15-minute live walkthrough.";
+      } else if (q.includes("admin") || q.includes("revenue") || q.includes("roster") || q.includes("block") || q.includes("manage")) {
+        reply = "Hospital administrators have complete control: doctor and department rostering, OPD slot management, real-time workload monitoring, daily revenue tracking, and instant doctor account access controls.";
       }
 
       const aiMsg: ChatMessage = {
@@ -202,7 +204,7 @@ export default function FAQAndAIAssistant() {
 
       setMessages((prev) => [...prev, aiMsg]);
       setIsTyping(false);
-    }, 700);
+    }, 450);
   };
 
   useEffect(() => {

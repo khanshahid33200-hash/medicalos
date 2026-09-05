@@ -10,9 +10,10 @@ import {
 } from "lucide-react";
 
 const productLinks = [
-  ["Platform Features", "/features"],
+  ["Product Features", "/features"],
+  ["Upcoming Features", "/features/upcoming"],
   ["How It Works", "/how-it-works"],
-  ["Product Tour", "/product"],
+  ["System Architecture", "/architecture"],
   ["Pricing & Plans", "/pricing"],
 ];
 

@@ -78,8 +78,8 @@ export default function AIAutomationSection() {
         {/* ─── SECTION HEADER ─── */}
         <div className="mx-auto max-w-4xl text-center">
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 15, filter: "blur(8px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: true }}
             className="inline-flex items-center gap-2 rounded-full border border-blue-200/80 bg-blue-50/80 px-4 py-2 shadow-2xs backdrop-blur-xl"
           >
@@ -90,8 +90,8 @@ export default function AIAutomationSection() {
           </motion.div>
 
           <motion.h2
-            initial={{ opacity: 0, y: 25 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 25, filter: "blur(14px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: 0.1 }}
             className="mt-6 text-4xl font-semibold tracking-[-0.05em] text-[#17191F] sm:text-5xl lg:text-6xl leading-[1.12]"
@@ -103,8 +103,8 @@ export default function AIAutomationSection() {
           </motion.h2>
 
           <motion.p
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 15, filter: "blur(8px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-[#6B6F78] md:text-lg"
@@ -119,8 +119,8 @@ export default function AIAutomationSection() {
           {/* Central AI Intelligence Hub */}
           <div className="flex justify-center mb-12">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, scale: 0.88, filter: "blur(12px)" }}
+              whileInView={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
               viewport={{ once: true }}
               className="relative rounded-3xl border border-white/90 bg-gradient-to-b from-white/90 to-white/70 p-6 shadow-[0_20px_60px_rgba(37,99,235,0.12)] backdrop-blur-2xl text-center max-w-lg w-full overflow-hidden"
             >
@@ -173,8 +173,8 @@ export default function AIAutomationSection() {
               return (
                 <motion.div
                   key={item.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, y: 25, filter: "blur(10px)" }}
+                  whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.08, duration: 0.5 }}
                   whileHover={{ y: -5 }}
@@ -203,7 +203,7 @@ export default function AIAutomationSection() {
           {/* Bottom Philosophy Callout */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             viewport={{ once: true }}
             className="mt-10 text-center"
           >

@@ -565,7 +565,7 @@ function PatientStep({
       className="group relative rounded-[24px] border border-white bg-white/75 p-5 shadow-[0_15px_35px_rgba(15,23,42,0.06)] backdrop-blur-xl text-left"
     >
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+        <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
           {step.badge}
         </span>
         <span className="text-[10px] font-semibold text-slate-300">
@@ -580,7 +580,7 @@ function PatientStep({
         transition={{
           duration: 0.5,
         }}
-        className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
+        className="mt-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#FF6B00] via-[#FF8533] to-[#FF4500] text-white shadow-lg shadow-orange-500/25"
       >
         <Icon size={20} />
       </motion.div>

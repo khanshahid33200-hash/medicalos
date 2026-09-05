@@ -1061,3 +1061,50 @@ BEGIN
     );
 END;
 $function$;
+
+-- =====================================================
+-- CONTACT MESSAGES TABLE & POLICIES
+-- =====================================================
+CREATE TABLE IF NOT EXISTS public.contact_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    full_name TEXT NOT NULL,
+    organization TEXT,
+    email TEXT NOT NULL,
+    phone TEXT,
+    subject TEXT,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'read', 'responded', 'closed')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
+
+-- Allow public visitor submissions
+CREATE POLICY "Allow public insert on contact_messages"
+    ON public.contact_messages
+    FOR INSERT
+    WITH CHECK (true);
+
+-- Allow platform admin access
+CREATE POLICY "Allow platform admin to select contact_messages"
+    ON public.contact_messages
+    FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE profiles.id = auth.uid()
+            AND profiles.role = 'platform_admin'
+        )
+    );
+
+CREATE POLICY "Allow platform admin to update contact_messages"
+    ON public.contact_messages
+    FOR UPDATE
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE profiles.id = auth.uid()
+            AND profiles.role = 'platform_admin'
+        )
+    );

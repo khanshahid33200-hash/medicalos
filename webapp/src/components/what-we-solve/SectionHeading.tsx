@@ -6,7 +6,7 @@ export default function SectionHeading() {
       {/* Badge */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
-        whileInView={{ opacity: 1, y: 0 }}
+        whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         viewport={{ once: true }}
         transition={{ duration: 0.5 }}
         className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-4 py-1.5 shadow-xs backdrop-blur-md"
@@ -19,8 +19,8 @@ export default function SectionHeading() {
 
       {/* Main Heading */}
       <motion.h2
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: 25, filter: "blur(10px)" }}
+        whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         viewport={{ once: true }}
         transition={{ duration: 0.6, delay: 0.1 }}
         className="mt-6 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-[56px] leading-[1.15]"
@@ -35,7 +35,7 @@ export default function SectionHeading() {
       {/* Subtitle */}
       <motion.p
         initial={{ opacity: 0, y: 15 }}
-        whileInView={{ opacity: 1, y: 0 }}
+        whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         viewport={{ once: true }}
         transition={{ duration: 0.5, delay: 0.2 }}
         className="mx-auto mt-5 max-w-2xl text-xs sm:text-sm font-medium leading-relaxed text-slate-500"

@@ -9,6 +9,7 @@ import LandingPage from './pages/LandingPage'
 import ProductPage from './pages/ProductPage'
 import AboutUsPage from './pages/AboutUsPage'
 import FeaturesPage from './pages/FeaturesPage'
+import UpcomingFeaturesPage from './pages/UpcomingFeaturesPage'
 import HowItWorksPage from './pages/HowItWorksPage'
 import ArchitecturePage from './pages/ArchitecturePage'
 import PricingPage from './pages/PricingPage'
@@ -60,6 +61,7 @@ import HospitalQRManagementPage from './pages/hospitaldashboard/HospitalQRManage
 // Components
 import CookieBanner from './components/CookieBanner'
 import ScrollToTop from './components/ScrollToTop'
+import StickyChatbot from './components/StickyChatbot'
 
 function App() {
   useEffect(() => {
@@ -80,9 +82,12 @@ function App() {
       <Routes>
         {/* Public Marketing & Legal Pages */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/product" element={<ProductPage />} />
+        <Route path="/product" element={<Navigate to="/" replace />} />
         <Route path="/how-it-works" element={<HowItWorksPage />} />
         <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/features/product" element={<FeaturesPage />} />
+        <Route path="/features/upcoming" element={<UpcomingFeaturesPage />} />
+        <Route path="/upcoming-features" element={<UpcomingFeaturesPage />} />
         <Route path="/architecture" element={<ArchitecturePage />} />
         <Route path="/platform" element={<ArchitecturePage />} />
         <Route path="/pricing" element={<PricingPage />} />
@@ -280,6 +285,9 @@ function App() {
         {/* Custom 404 Catch-All Route */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+
+      {/* Global Sticky AI Chatbot */}
+      <StickyChatbot />
 
       {/* Global Cookie Consent Banner */}
       <CookieBanner />
